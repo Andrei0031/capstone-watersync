@@ -1206,11 +1206,19 @@ function updateRevenueChart(period) {
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
 
-    // Fetch paid revenue forecast only
-    $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ml', forecast_months: horizon })
+    // Fetch paid revenue forecast (use 'ensemble' instead of 'ml' since ML requires vendor folder)
+    $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ensemble', forecast_months: horizon })
     .done(function(paidData) {
+        console.log('Revenue forecast data received:', paidData);
         const actual = paidData.actual || [];
         const forecast = paidData.forecast || [];
+        
+        // If no data, show message
+        if (actual.length === 0 && forecast.length === 0) {
+            console.warn('No revenue data available');
+            loadActualDataOnly(period);
+            return;
+        }
 
         const actualLabels = actual.map(i => i.period);
         const actualValues = actual.map(i => parseFloat(i.revenue) || 0);
@@ -1329,8 +1337,58 @@ function loadActualDataOnly(period) {
         });
         
         console.log('Fallback chart created with actual data only');
+        
+        // If still no data, show empty chart with message
+        if (labels.length === 0 || values.every(v => v === 0)) {
+            console.warn('No revenue data found in database');
+            // Create empty chart with message
+            if (revenueChart) {
+                revenueChart.destroy();
+            }
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            revenueChart = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{
+                        label: 'No Revenue Data Available',
+                        data: [0],
+                        borderColor: '#ccc',
+                        backgroundColor: 'rgba(200, 200, 200, 0.1)',
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₱' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+        }
     }).fail(function(xhr, status, error) {
-        console.error('Failed to load actual data:', error);
+        console.error('Failed to load actual data:', error, xhr.responseText);
+        // Show error message in chart area
+        const chartContainer = document.querySelector('.chart-container');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<div class="alert alert-warning text-center">Unable to load revenue data. Please check your database connection.</div>';
+        }
     });
 }
 
