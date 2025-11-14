@@ -1,0 +1,83 @@
+# Database Configuration (contains sensitive credentials)
+db.php
+
+# User-generated content and uploads
+# Ignore files inside these folders, but keep the folders themselves
+uploads/*
+!uploads/.gitkeep
+uploads/meter_readings/*
+!uploads/meter_readings/.gitkeep
+qr_codes/*
+!qr_codes/.gitkeep
+storage/*
+!storage/.gitkeep
+
+# Log files
+*.log
+qr_error.log
+error.log
+
+# Vendor dependencies (Composer)
+vendor/
+composer.phar
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Node modules (if using Node.js)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (if using ML service)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Test files
+test_*.php
+quick_*.php
+
+# Large files that shouldn't be in Git
+*.zip
+*.tar.gz
+*.rar
+
+# Sensitive configuration files
+config.local.php
+secrets.php
+
+# QR code images (generated files)
+qr_meter_*.png
+
