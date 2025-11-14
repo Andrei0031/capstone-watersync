@@ -743,6 +743,18 @@ if(isset($_GET['action'])) {
     }
     
     header('Content-Type: application/json');
-    echo json_encode($response);
+    
+    // Add error handling for JSON encoding
+    $jsonResponse = json_encode($response);
+    if ($jsonResponse === false) {
+        error_log("JSON Encode Error: " . json_last_error_msg());
+        $response = [
+            'error' => 'Failed to encode response',
+            'json_error' => json_last_error_msg()
+        ];
+        $jsonResponse = json_encode($response);
+    }
+    
+    echo $jsonResponse;
     exit();
 } 
