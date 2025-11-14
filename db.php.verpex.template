@@ -1,0 +1,41 @@
+<?php
+/**
+ * Database Configuration for Verpex Hosting
+ * 
+ * INSTRUCTIONS:
+ * 1. Copy this file to db.php
+ * 2. Replace the values below with your Verpex database credentials
+ * 3. You can find these in your Verpex cPanel → Databases section
+ */
+
+// Database Configuration
+$host = 'localhost'; // Usually 'localhost' for Verpex shared hosting
+$user = 'your_verpex_db_username'; // Replace with your Verpex database username
+$pass = 'your_verpex_db_password'; // Replace with your Verpex database password
+$dbname = 'your_verpex_db_name'; // Replace with your Verpex database name
+
+try {
+    $conn = new mysqli($host, $user, $pass, $dbname);
+
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        throw new Exception("Database connection failed");
+    }
+
+    // Set the character set to utf8mb4
+    if (!$conn->set_charset("utf8mb4")) {
+        error_log("Error setting charset: " . $conn->error);
+    }
+
+} catch (Exception $e) {
+    error_log("Database connection error: " . $e->getMessage());
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Database connection error']);
+        exit();
+    } else {
+        die("Database connection error. Please try again later.");
+    }
+}
+?>
+

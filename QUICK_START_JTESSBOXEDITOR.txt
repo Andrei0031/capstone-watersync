@@ -1,0 +1,59 @@
+═══════════════════════════════════════════════════════════════
+  QUICK START: jTessBoxEditor for Tesseract Training
+═══════════════════════════════════════════════════════════════
+
+STEP 1: INSTALL JAVA
+─────────────────────
+1. Download: https://www.java.com/download/
+2. Install Java
+3. Verify: Open CMD, type "java -version"
+
+STEP 2: DOWNLOAD jTessBoxEditor
+────────────────────────────────
+1. Go to: https://sourceforge.net/projects/vietocr/files/jTessBoxEditor/
+2. Download: jTessBoxEditor.jar
+3. Save to: C:\TesseractTools\ (or any folder you prefer)
+
+STEP 3: RUN jTessBoxEditor
+───────────────────────────
+Option A - Using Batch File (Easiest):
+  1. Double-click: run_jtessboxeditor.bat
+  2. (Edit the file first to set correct path)
+
+Option B - Using Command Prompt:
+  1. Open CMD
+  2. Type: cd C:\TesseractTools
+  3. Type: java -Xmx1024m -jar jTessBoxEditor.jar
+
+STEP 4: TRAIN YOUR MODEL
+─────────────────────────
+1. In jTessBoxEditor → Click "Box Editor" tab
+2. Click "Open" → Select your training images
+   Location: C:\xampp\htdocs\CAPSTONE\tesseract_training\images\
+3. Draw boxes around "00792" in each image
+4. Label each box: "00792 m³"
+5. Click "Train" tab → Click "Train"
+6. Wait for training to complete
+7. Copy .traineddata file to: C:\Program Files\Tesseract-OCR\tessdata\
+8. Update upload_reading.php: $language = 'watermeter';
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+Problem: "java is not recognized"
+Solution: Install Java from https://www.java.com/download/
+
+Problem: "Could not find jTessBoxEditor.jar"
+Solution: Download jTessBoxEditor.jar and save it to the folder
+
+Problem: jTessBoxEditor won't open
+Solution: Try: java -Xmx2048m -jar jTessBoxEditor.jar
+
+═══════════════════════════════════════════════════════════════
+  NEED HELP?
+═══════════════════════════════════════════════════════════════
+
+See detailed guide: HOW_TO_RUN_JTESSBOXEDITOR.md
+Training tools guide: TESSERACT_TRAINING_TOOLS.md
+

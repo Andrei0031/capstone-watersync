@@ -1,0 +1,60 @@
+═══════════════════════════════════════════════════════════════
+  QUICK SETUP FOR jTessBoxEditor TRAINING
+═══════════════════════════════════════════════════════════════
+
+jTessBoxEditor is now open! Follow these steps:
+
+STEP 1: SET PATHS (Trainer Tab)
+────────────────────────────────
+1. Tesseract Executables: 
+   Click "..." → Navigate to:
+   C:\xampp\htdocs\CAPSTONE\jTessBoxEditor\tesseract-ocr
+
+2. Training Data:
+   Click "..." → Navigate to:
+   C:\xampp\htdocs\CAPSTONE\tesseract_training\watermeter-ground-truth
+   (Create folder if it doesn't exist)
+
+3. Language: watermeter
+4. Bootstrap Language: eng
+
+STEP 2: COLLECT TRAINING IMAGES
+─────────────────────────────────
+Option A - Use Training Helper:
+  http://192.168.100.5/CAPSTONE/train_tesseract_watermeter.php?action=upload
+  Upload 50-100+ images with correct readings
+
+Option B - Copy Images:
+  Copy images to: C:\xampp\htdocs\CAPSTONE\tesseract_training\watermeter-ground-truth\
+  Create .gt.txt files: meter_001.gt.txt containing "00792 m³"
+
+STEP 3: DRAW BOXES (Box Editor Tab)
+─────────────────────────────────────
+1. Click "Box Editor" tab
+2. Click "Open" → Select your training images
+3. Draw boxes around "00792" in each image
+4. Label: "00792 m³"
+5. Save (creates .box files)
+
+STEP 4: TRAIN MODEL (Trainer Tab)
+───────────────────────────────────
+1. Click "Trainer" tab
+2. Verify all paths are set correctly
+3. Training Mode: "Fine-tune from existing model"
+4. Click "Run"
+5. Wait for training (30 min - several hours)
+
+STEP 5: INSTALL MODEL
+──────────────────────
+1. Copy watermeter.traineddata to:
+   C:\Program Files\Tesseract-OCR\tessdata\
+
+2. Update upload_reading.php:
+   $language = 'watermeter';
+
+STEP 6: TEST
+────────────
+Test at: http://192.168.100.5/CAPSTONE/train_tesseract_watermeter.php?action=test
+
+═══════════════════════════════════════════════════════════════
+

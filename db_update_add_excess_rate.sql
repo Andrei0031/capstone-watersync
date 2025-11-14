@@ -1,0 +1,2 @@
+ALTER TABLE category_rates
+ADD COLUMN excess_rate DECIMAL(10,2) NOT NULL DEFAULT 20.00;
