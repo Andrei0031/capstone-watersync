@@ -1236,7 +1236,12 @@ function updateRevenueChart(period) {
 
     // Fetch paid revenue forecast using selected method
     console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method:', forecastMethod);
-    $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: forecastMethod, forecast_months: horizon })
+    $.ajax({
+        url: 'dashboard_data.php',
+        method: 'GET',
+        data: { action: 'revenue_forecast', period: period, forecast_method: forecastMethod, forecast_months: horizon },
+        dataType: 'json'
+    })
     .done(function(paidData) {
         console.log('✅ Revenue forecast data received:', paidData);
         console.log('📊 Response structure:', {
@@ -1396,7 +1401,12 @@ function updateRevenueChart(period) {
         console.warn('Response:', xhr.responseText);
         // Fallback to linear regression if selected method fails
         console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Linear (fallback)');
-        $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'linear', forecast_months: horizon })
+        $.ajax({
+            url: 'dashboard_data.php',
+            method: 'GET',
+            data: { action: 'revenue_forecast', period: period, forecast_method: 'linear', forecast_months: horizon },
+            dataType: 'json'
+        })
         .done(function(paidData) {
             console.log('Ensemble forecast data received:', paidData);
             const actual = paidData.actual || [];
@@ -1548,7 +1558,13 @@ function renderChartWithActualOnly(actualData, period) {
 function loadActualDataOnly(period) {
     console.log('🔄 Loading actual data only for period:', period);
     
-    $.get('dashboard_data.php', { action: 'revenue_data', period: period }, function(data) {
+    $.ajax({
+        url: 'dashboard_data.php',
+        method: 'GET',
+        data: { action: 'revenue_data', period: period },
+        dataType: 'json'
+    })
+    .done(function(data) {
         console.log('📥 Received data from revenue_data endpoint:', data);
         
         // Ensure data is an array
@@ -1645,7 +1661,8 @@ function loadActualDataOnly(period) {
                 }
             });
         }
-    }).fail(function(xhr, status, error) {
+    })
+    .fail(function(xhr, status, error) {
         console.error('Failed to load actual data:', error, xhr.responseText);
         // Show error message in chart area
         const chartContainer = document.querySelector('.chart-container');
