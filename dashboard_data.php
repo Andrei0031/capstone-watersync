@@ -12,7 +12,10 @@ if (!isset($_SESSION['admin_id'])) {
 
 include 'db.php';
 include 'revenue_forecasting.php';
-require_once __DIR__ . '/vendor/autoload.php';
+// Load Composer autoloader if available (optional - for Rubix ML)
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
 class DashboardData {
     private $conn;
