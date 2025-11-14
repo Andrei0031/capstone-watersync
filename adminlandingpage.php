@@ -1,5 +1,12 @@
 <?php
+// Enable error display for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Start session FIRST before any output
 session_start();
+
 if (!isset($_SESSION['admin_id'])) {
     header("Location: adminlogin.php");
     exit();
