@@ -1,4 +1,7 @@
 <?php
+// Start session FIRST before any output
+session_start();
+
 // Enable error display for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);

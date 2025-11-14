@@ -53,5 +53,4 @@ function validateSession() {
     $_SESSION['last_activity'] = time();
     
     return true;
-}
-?> 
+} 
