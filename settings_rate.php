@@ -3413,7 +3413,7 @@ function updateSMSFields() {
                                     <div class="mb-3">
                                         <label for="test_email" class="form-label">Test Email</label>
                                         <input type="email" class="form-control" id="test_email" name="test_email" 
-                                               placeholder="test@example.com" required>
+                                               placeholder="test@example.com">
                                     </div>
                                 </div>
                             </div>
