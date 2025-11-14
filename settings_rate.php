@@ -2254,6 +2254,8 @@ if ($mobile_users_result) {
                     throw new Error(errorMessage);
                 }
                 const data = await response.json();
+                
+                console.log('Fetched QR data:', data); // Debug log
 
                 if (data.success && data.clients) {
                     if (data.clients.length > 0) {
