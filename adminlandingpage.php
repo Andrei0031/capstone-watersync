@@ -1206,8 +1206,8 @@ function updateRevenueChart(period) {
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
 
-    // Fetch paid revenue forecast (use 'ensemble' instead of 'ml' since ML requires vendor folder)
-    $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ensemble', forecast_months: horizon })
+    // Fetch paid revenue forecast using ML method
+    $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ml', forecast_months: horizon })
     .done(function(paidData) {
         console.log('Revenue forecast data received:', paidData);
         const actual = paidData.actual || [];
