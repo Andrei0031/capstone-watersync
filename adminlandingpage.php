@@ -1142,8 +1142,22 @@ let paymentStatusChart;
 
 // Initialize charts
 $(document).ready(function() {
-    // Initialize Revenue Chart
-    updateRevenueChart('monthly');
+    // Wait for Chart.js to be fully loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js not loaded! Waiting for it...');
+        // Wait a bit and try again
+        setTimeout(function() {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js still not loaded after timeout!');
+                alert('Chart.js library failed to load. Please refresh the page.');
+                return;
+            }
+            updateRevenueChart('monthly');
+        }, 1000);
+    } else {
+        // Initialize Revenue Chart
+        updateRevenueChart('monthly');
+    }
     
     // Initialize Payment Status Chart
     const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
@@ -1295,8 +1309,33 @@ function updateRevenueChart(period) {
         console.log('Actual series (first 5):', actualSeries.slice(0, 5));
         console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
 
-        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-        revenueChart = new Chart(revenueCtx, {
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js is not loaded!');
+            alert('Chart.js library is missing. Please refresh the page.');
+            return;
+        }
+
+        // Check if canvas element exists
+        const canvasElement = document.getElementById('revenueChart');
+        if (!canvasElement) {
+            console.error('Canvas element #revenueChart not found!');
+            return;
+        }
+
+        // Destroy existing chart if it exists
+        if (revenueChart) {
+            revenueChart.destroy();
+        }
+
+        const revenueCtx = canvasElement.getContext('2d');
+        if (!revenueCtx) {
+            console.error('Could not get 2d context from canvas!');
+            return;
+        }
+
+        try {
+            revenueChart = new Chart(revenueCtx, {
             type: 'line',
             data: {
                 labels: allLabels,
@@ -1330,6 +1369,22 @@ function updateRevenueChart(period) {
                 }
             }
         });
+        console.log('Chart created successfully');
+        } catch (chartError) {
+            console.error('Error creating chart:', chartError);
+            console.error('Chart error details:', {
+                message: chartError.message,
+                stack: chartError.stack,
+                labels: allLabels.length,
+                actualSeriesLength: actualSeries.length,
+                forecastSeriesLength: forecastSeries.length
+            });
+            // Show error message to user
+            const chartContainer = document.querySelector('.chart-container');
+            if (chartContainer) {
+                chartContainer.innerHTML = '<div class="alert alert-danger">Error rendering chart: ' + chartError.message + '</div>';
+            }
+        }
     })
     .fail(function(xhr, status, error){
         console.warn(forecastMethod.toUpperCase() + ' forecast failed, trying linear regression as fallback:', error);
