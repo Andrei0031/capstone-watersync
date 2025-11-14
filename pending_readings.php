@@ -5,23 +5,24 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-// Enable error display for debugging
+// Enable error display for debugging (remove in production)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Load vendor autoload if it exists (for Tesseract OCR)
+$tesseract_available = false;
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once 'vendor/autoload.php';
-    if (class_exists('thiagoalessio\TesseractOCR\TesseractOCR')) {
-        use thiagoalessio\TesseractOCR\TesseractOCR;
-        define('TESSERACT_AVAILABLE', true);
-    } else {
-        define('TESSERACT_AVAILABLE', false);
+    try {
+        require_once __DIR__ . '/vendor/autoload.php';
+        if (class_exists('thiagoalessio\TesseractOCR\TesseractOCR')) {
+            $tesseract_available = true;
+        }
+    } catch (Exception $e) {
+        error_log("Failed to load Tesseract: " . $e->getMessage());
     }
-} else {
-    define('TESSERACT_AVAILABLE', false);
 }
+define('TESSERACT_AVAILABLE', $tesseract_available);
 
 include 'db.php';
 include 'automated_bill_creation.php';
