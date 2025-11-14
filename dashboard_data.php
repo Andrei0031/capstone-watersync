@@ -14,7 +14,11 @@ include 'db.php';
 include 'revenue_forecasting.php';
 // Load Composer autoloader if available (optional - for Rubix ML)
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    // Suppress deprecation warnings from vendor libraries (PHP 8.2+)
+    $oldErrorReporting = error_reporting();
+    error_reporting($oldErrorReporting & ~E_DEPRECATED);
     require_once __DIR__ . '/vendor/autoload.php';
+    error_reporting($oldErrorReporting);
 }
 
 class DashboardData {

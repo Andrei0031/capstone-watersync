@@ -1,8 +1,8 @@
 <?php
-// Enable error display for debugging
+// Enable error display for debugging (but suppress vendor deprecation warnings)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+error_reporting(E_ALL & ~E_DEPRECATED); // Suppress deprecation warnings from vendor libraries
 
 // Start session FIRST before any output
 session_start();

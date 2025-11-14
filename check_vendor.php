@@ -4,10 +4,10 @@
  * Check if vendor folder and dependencies are properly installed
  */
 
-// Enable error display
+// Enable error display (but suppress vendor deprecation warnings)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+error_reporting(E_ALL & ~E_DEPRECATED); // Suppress deprecation warnings from vendor libraries
 
 echo "<h1>Vendor Folder Diagnostic</h1>";
 echo "<pre>";
