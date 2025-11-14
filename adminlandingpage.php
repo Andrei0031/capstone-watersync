@@ -1207,15 +1207,30 @@ function updateRevenueChart(period) {
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
 
     // Fetch paid revenue forecast using ML method
+    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: ML');
     $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ml', forecast_months: horizon })
     .done(function(paidData) {
         console.log('Revenue forecast data received:', paidData);
+        console.log('Response structure:', {
+            hasActual: !!paidData.actual,
+            hasForecast: !!paidData.forecast,
+            actualLength: paidData.actual ? paidData.actual.length : 0,
+            forecastLength: paidData.forecast ? paidData.forecast.length : 0
+        });
+        
         const actual = paidData.actual || [];
         const forecast = paidData.forecast || [];
         
-        // If no data, show message
+        // If no forecast data but have actual, still show chart with actual only
+        if (forecast.length === 0 && actual.length > 0) {
+            console.warn('No forecast data, showing actual data only');
+            loadActualDataOnly(period);
+            return;
+        }
+        
+        // If no data at all, show message
         if (actual.length === 0 && forecast.length === 0) {
-            console.warn('No revenue data available');
+            console.warn('No revenue data available at all');
             loadActualDataOnly(period);
             return;
         }
@@ -1250,6 +1265,11 @@ function updateRevenueChart(period) {
             { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
             { label: 'Forecasted Revenue (Paid)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
         ];
+        
+        console.log('ML forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
+        console.log('All labels:', allLabels);
+        console.log('Actual series (first 5):', actualSeries.slice(0, 5));
+        console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
 
         const revenueCtx = document.getElementById('revenueChart').getContext('2d');
         revenueChart = new Chart(revenueCtx, {
@@ -1289,13 +1309,26 @@ function updateRevenueChart(period) {
     })
     .fail(function(xhr, status, error){
         console.warn('ML forecast failed, trying ensemble method:', error);
+        console.warn('Response:', xhr.responseText);
         // Fallback to ensemble method if ML fails
+        console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Ensemble (fallback)');
         $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ensemble', forecast_months: horizon })
         .done(function(paidData) {
+            console.log('Ensemble forecast data received:', paidData);
             const actual = paidData.actual || [];
             const forecast = paidData.forecast || [];
             
+            console.log('Ensemble - Actual:', actual.length, 'Forecast:', forecast.length);
+            
+            // If no forecast data but have actual, still show chart with actual only
+            if (forecast.length === 0 && actual.length > 0) {
+                console.warn('No ensemble forecast data, showing actual data only');
+                loadActualDataOnly(period);
+                return;
+            }
+            
             if (actual.length === 0 && forecast.length === 0) {
+                console.warn('No data at all in ensemble forecast');
                 loadActualDataOnly(period);
                 return;
             }
@@ -1327,6 +1360,10 @@ function updateRevenueChart(period) {
                 { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
                 { label: 'Forecasted Revenue (Paid) - Ensemble', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
             ];
+            
+            console.log('Ensemble forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
+            console.log('Actual series:', actualSeries);
+            console.log('Forecast series:', forecastSeries);
             
             const revenueCtx = document.getElementById('revenueChart').getContext('2d');
             revenueChart = new Chart(revenueCtx, {
