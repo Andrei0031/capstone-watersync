@@ -127,19 +127,24 @@ class DashboardData {
     }
     
     public function getPaymentStatusData() {
-        // Use the exact same query as debug_status.php
+        // Get only the LATEST bill per customer (most recent billing period)
         $sql = "SELECT 
-                id,
-                status,
-                due_date,
-                total,
+                bl.id,
+                bl.status,
+                bl.due_date,
+                bl.total,
                 CASE 
-                    WHEN status = 1 THEN 'paid'
-                    WHEN status = 0 AND due_date < CURRENT_DATE() THEN 'overdue'
-                    WHEN status = 0 THEN 'pending'
+                    WHEN bl.status = 1 THEN 'paid'
+                    WHEN bl.status = 0 AND bl.due_date < CURRENT_DATE() THEN 'overdue'
+                    WHEN bl.status = 0 THEN 'pending'
                 END as payment_status
-                FROM billing_list
-                ORDER BY id";
+                FROM billing_list bl
+                INNER JOIN (
+                    SELECT client_id, MAX(id) as latest_bill_id
+                    FROM billing_list
+                    GROUP BY client_id
+                ) latest ON bl.id = latest.latest_bill_id
+                ORDER BY bl.id";
         
         $result = $this->conn->query($sql);
         
@@ -151,7 +156,7 @@ class DashboardData {
             'total_bills' => 0
         ];
         
-        // Count each status exactly as in debug_status.php
+        // Count each status (latest bill per customer only)
         if ($result) {
             while ($row = $result->fetch_assoc()) {
                 $data['total_bills']++;
