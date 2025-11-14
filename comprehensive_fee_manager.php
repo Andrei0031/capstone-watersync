@@ -4,7 +4,7 @@
  * Handles all types of additional fees across all system workflows
  */
 
-function getApplicableFees($client_id, $context = 'regular_bill', $base_amount = 0, $conn) {
+function getApplicableFees($client_id, $conn, $context = 'regular_bill', $base_amount = 0) {
     try {
         // Get client info
         $client_stmt = $conn->prepare("SELECT * FROM client_list WHERE id = ?");
@@ -135,7 +135,7 @@ function applyFeesToBill($bill_id, $fees_data, $conn) {
     }
 }
 
-function calculateBillWithFees($client_id, $reading_value, $previous_reading, $context = 'regular_bill', $conn) {
+function calculateBillWithFees($client_id, $reading_value, $previous_reading, $conn, $context = 'regular_bill') {
     try {
         // Get client and rate info
         $client_stmt = $conn->prepare("
@@ -163,7 +163,7 @@ function calculateBillWithFees($client_id, $reading_value, $previous_reading, $c
         }
         
         // Get applicable fees
-        $fees_data = getApplicableFees($client_id, $context, $base_total, $conn);
+        $fees_data = getApplicableFees($client_id, $conn, $context, $base_total);
         
         if (!$fees_data['success']) {
             return $fees_data;
@@ -273,7 +273,7 @@ function applyConnectionFee($client_id, $conn) {
         }
         
         // Apply connection fee
-        $fees_data = getApplicableFees($client_id, 'new_connection', 0, $conn);
+        $fees_data = getApplicableFees($client_id, $conn, 'new_connection', 0);
         if ($fees_data['success']) {
             // Filter to only connection fee
             $connection_fees = array_filter($fees_data['fees'], function($fee) {
@@ -313,7 +313,7 @@ function applyReconnectionFee($client_id, $conn) {
         }
         
         // Apply reconnection fee
-        $fees_data = getApplicableFees($client_id, 'reconnection', 0, $conn);
+        $fees_data = getApplicableFees($client_id, $conn, 'reconnection', 0);
         if ($fees_data['success']) {
             // Filter to only reconnection fee
             $reconnection_fees = array_filter($fees_data['fees'], function($fee) {

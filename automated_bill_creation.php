@@ -67,7 +67,7 @@ function createAutomatedBill($client_id, $reading_value, $billing_cycle_id, $con
         
         // Get applicable additional fees using comprehensive fee system
         require_once 'comprehensive_fee_manager.php';
-        $fees_result = getApplicableFees($client_id, 'regular_bill', $base_total, $conn);
+        $fees_result = getApplicableFees($client_id, $conn, 'regular_bill', $base_total);
         
         if (!$fees_result['success']) {
             throw new Exception("Failed to calculate fees: " . $fees_result['error']);

@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             // Calculate consumption and total with comprehensive fees
             require_once 'comprehensive_fee_manager.php';
-            $bill_calculation = calculateBillWithFees($client_id, $reading, $previous, 'regular_bill', $conn);
+            $bill_calculation = calculateBillWithFees($client_id, $reading, $previous, $conn, 'regular_bill');
             
             if (!$bill_calculation['success']) {
                 throw new Exception("Failed to calculate bill: " . $bill_calculation['error']);

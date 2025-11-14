@@ -558,7 +558,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $is_old_bill = strtotime($reading_date) < strtotime('-30 days');
                                 
                                 if (!$is_old_bill && function_exists('getApplicableFees')) {
-                                    $fees_result = getApplicableFees($client_id, 'regular_bill', $base_total, $conn);
+                                    $fees_result = getApplicableFees($client_id, $conn, 'regular_bill', $base_total);
                                     $additional_fees = $fees_result['success'] ? $fees_result['total_fees'] : 0;
                                 }
                                 
