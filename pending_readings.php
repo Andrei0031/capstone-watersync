@@ -5,19 +5,27 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-// Enable error display for debugging (remove in production)
+// Enable error display for debugging (suppress deprecation warnings from vendor libraries)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+error_reporting(E_ALL & ~E_DEPRECATED); // Suppress deprecation warnings (PHP 8.2+)
 
 // Load vendor autoload if it exists (for Tesseract OCR)
 $tesseract_available = false;
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     try {
+        // Temporarily suppress deprecation warnings from vendor code
+        $oldErrorReporting = error_reporting();
+        error_reporting($oldErrorReporting & ~E_DEPRECATED);
+        
         require_once __DIR__ . '/vendor/autoload.php';
+        
         if (class_exists('thiagoalessio\TesseractOCR\TesseractOCR')) {
             $tesseract_available = true;
         }
+        
+        // Restore error reporting
+        error_reporting($oldErrorReporting);
     } catch (Exception $e) {
         error_log("Failed to load Tesseract: " . $e->getMessage());
     }
