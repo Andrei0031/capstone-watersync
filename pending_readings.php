@@ -1820,6 +1820,51 @@ $failed_result = $conn->query($failed_sql);
         </div>
     </div>
 
+    <!-- Processing Loading Modal -->
+    <div class="modal fade" id="processingLoadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Processing...</span>
+                    </div>
+                    <h5 class="mb-2">Processing Meter Readings...</h5>
+                    <p class="text-muted mb-0" id="processingStatus">Please wait while we process the OCR...</p>
+                    <div class="progress mt-3" style="height: 5px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Result Modal -->
+    <div class="modal fade" id="processingResultModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" id="resultModalHeader">
+                    <h5 class="modal-title" id="resultModalTitle">
+                        <i class="fas fa-check-circle me-2"></i>Processing Complete
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4" id="resultModalBody">
+                    <div id="resultIcon" class="mb-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h5 id="resultMessage">Processing completed successfully!</h5>
+                    <p class="text-muted" id="resultDetails"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-sync me-2"></i>Refresh Page
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS and other scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -1849,6 +1894,104 @@ $failed_result = $conn->query($failed_sql);
                 const imagePath = button.getAttribute('data-image');
                 document.getElementById('modalImage').src = imagePath;
             });
+
+            // Handle Processing Form Submission with AJAX
+            const processingForm = document.getElementById('processingForm');
+            if (processingForm) {
+                processingForm.addEventListener('submit', function(e) {
+                    e.preventDefault(); // Prevent default form submission
+                    
+                    // Get selected readings
+                    const selectedReadings = document.querySelectorAll('input[name="selected_readings[]"]:checked');
+                    
+                    if (selectedReadings.length === 0) {
+                        alert('Please select at least one reading to process.');
+                        return;
+                    }
+                    
+                    // Show loading modal
+                    const loadingModal = new bootstrap.Modal(document.getElementById('processingLoadingModal'));
+                    loadingModal.show();
+                    
+                    // Update status text
+                    document.getElementById('processingStatus').textContent = 
+                        `Processing ${selectedReadings.length} reading(s)... This may take a moment.`;
+                    
+                    // Prepare form data
+                    const formData = new FormData(this);
+                    formData.append('process_selected', '1');
+                    
+                    // Submit via AJAX
+                    fetch('pending_readings.php', {
+                        method: 'POST',
+                        body: formData,
+                        redirect: 'manual' // Don't follow redirects automatically
+                    })
+                    .then(response => {
+                        // Check if it's a redirect (302, 303, 307, etc.)
+                        if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                            // Get redirect location from headers
+                            const redirectUrl = response.headers.get('Location') || response.url;
+                            
+                            // Parse URL parameters from redirect
+                            try {
+                                const url = new URL(redirectUrl, window.location.origin);
+                                const status = url.searchParams.get('status') || 'success';
+                                const message = decodeURIComponent(url.searchParams.get('message') || 'Processing completed!');
+                                
+                                // Hide loading modal
+                                loadingModal.hide();
+                                
+                                // Show result modal
+                                setTimeout(() => {
+                                    showProcessingResult(status, message);
+                                }, 300);
+                                
+                                return;
+                            } catch (e) {
+                                console.error('Error parsing redirect URL:', e);
+                            }
+                        }
+                        
+                        // If not a redirect, check response
+                        return response.text();
+                    })
+                    .then(html => {
+                        if (!html) return; // Already handled as redirect
+                        
+                        // Hide loading modal
+                        loadingModal.hide();
+                        
+                        // Try to parse the response for redirect URL in the HTML
+                        const match = html.match(/Location:\s*pending_readings\.php\?(.+?)[\s"'<]/);
+                        if (match && match[1]) {
+                            const urlParams = new URLSearchParams(match[1]);
+                            const status = urlParams.get('status') || 'success';
+                            const message = decodeURIComponent(urlParams.get('message') || 'Processing completed!');
+                            
+                            setTimeout(() => {
+                                showProcessingResult(status, message);
+                            }, 300);
+                        } else {
+                            // Fallback: assume success
+                            setTimeout(() => {
+                                showProcessingResult('success', 'Processing completed! Refreshing page...');
+                                setTimeout(() => location.reload(), 2000);
+                            }, 300);
+                        }
+                    })
+                    .catch(error => {
+                        // Hide loading modal
+                        loadingModal.hide();
+                        
+                        // Show error result
+                        console.error('Processing error:', error);
+                        setTimeout(() => {
+                            showProcessingResult('error', 'An error occurred while processing. Please try again.');
+                        }, 300);
+                    });
+                });
+            }
 
             // Handle checkboxes for pending readings
             const selectAllPending = document.getElementById('selectAllPending');
@@ -2012,6 +2155,45 @@ $failed_result = $conn->query($failed_sql);
         function viewImage(imagePath) {
             document.getElementById('modalImage').src = imagePath;
             new bootstrap.Modal(document.getElementById('imageModal')).show();
+        }
+
+        // Function to show processing result modal
+        function showProcessingResult(status, message) {
+            const resultModal = new bootstrap.Modal(document.getElementById('processingResultModal'));
+            const resultIcon = document.getElementById('resultIcon');
+            const resultTitle = document.getElementById('resultModalTitle');
+            const resultMessage = document.getElementById('resultMessage');
+            const resultDetails = document.getElementById('resultDetails');
+            const resultHeader = document.getElementById('resultModalHeader');
+            
+            // Configure modal based on status
+            if (status === 'success') {
+                resultIcon.innerHTML = '<i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>';
+                resultTitle.innerHTML = '<i class="fas fa-check-circle me-2"></i>Processing Complete';
+                resultHeader.className = 'modal-header bg-success text-white';
+                resultMessage.textContent = 'Successfully processed all readings!';
+                resultDetails.textContent = message || 'All selected meter readings have been processed successfully.';
+            } else if (status === 'partial') {
+                resultIcon.innerHTML = '<i class="fas fa-exclamation-circle text-warning" style="font-size: 4rem;"></i>';
+                resultTitle.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Partially Complete';
+                resultHeader.className = 'modal-header bg-warning text-dark';
+                resultMessage.textContent = 'Some readings processed with warnings';
+                resultDetails.textContent = message || 'Some readings were processed, but some failed. Check the failed tab for details.';
+            } else if (status === 'warning') {
+                resultIcon.innerHTML = '<i class="fas fa-info-circle text-info" style="font-size: 4rem;"></i>';
+                resultTitle.innerHTML = '<i class="fas fa-info-circle me-2"></i>Notice';
+                resultHeader.className = 'modal-header bg-info text-white';
+                resultMessage.textContent = 'Processing Notice';
+                resultDetails.textContent = message || 'Please check your selection and try again.';
+            } else {
+                resultIcon.innerHTML = '<i class="fas fa-times-circle text-danger" style="font-size: 4rem;"></i>';
+                resultTitle.innerHTML = '<i class="fas fa-times-circle me-2"></i>Processing Failed';
+                resultHeader.className = 'modal-header bg-danger text-white';
+                resultMessage.textContent = 'Failed to process readings';
+                resultDetails.textContent = message || 'An error occurred while processing. Please try again or contact support.';
+            }
+            
+            resultModal.show();
         }
 
         function downloadImage() {
