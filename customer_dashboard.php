@@ -2020,42 +2020,12 @@ $disconnection_notices = $stmt->get_result();
         });
     });
 
-    // Tab navigation from URL hash
-    function initTabFromHash() {
-        const hash = window.location.hash;
-        if (hash) {
-            const hashMap = {
-                '#overview': '#nav-overview',
-                '#notifications': '#nav-notifications', 
-                '#billing': '#nav-billing',
-                '#reports': '#nav-reports'
-            };
-            
-            const targetHash = hashMap[hash] || hash;
-            const tabButton = document.querySelector(`[data-bs-target="${targetHash}"]`);
-            if (tabButton) {
-                tabButton.click();
-            }
-            
-            // Show/hide water reports form based on hash
-            const waterReportsForm = document.getElementById('water-reports-form');
-            if (waterReportsForm) {
-                if (targetHash === '#nav-reports') {
-                    waterReportsForm.style.display = 'block';
-                } else {
-                    waterReportsForm.style.display = 'none';
-                }
-            }
-        }
-    }
+    // Tab navigation from URL hash - DISABLED (no hash in URL)
+    // Removed to prevent hash from appearing in URL when switching tabs
 
-    // Update URL hash when tab changes
+    // Handle tab changes (without updating URL hash)
     document.addEventListener('shown.bs.tab', function (e) {
         const target = e.target.getAttribute('data-bs-target');
-        if (target) {
-            const cleanHash = target.replace('nav-', '');
-            window.location.hash = cleanHash;
-        }
         
         // Show/hide water reports form based on active tab
         const waterReportsForm = document.getElementById('water-reports-form');
@@ -2067,9 +2037,6 @@ $disconnection_notices = $stmt->get_result();
             }
         }
     });
-
-    // Initialize tab from hash on page load
-    window.addEventListener('load', initTabFromHash);
 
     // View report details function
     window.viewReportDetails = function(reportId) {
