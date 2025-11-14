@@ -1483,6 +1483,12 @@ function loadActualDataOnly(period) {
     console.log('Loading actual data only for period:', period);
     
     $.get('dashboard_data.php', { action: 'revenue_data', period: period }, function(data) {
+        // Ensure data is an array
+        if (!Array.isArray(data)) {
+            console.error('Expected array but got:', typeof data, data);
+            data = [];
+        }
+        
         const labels = data.map(item => item.period);
         const values = data.map(item => parseFloat(item.revenue));
         
@@ -1656,23 +1662,41 @@ document.addEventListener('DOMContentLoaded', function() {
         const gridColor = isDark ? '#393b40' : '#dee2e6';
         const backgroundColor = isDark ? '#2d2f34' : '#fff';
         
-        // Update Revenue Chart
-        if (window.revenueChart) {
-            window.revenueChart.options.scales.y.grid.color = gridColor;
-            window.revenueChart.options.scales.x.grid.color = gridColor;
-            window.revenueChart.options.scales.y.ticks.color = textColor;
-            window.revenueChart.options.scales.x.ticks.color = textColor;
-            window.revenueChart.options.plugins.title.color = textColor;
-            window.revenueChart.data.datasets[0].borderColor = isDark ? '#4e9eff' : '#4e73df';
-            window.revenueChart.data.datasets[0].backgroundColor = isDark ? 'rgba(78, 158, 255, 0.1)' : 'rgba(78, 115, 223, 0.05)';
-            window.revenueChart.update();
+        // Update Revenue Chart (with proper null checks)
+        if (revenueChart && revenueChart.options && revenueChart.options.scales) {
+            try {
+                if (revenueChart.options.scales.y) {
+                    revenueChart.options.scales.y.grid.color = gridColor;
+                    revenueChart.options.scales.y.ticks.color = textColor;
+                }
+                if (revenueChart.options.scales.x) {
+                    revenueChart.options.scales.x.grid.color = gridColor;
+                    revenueChart.options.scales.x.ticks.color = textColor;
+                }
+                if (revenueChart.options.plugins && revenueChart.options.plugins.title) {
+                    revenueChart.options.plugins.title.color = textColor;
+                }
+                if (revenueChart.data && revenueChart.data.datasets && revenueChart.data.datasets[0]) {
+                    revenueChart.data.datasets[0].borderColor = isDark ? '#4e9eff' : '#4e73df';
+                    revenueChart.data.datasets[0].backgroundColor = isDark ? 'rgba(78, 158, 255, 0.1)' : 'rgba(78, 115, 223, 0.05)';
+                }
+                revenueChart.update();
+            } catch (e) {
+                console.warn('Could not update revenue chart theme:', e);
+            }
         }
         
-        // Update Payment Status Chart
-        if (window.paymentStatusChart) {
-            window.paymentStatusChart.options.plugins.legend.labels.color = textColor;
-            window.paymentStatusChart.options.plugins.legend.labels.boxWidth = 15;
-            window.paymentStatusChart.update();
+        // Update Payment Status Chart (with proper null checks)
+        if (paymentStatusChart && paymentStatusChart.options && paymentStatusChart.options.plugins) {
+            try {
+                if (paymentStatusChart.options.plugins.legend && paymentStatusChart.options.plugins.legend.labels) {
+                    paymentStatusChart.options.plugins.legend.labels.color = textColor;
+                    paymentStatusChart.options.plugins.legend.labels.boxWidth = 15;
+                }
+                paymentStatusChart.update();
+            } catch (e) {
+                console.warn('Could not update payment status chart theme:', e);
+            }
         }
 
         // Update other elements that might need color adjustment
