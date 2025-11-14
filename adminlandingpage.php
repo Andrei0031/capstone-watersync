@@ -1238,8 +1238,8 @@ function updateRevenueChart(period) {
     console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method:', forecastMethod);
     $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: forecastMethod, forecast_months: horizon })
     .done(function(paidData) {
-        console.log('Revenue forecast data received:', paidData);
-        console.log('Response structure:', {
+        console.log('✅ Revenue forecast data received:', paidData);
+        console.log('📊 Response structure:', {
             hasActual: !!paidData.actual,
             hasForecast: !!paidData.forecast,
             actualLength: paidData.actual ? paidData.actual.length : 0,
@@ -1249,19 +1249,24 @@ function updateRevenueChart(period) {
         const actual = paidData.actual || [];
         const forecast = paidData.forecast || [];
         
-        // If no forecast data but have actual, still show chart with actual only
-        if (forecast.length === 0 && actual.length > 0) {
-            console.warn('No forecast data, showing actual data only');
+        console.log('🔍 After assignment - Actual:', actual.length, 'Forecast:', forecast.length);
+        
+        // If we have actual data, always try to show the chart (even without forecast)
+        if (actual.length === 0) {
+            console.error('❌ No actual revenue data found!');
             loadActualDataOnly(period);
             return;
         }
         
-        // If no data at all, show message
-        if (actual.length === 0 && forecast.length === 0) {
-            console.warn('No revenue data available at all');
-            loadActualDataOnly(period);
+        // If no forecast but have actual, show chart with actual only  
+        if (forecast.length === 0) {
+            console.warn('⚠️ No forecast data, but we have actual data. Showing actual only.');
+            // Don't call loadActualDataOnly, just use the actual data we already have
+            renderChartWithActualOnly(actual, period);
             return;
         }
+        
+        console.log('✅ Both actual and forecast data available. Rendering full chart.');
 
         const actualLabels = actual.map(i => i.period);
         const actualValues = actual.map(i => parseFloat(i.revenue) || 0);
@@ -1479,13 +1484,76 @@ function updateRevenueChart(period) {
     });
 }
 
+function renderChartWithActualOnly(actualData, period) {
+    console.log('📊 Rendering chart with actual data only:', actualData.length, 'points');
+    
+    if (revenueChart) {
+        revenueChart.destroy();
+    }
+    
+    const labels = actualData.map(item => item.period);
+    const values = actualData.map(item => parseFloat(item.revenue) || 0);
+    
+    console.log('Labels:', labels.slice(0, 5), '...');
+    console.log('Values:', values.slice(0, 5), '...');
+    
+    const canvasElement = document.getElementById('revenueChart');
+    if (!canvasElement) {
+        console.error('❌ Canvas element not found!');
+        return;
+    }
+    
+    const revenueCtx = canvasElement.getContext('2d');
+    revenueChart = new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Actual Revenue (Paid)',
+                data: values,
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointBackgroundColor: '#4e73df',
+                pointBorderColor: '#4e73df',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '₱' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+    
+    console.log('✅ Chart rendered successfully with actual data');
+}
+
 function loadActualDataOnly(period) {
-    console.log('Loading actual data only for period:', period);
+    console.log('🔄 Loading actual data only for period:', period);
     
     $.get('dashboard_data.php', { action: 'revenue_data', period: period }, function(data) {
+        console.log('📥 Received data from revenue_data endpoint:', data);
+        
         // Ensure data is an array
         if (!Array.isArray(data)) {
-            console.error('Expected array but got:', typeof data, data);
+            console.error('❌ Expected array but got:', typeof data, data);
             data = [];
         }
         
