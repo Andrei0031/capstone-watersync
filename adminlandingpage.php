@@ -1294,16 +1294,6 @@ function updateRevenueChart(period) {
         console.log('All labels:', allLabels);
         console.log('Actual series (first 5):', actualSeries.slice(0, 5));
         console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
-        
-        // Update label based on method
-        const methodLabels = {
-            'linear': 'Linear Regression',
-            'ml': 'Machine Learning',
-            'ensemble': 'Ensemble',
-            'seasonal': 'Seasonal',
-            'moving_average': 'Moving Average'
-        };
-        const methodLabel = methodLabels[forecastMethod] || forecastMethod;
 
         const revenueCtx = document.getElementById('revenueChart').getContext('2d');
         revenueChart = new Chart(revenueCtx, {
