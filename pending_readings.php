@@ -5,8 +5,23 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-require_once 'vendor/autoload.php';
-use thiagoalessio\TesseractOCR\TesseractOCR;
+// Enable error display for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Load vendor autoload if it exists (for Tesseract OCR)
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once 'vendor/autoload.php';
+    if (class_exists('thiagoalessio\TesseractOCR\TesseractOCR')) {
+        use thiagoalessio\TesseractOCR\TesseractOCR;
+        define('TESSERACT_AVAILABLE', true);
+    } else {
+        define('TESSERACT_AVAILABLE', false);
+    }
+} else {
+    define('TESSERACT_AVAILABLE', false);
+}
 
 include 'db.php';
 include 'automated_bill_creation.php';
@@ -15,6 +30,11 @@ include 'automated_bill_creation.php';
  * Check if Tesseract OCR is available on the system
  */
 function isTesseractAvailable() {
+    // First check if the PHP class is available
+    if (!defined('TESSERACT_AVAILABLE') || !TESSERACT_AVAILABLE) {
+        return false;
+    }
+    
     $possiblePaths = [
         'tesseract',
         'C:\\Program Files\\Tesseract-OCR\\tesseract.exe',
