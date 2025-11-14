@@ -537,6 +537,12 @@ class DashboardData {
      */
     private function embeddedPhpMlForecast($forecastMonths = 6) {
         try {
+            // Check if vendor/autoload.php exists
+            $autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
+            if (!file_exists($autoloadPath)) {
+                error_log("ML Forecast: vendor/autoload.php not found at: " . $autoloadPath);
+                return [];
+            }
             // Build ALL historical monthly revenue (no date limit) to include old imported records
             $historical = [];
             $res = $this->conn->query("SELECT DATE_FORMAT(reading_date, '%Y-%m') as period, SUM(total) as revenue FROM billing_list WHERE status = 1 GROUP BY period ORDER BY period ASC");
@@ -574,11 +580,23 @@ class DashboardData {
             $rtClass = '\\Rubix\\ML\\Regressors\\RegressionTree';
             $pmClass = '\\Rubix\\ML\\PersistentModel';
             $fsClass = '\\Rubix\\ML\\Persisters\\Filesystem';
-            if (!class_exists($gbClass) || !class_exists($rtClass)) return [];
+            if (!class_exists($gbClass) || !class_exists($rtClass)) {
+                error_log("ML Forecast: Rubix ML classes not found. GradientBoost: " . (class_exists($gbClass) ? 'yes' : 'no') . ", RegressionTree: " . (class_exists($rtClass) ? 'yes' : 'no'));
+                return [];
+            }
 
             // Prepare persistence
             $modelsDir = __DIR__ . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'models';
-            if (!is_dir($modelsDir)) { @mkdir($modelsDir, 0775, true); }
+            if (!is_dir($modelsDir)) { 
+                if (!@mkdir($modelsDir, 0775, true)) {
+                    error_log("ML Forecast: Failed to create storage/models directory: " . $modelsDir);
+                    return [];
+                }
+            }
+            if (!is_writable($modelsDir)) {
+                error_log("ML Forecast: storage/models directory is not writable: " . $modelsDir);
+                return [];
+            }
             $modelPath = $modelsDir . DIRECTORY_SEPARATOR . 'revenue_gbr.model';
 
             // Build estimator and persistent wrapper
@@ -626,6 +644,7 @@ class DashboardData {
             }
             return $forecast;
         } catch (\Throwable $e) {
+            error_log("ML Forecast Error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
             return [];
         }
     }
