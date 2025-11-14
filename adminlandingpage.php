@@ -1287,7 +1287,80 @@ function updateRevenueChart(period) {
             }
         });
     })
-    .fail(function(){ loadActualDataOnly(period); });
+    .fail(function(xhr, status, error){
+        console.warn('ML forecast failed, trying ensemble method:', error);
+        // Fallback to ensemble method if ML fails
+        $.get('dashboard_data.php', { action: 'revenue_forecast', period: period, forecast_method: 'ensemble', forecast_months: horizon })
+        .done(function(paidData) {
+            const actual = paidData.actual || [];
+            const forecast = paidData.forecast || [];
+            
+            if (actual.length === 0 && forecast.length === 0) {
+                loadActualDataOnly(period);
+                return;
+            }
+            
+            // Use same chart rendering logic as ML method
+            const actualLabels = actual.map(i => i.period);
+            const actualValues = actual.map(i => parseFloat(i.revenue) || 0);
+            const forecastLabels = forecast.map(i => i.period);
+            const forecastValues = forecast.map(i => parseFloat(i.revenue) || 0);
+            
+            const allLabelsSet = new Set([...actualLabels, ...forecastLabels]);
+            const allLabels = Array.from(allLabelsSet).sort();
+            
+            const paidActualMap = {};
+            actualLabels.forEach((label, idx) => { paidActualMap[label] = actualValues[idx]; });
+            const paidForecastMap = {};
+            forecastLabels.forEach((label, idx) => { paidForecastMap[label] = forecastValues[idx]; });
+            
+            const actualSeries = allLabels.map(label => paidActualMap[label] || null);
+            const forecastSeries = allLabels.map(label => paidForecastMap[label] || null);
+            
+            const lastActual = actualValues[actualValues.length - 1] || 0;
+            const lastActualIndex = actualLabels.length > 0 ? allLabels.indexOf(actualLabels[actualLabels.length - 1]) : -1;
+            if (lastActualIndex >= 0 && forecastValues.length > 0) {
+                forecastSeries[lastActualIndex] = lastActual;
+            }
+            
+            const datasets = [
+                { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
+                { label: 'Forecasted Revenue (Paid) - Ensemble', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
+            ];
+            
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            revenueChart = new Chart(revenueCtx, {
+                type: 'line',
+                data: { labels: allLabels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: function(value){ return '₱' + value.toLocaleString(); } }, grid: { color: 'rgba(0,0,0,0.1)' } },
+                        x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: { 
+                            filter: function(ti){ return ti.raw !== null; }, 
+                            callbacks: { 
+                                label: function(ctx){ 
+                                    const v = ctx.raw; 
+                                    if (v === null) return null;
+                                    return ctx.dataset.label + ': ₱' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); 
+                                } 
+                            } 
+                        }
+                    },
+                    elements: { line: { spanGaps: true } }
+                }
+            });
+        })
+        .fail(function(){ 
+            loadActualDataOnly(period); 
+        });
+    });
 }
 
 function loadActualDataOnly(period) {
