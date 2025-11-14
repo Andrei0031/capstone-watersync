@@ -506,34 +506,60 @@ class DashboardData {
     }
     
     public function getRevenueWithForecast($period = 'monthly', $forecastMethod = 'ensemble', $forecastMonths = 6) {
-        $forecast = new RevenueForecast($this->conn);
-        // Always provide actuals
-        $actualData = $this->getRevenueData($period);
+        try {
+            $forecast = new RevenueForecast($this->conn);
+            // Always provide actuals
+            $actualData = $this->getRevenueData($period);
 
-        // Prefer embedded PHP ML when requested
-        if ($forecastMethod === 'ml') {
-            $phpMlForecast = $this->embeddedPhpMlForecast($forecastMonths);
-            if (!empty($phpMlForecast)) {
-                return [ 'actual' => $actualData, 'forecast' => $phpMlForecast ];
+            // Prefer embedded PHP ML when requested
+            if ($forecastMethod === 'ml') {
+                $phpMlForecast = $this->embeddedPhpMlForecast($forecastMonths);
+                if (!empty($phpMlForecast)) {
+                    return [ 'actual' => $actualData, 'forecast' => $phpMlForecast ];
+                }
+                // fallback to seasonal
+                $forecastMethod = 'seasonal';
             }
-            // fallback to seasonal
-            $forecastMethod = 'seasonal';
-        }
 
-        // PHP-native forecasts (fallbacks and for non-ML methods)
-        $comprehensive = $forecast->getComprehensiveForecast($forecastMonths);
-        $selectedForecast = [];
-        if (isset($comprehensive['forecasts'][$forecastMethod])) {
-            $selectedForecast = $comprehensive['forecasts'][$forecastMethod];
-        } else {
-            // Default to seasonal if requested method missing
-            $selectedForecast = $comprehensive['forecasts']['seasonal'] ?? [];
-        }
+            // PHP-native forecasts (fallbacks and for non-ML methods)
+            $comprehensive = $forecast->getComprehensiveForecast($forecastMonths);
+            $selectedForecast = [];
+            
+            // Log available methods for debugging
+            if (isset($comprehensive['forecasts'])) {
+                error_log("Forecast Debug: Available methods: " . implode(', ', array_keys($comprehensive['forecasts'])));
+                error_log("Forecast Debug: Requested method: " . $forecastMethod);
+            } else {
+                error_log("Forecast Debug: No 'forecasts' key in comprehensive result");
+            }
+            
+            if (isset($comprehensive['forecasts'][$forecastMethod])) {
+                $selectedForecast = $comprehensive['forecasts'][$forecastMethod];
+                error_log("Forecast Debug: Selected forecast method '{$forecastMethod}' returned " . count($selectedForecast) . " points");
+            } else {
+                // Default to seasonal if requested method missing
+                error_log("Forecast Debug: Method '{$forecastMethod}' not found, falling back to seasonal");
+                $selectedForecast = $comprehensive['forecasts']['seasonal'] ?? [];
+                if (empty($selectedForecast)) {
+                    // Try linear as last resort
+                    $selectedForecast = $comprehensive['forecasts']['linear'] ?? [];
+                    error_log("Forecast Debug: Seasonal also empty, trying linear: " . count($selectedForecast) . " points");
+                }
+            }
 
-        return [
-            'actual' => $actualData,
-            'forecast' => $selectedForecast
-        ];
+            return [
+                'actual' => $actualData,
+                'forecast' => $selectedForecast
+            ];
+        } catch (\Throwable $e) {
+            error_log("Forecast Error in getRevenueWithForecast: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+            // Return empty forecast but keep actual data
+            return [
+                'actual' => $this->getRevenueData($period),
+                'forecast' => [],
+                'error' => 'Forecast generation failed: ' . $e->getMessage()
+            ];
+        }
     }
 
     /**
@@ -678,7 +704,26 @@ if(isset($_GET['action'])) {
             $period = $_GET['period'] ?? 'monthly';
             $forecastMethod = $_GET['forecast_method'] ?? 'ensemble';
             $forecastMonths = intval($_GET['forecast_months'] ?? 6);
-            $response = $dashboard->getRevenueWithForecast($period, $forecastMethod, $forecastMonths);
+            try {
+                $response = $dashboard->getRevenueWithForecast($period, $forecastMethod, $forecastMonths);
+                // Add debug info in development
+                if (isset($_GET['debug']) && $_GET['debug'] === '1') {
+                    $response['debug'] = [
+                        'method' => $forecastMethod,
+                        'period' => $period,
+                        'forecast_months' => $forecastMonths,
+                        'actual_count' => count($response['actual'] ?? []),
+                        'forecast_count' => count($response['forecast'] ?? [])
+                    ];
+                }
+            } catch (\Throwable $e) {
+                error_log("Forecast API Error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+                $response = [
+                    'actual' => [],
+                    'forecast' => [],
+                    'error' => 'Forecast generation failed: ' . $e->getMessage()
+                ];
+            }
             break;
         case 'pending_revenue_forecast':
             $period = $_GET['period'] ?? 'monthly';
