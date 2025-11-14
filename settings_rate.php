@@ -2266,10 +2266,33 @@ if ($mobile_users_result) {
                                 displayedQRData.push(client);
                             }
                         });
-                        showQRMessage(`${data.clients.length} QR code(s) loaded.`, 'success');
-                        printAllStickersBtn.disabled = displayedQRData.length === 0;
+                        
+                        if (displayedQRData.length > 0) {
+                            showQRMessage(`${displayedQRData.length} QR code(s) displayed.`, 'success');
+                            printAllStickersBtn.disabled = false;
+                        } else {
+                            // Show helpful message if no QR codes exist yet
+                            const totalClients = data.clients.length;
+                            qrCodeDisplayArea.innerHTML = `
+                                <div class="col-12">
+                                    <div class="alert alert-info text-center">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>No QR codes generated yet.</strong><br>
+                                        <p class="mb-2 mt-2">Found ${totalClients} active client(s). Click "Generate Selected QR Codes" above to create QR codes for them.</p>
+                                    </div>
+                                </div>
+                            `;
+                            printAllStickersBtn.disabled = true;
+                        }
                     } else {
-                        showQRMessage('No QR codes found for the selection.', 'info');
+                        qrCodeDisplayArea.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-warning text-center">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    No active clients found.
+                                </div>
+                            </div>
+                        `;
                         printAllStickersBtn.disabled = true;
                     }
                 } else {
@@ -2278,7 +2301,16 @@ if ($mobile_users_result) {
                 }
             } catch (error) {
                 console.error('Error fetching QR codes:', error);
-                showQRMessage('Error fetching QR codes: ' + error.message, 'danger');
+                showQRMessage('Error loading QR codes: ' + error.message, 'danger');
+                qrCodeDisplayArea.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger text-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error loading QR codes: ${error.message}<br>
+                            <small>Check the browser console (F12) for more details.</small>
+                        </div>
+                    </div>
+                `;
                 printAllStickersBtn.disabled = true;
             } finally {
                 setLoading(false);
