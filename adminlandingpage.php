@@ -1210,14 +1210,8 @@ $(document).ready(function() {
         updateRevenueChart($(this).data('period'));
     });
 
-                // Handle forecast controls
+                // Handle forecast horizon change
                 $('#forecastHorizon').on('change', function(){
-                    const period = $('.btn-group button.active').data('period') || 'monthly';
-                    updateRevenueChart(period);
-                });
-                
-                // Handle forecast method change
-                $('#forecastMethod').on('change', function(){
                     const period = $('.btn-group button.active').data('period') || 'monthly';
                     updateRevenueChart(period);
                 });
@@ -1232,10 +1226,10 @@ function updateRevenueChart(period) {
     }
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
-    const forecastMethod = document.getElementById('forecastMethod')?.value || 'linear';
+    const forecastMethod = 'linear'; // Always use Linear Regression
 
-    // Fetch paid revenue forecast using selected method
-    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method:', forecastMethod);
+    // Fetch paid revenue forecast using Linear Regression
+    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Linear Regression');
     $.ajax({
         url: 'dashboard_data.php',
         method: 'GET',
@@ -1299,22 +1293,12 @@ function updateRevenueChart(period) {
             forecastSeries[lastActualIndex] = lastActual;
         }
 
-        // Update label based on method
-        const methodLabels = {
-            'linear': 'Linear Regression',
-            'ml': 'Machine Learning',
-            'ensemble': 'Ensemble',
-            'seasonal': 'Seasonal',
-            'moving_average': 'Moving Average'
-        };
-        const methodLabel = methodLabels[forecastMethod] || forecastMethod;
-        
         const datasets = [
             { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
-            { label: 'Forecasted Revenue (' + methodLabel + ')', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
+            { label: 'Forecasted Revenue (Linear Regression)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
         ];
         
-        console.log(forecastMethod.toUpperCase() + ' forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
+        console.log('LINEAR REGRESSION forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
         console.log('All labels:', allLabels);
         console.log('Actual series (first 5):', actualSeries.slice(0, 5));
         console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
@@ -1397,10 +1381,9 @@ function updateRevenueChart(period) {
         }
     })
     .fail(function(xhr, status, error){
-        console.warn(forecastMethod.toUpperCase() + ' forecast failed, trying linear regression as fallback:', error);
-        console.warn('Response:', xhr.responseText);
-        // Fallback to linear regression if selected method fails
-        console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Linear (fallback)');
+        console.error('Linear Regression forecast failed:', error);
+        console.error('Response:', xhr.responseText);
+        console.log('Attempting to load actual data only as fallback');
         $.ajax({
             url: 'dashboard_data.php',
             method: 'GET',
