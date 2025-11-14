@@ -3,6 +3,10 @@
 # Enable Rewrite Engine
 RewriteEngine On
 
+# Redirect root URL to customer login
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^$ /customer_login.php [R=301,L]
+
 # Force HTTPS (uncomment after SSL is configured)
 # RewriteCond %{HTTPS} off
 # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
