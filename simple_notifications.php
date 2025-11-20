@@ -87,7 +87,6 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
             $email_subject = "Water Bill Created for $billing_month - Amount Due: PHP $amount$subject_overdue";
             $email_message = "Dear $customer_name,\n\nYour water bill has been created:\n\n" .
                            "Billing Month: $billing_month\n" .
-                           "Bill ID: $bill_id\n" .
                            "Amount Due: ₱$amount\n" .
                            "Due Date: $due_date\n" .
                            "Current Reading: {$bill['reading']}\n" .

@@ -2031,7 +2031,6 @@ if ($params) {
                                 <table class="table table-hover mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Bill #</th>
                                             <th>Billing Month</th>
                                             <th>Reading Date</th>
                                             <th>Due Date</th>
@@ -2044,7 +2043,7 @@ if ($params) {
                                     </thead>
                                     <tbody id="billingHistoryTableBody">
                                         <tr>
-                                            <td colspan="9" class="text-center text-muted py-4">Loading...</td>
+                                            <td colspan="8" class="text-center text-muted py-4">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2569,7 +2568,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             return `
                                 <tr>
-                                    <td><strong>#${bill.id}</strong></td>
                                     <td>${bill.billing_month || 'N/A'}</td>
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
@@ -2582,7 +2580,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                         }).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No billing history found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No billing history found</td></tr>';
                     }
                     
                     // Hide loading, show content
