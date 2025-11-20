@@ -405,84 +405,100 @@ try {
                 error_log("Error checking gps_location column: " . $e->getMessage());
             }
             
-            // Build INSERT statement based on available columns
-            // Always use minimal INSERT to avoid column errors - columns were added above if needed
-            // But check again to be safe
-            if ($has_device_info && $has_app_version && $has_gps_location) {
-                // All columns exist - use full INSERT
-                $insert_stmt = $conn->prepare("
-                    INSERT INTO pending_meter_readings 
-                    (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
-                     mobile_upload_id, status, upload_date, device_info, app_version, gps_location,
-                     ocr_reading, extracted_text, processed_at) 
-                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, ?, ?, ?, NOW())
-                ");
-                if (!$insert_stmt) {
-                    throw new Exception('Failed to prepare INSERT statement: ' . $conn->error);
-                }
-                $insert_stmt->bind_param("iisdsssssdss", 
-                    $client_id,
-                    $current_cycle['id'],
-                    $relative_path,
-                    $reading_value,
-                    $mobile_upload_id,
-                    $status,
-                    $device_info,
-                    $mobile_app_version,
-                    $gps_location,
-                    $ocrReading,
-                    $extractedText
-                );
-            } else {
-                // Some columns missing - use minimal INSERT (without optional columns)
-                $insert_stmt = $conn->prepare("
-                    INSERT INTO pending_meter_readings 
-                    (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
-                     mobile_upload_id, status, upload_date,
-                     ocr_reading, extracted_text, processed_at) 
-                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, NOW())
-                ");
-                if (!$insert_stmt) {
-                    throw new Exception('Failed to prepare INSERT statement: ' . $conn->error);
-                }
-                $insert_stmt->bind_param("iisdsssdss", 
-                    $client_id,
-                    $current_cycle['id'],
-                    $relative_path,
-                    $reading_value,
-                    $mobile_upload_id,
-                    $status,
-                    $ocrReading,
-                    $extractedText
-                );
+            // Build INSERT statement - use minimal required columns first
+            // Handle optional columns by checking if they exist before including them
+            $base_sql = "INSERT INTO pending_meter_readings 
+                (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
+                 mobile_upload_id, status, upload_date, ocr_reading, extracted_text, processed_at) 
+                VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, NOW())";
+            
+            // Prepare base statement
+            $insert_stmt = $conn->prepare($base_sql);
+            if (!$insert_stmt) {
+                $error_msg = $conn->error ?: 'Unknown database error';
+                error_log("Batch Upload: Prepare failed: $error_msg | SQL: $base_sql");
+                throw new Exception('Failed to prepare INSERT statement: ' . $error_msg);
             }
             
-            $execute_result = $insert_stmt->execute();
+            // Bind base parameters
+            // Types: i, i, s, d, s, s, d, s = 8 parameters
+            $ocrReading_val = $ocrReading !== null ? $ocrReading : null;
+            $extractedText_val = $extractedText !== null ? $extractedText : '';
             
-            if ($execute_result) {
-                $reading_id = $insert_stmt->insert_id;
-                
-                $reading_result['success'] = true;
-                $reading_result['reading_id'] = $reading_id;
-                $reading_result['status'] = $status;
-                $reading_result['ocr_processed'] = $ocrProcessed;
-                $reading_result['ocr_reading'] = $ocrReading;
-                $reading_result['client_name'] = trim(($client['firstname'] ?? '') . ' ' . ($client['lastname'] ?? ''));
-                $reading_result['meter_code'] = $client['meter_code'] ?? null;
-                
-                $success_count++;
-                error_log("Batch Upload: Successfully inserted reading ID $reading_id for client $client_id");
-            } else {
-                // Delete uploaded image if database insert failed
-                if (file_exists($filepath)) {
-                    unlink($filepath);
-                }
-                $db_error = $insert_stmt->error ?: $conn->error;
-                error_log("Batch Upload: Database insert failed for client $client_id: $db_error");
-                throw new Exception('Failed to save meter reading: ' . $db_error);
+            if (!$insert_stmt->bind_param("iisdssds", 
+                $client_id,
+                $current_cycle['id'],
+                $relative_path,
+                $reading_value,
+                $mobile_upload_id,
+                $status,
+                $ocrReading_val,
+                $extractedText_val
+            )) {
+                throw new Exception('Failed to bind base parameters: ' . $insert_stmt->error);
             }
             
+            // Execute base insert first
+            if (!$insert_stmt->execute()) {
+                $error_msg = $insert_stmt->error ?: $conn->error;
+                error_log("Batch Upload: Execute failed for client $client_id: $error_msg");
+                throw new Exception('Failed to execute INSERT: ' . $error_msg);
+            }
+            
+            $reading_id = $insert_stmt->insert_id;
             $insert_stmt->close();
+            
+            // Update optional columns if they exist and were provided
+            if ($reading_id && ($has_device_info || $has_app_version || $has_gps_location)) {
+                $update_parts = [];
+                $update_types = "";
+                $update_values = [];
+                
+                if ($has_device_info && $device_info !== null) {
+                    $update_parts[] = "device_info = ?";
+                    $update_types .= "s";
+                    $update_values[] = $device_info;
+                }
+                if ($has_app_version && $mobile_app_version !== null) {
+                    $update_parts[] = "app_version = ?";
+                    $update_types .= "s";
+                    $update_values[] = $mobile_app_version;
+                }
+                if ($has_gps_location && $gps_location !== null) {
+                    $update_parts[] = "gps_location = ?";
+                    $update_types .= "s";
+                    $update_values[] = $gps_location;
+                }
+                
+                if (!empty($update_parts)) {
+                    $update_sql = "UPDATE pending_meter_readings SET " . implode(", ", $update_parts) . " WHERE id = ?";
+                    $update_types .= "i";
+                    $update_values[] = $reading_id;
+                    
+                    $update_stmt = $conn->prepare($update_sql);
+                    if ($update_stmt) {
+                        $update_params = [$update_types];
+                        foreach ($update_values as &$val) {
+                            $update_params[] = &$val;
+                        }
+                        call_user_func_array([$update_stmt, 'bind_param'], $update_params);
+                        $update_stmt->execute();
+                        $update_stmt->close();
+                    }
+                }
+            }
+            
+            // If we got here, the insert was successful
+            $reading_result['success'] = true;
+            $reading_result['reading_id'] = $reading_id;
+            $reading_result['status'] = $status;
+            $reading_result['ocr_processed'] = $ocrProcessed;
+            $reading_result['ocr_reading'] = $ocrReading;
+            $reading_result['client_name'] = trim(($client['firstname'] ?? '') . ' ' . ($client['lastname'] ?? ''));
+            $reading_result['meter_code'] = $client['meter_code'] ?? null;
+            
+            $success_count++;
+            error_log("Batch Upload: Successfully inserted reading ID $reading_id for client $client_id");
             
         } catch (Exception $e) {
             $reading_result['error'] = $e->getMessage();
