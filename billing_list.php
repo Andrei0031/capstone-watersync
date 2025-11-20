@@ -1692,11 +1692,23 @@ if ($params) {
                             <input type="date" class="form-control" name="due_date" required>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Current Reading</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" name="reading" step="0.01" required>
-                            <span class="input-group-text">Reading</span>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Previous Reading</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="previous" id="previousReading" step="0.01" required>
+                                <button type="button" class="btn btn-outline-secondary" id="getPreviousReadingBtn" title="Get last reading">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Click the button to auto-fill from last bill</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Current Reading</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="reading" step="0.01" required>
+                                <span class="input-group-text">cu.m</span>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -2793,6 +2805,35 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error fetching previous reading:', error);
             return 0;
         }
+    }
+    
+    // Auto-fill previous reading when client is selected
+    const clientSelect = document.getElementById('clientSelect');
+    const previousReadingInput = document.getElementById('previousReading');
+    const getPreviousReadingBtn = document.getElementById('getPreviousReadingBtn');
+    
+    if (clientSelect && previousReadingInput && getPreviousReadingBtn) {
+        // Auto-fill when client changes
+        clientSelect.addEventListener('change', async function() {
+            const clientId = this.value;
+            if (clientId) {
+                const previousReading = await fetchPreviousReading(clientId);
+                previousReadingInput.value = previousReading.toFixed(2);
+            } else {
+                previousReadingInput.value = '';
+            }
+        });
+        
+        // Button to manually fetch previous reading
+        getPreviousReadingBtn.addEventListener('click', async function() {
+            const clientId = clientSelect.value;
+            if (!clientId) {
+                alert('Please select a client first');
+                return;
+            }
+            const previousReading = await fetchPreviousReading(clientId);
+            previousReadingInput.value = previousReading.toFixed(2);
+        });
     }
 
     // Function to generate reference number
