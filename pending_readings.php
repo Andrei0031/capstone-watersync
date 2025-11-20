@@ -473,6 +473,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
     exit();
 }
 
+// Set longer timeout for OCR processing
+set_time_limit(300); // 5 minutes for batch processing
+ini_set('max_execution_time', 300);
+
 // Automated bill creation for all pending readings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['auto_create_bills'])) {
     $result = processOCRReadingsAutomatically($conn);
@@ -2042,13 +2046,24 @@ if (!$failed_result) {
                     const formData = new FormData(this);
                     formData.append('process_selected', '1');
                     
+                    // Create AbortController for timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => {
+                        controller.abort();
+                        loadingModal.hide();
+                        alert('Processing timed out after 2 minutes. Please try again or check server logs.');
+                    }, 120000); // 2 minute timeout
+                    
                     // Submit via AJAX
                     fetch('pending_readings.php', {
                         method: 'POST',
                         body: formData,
-                        redirect: 'manual' // Don't follow redirects automatically
+                        redirect: 'manual', // Don't follow redirects automatically
+                        signal: controller.signal // Add abort signal
                     })
                     .then(response => {
+                        clearTimeout(timeoutId); // Clear timeout on success
+                        
                         // Check if it's a redirect (302, 303, 307, etc.)
                         if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
                             // Get redirect location from headers
@@ -2102,13 +2117,19 @@ if (!$failed_result) {
                         }
                     })
                     .catch(error => {
+                        clearTimeout(timeoutId); // Clear timeout on error
+                        
                         // Hide loading modal
                         loadingModal.hide();
                         
                         // Show error result
                         console.error('Processing error:', error);
+                        let errorMsg = 'An error occurred while processing.';
+                        if (error.name === 'AbortError') {
+                            errorMsg = 'Processing timed out. The request took too long. Please try again or check if Roboflow API is accessible.';
+                        }
                         setTimeout(() => {
-                            showProcessingResult('error', 'An error occurred while processing. Please try again.');
+                            showProcessingResult('error', errorMsg);
                         }, 300);
                     });
                 });

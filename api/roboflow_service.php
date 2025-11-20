@@ -448,7 +448,8 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced to 15 seconds to fail faster
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Connection timeout 10 seconds
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
@@ -532,7 +533,8 @@ function detectDigitsWithRoboflow($imagePath) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: multipart/form-data; boundary=' . $delimiter
             ]);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             
             $response = curl_exec($ch);
@@ -580,7 +582,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 curl_setopt($ch, CURLOPT_HTTPHEADER, [
                     'Content-Type: text/plain'
                 ]);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 
                 $response = curl_exec($ch);
@@ -628,7 +631,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     curl_setopt($ch, CURLOPT_POST, true);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     
                     $response = curl_exec($ch);
@@ -651,7 +655,8 @@ function detectDigitsWithRoboflow($imagePath) {
                         curl_setopt($ch, CURLOPT_HTTPHEADER, [
                             'Content-Type: application/x-www-form-urlencoded'
                         ]);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
                         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                         
                         $response = curl_exec($ch);
