@@ -55,26 +55,47 @@ try {
         sendResponse(false, 'Failed to save image', null, 500);
     }
     
-    // Check if OCR should be processed immediately or saved as pending
-    $processOcr = isset($input['process_ocr']) ? filter_var($input['process_ocr'], FILTER_VALIDATE_BOOLEAN) : false;
-    
-    // Process OCR extraction using Tesseract (server-side) ONLY if process_ocr is true
+    // AUTO-PROCESS OCR IMMEDIATELY (always process, no pending status)
     $ocrReading = null;
     $extractedText = '';
     $ocrProcessed = false;
+    $ocrError = null;
     
-    if ($processOcr) {
-        try {
-            $ocrResult = processImageWithTesseract($filepath);
-            if ($ocrResult['success']) {
+    try {
+        // Try Roboflow digit detection first (preferred method)
+        if (function_exists('processImageWithRoboflowDigits')) {
+            $ocrResult = processImageWithRoboflowDigits($filepath);
+            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                $ocrReading = $ocrResult['meter_reading'];
                 $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrReading = $ocrResult['meter_reading'] ?? null;
                 $ocrProcessed = true;
+                error_log("✓ Auto-OCR SUCCESS (Roboflow): Reading will be created with value: $ocrReading");
+            } else {
+                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
             }
-        } catch (Exception $e) {
-            // OCR failed, but continue with upload
-            error_log('OCR processing failed: ' . $e->getMessage());
         }
+        
+        // If Roboflow failed, try Tesseract as fallback (if available)
+        if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
+            $tesseractResult = processImageWithTesseract($filepath);
+            if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
+                $ocrReading = $tesseractResult['meter_reading'];
+                $extractedText = $tesseractResult['extracted_text'] ?? '';
+                $ocrProcessed = true;
+                error_log("✓ Auto-OCR SUCCESS (Tesseract): Reading will be created with value: $ocrReading");
+            } else {
+                $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
+            }
+        }
+        
+        if (!$ocrProcessed) {
+            $ocrError = $ocrError ?? 'OCR processing failed';
+            error_log("✗ Auto-OCR FAILED: $ocrError");
+        }
+        
+    } catch (Exception $e) {
+        $ocrError = 'OCR processing exception: ' . $e->getMessage();
+        error_log("✗ Auto-OCR EXCEPTION: $ocrError");
     }
     
     // Get current active billing cycle
@@ -136,14 +157,14 @@ try {
         $conn->query("ALTER TABLE pending_meter_readings MODIFY COLUMN status ENUM('pending', 'processed', 'failed') DEFAULT 'pending'");
     }
     
-    // Determine status based on OCR processing
-    $status = $processOcr && $ocrProcessed ? 'processed' : 'pending';
+    // Determine status based on OCR processing (no pending - either processed or failed)
+    $status = $ocrProcessed ? 'processed' : 'failed';
     
     // Insert into pending_meter_readings with billing cycle
     $stmt = $conn->prepare("
         INSERT INTO pending_meter_readings 
-        (client_id, billing_cycle_id, image_path, mobile_upload_id, reading_date, status, upload_date, ocr_reading, extracted_text) 
-        VALUES (?, ?, ?, ?, CURDATE(), ?, NOW(), ?, ?)
+        (client_id, billing_cycle_id, image_path, mobile_upload_id, reading_date, status, upload_date, ocr_reading, extracted_text, processed_at) 
+        VALUES (?, ?, ?, ?, CURDATE(), ?, NOW(), ?, ?, NOW())
     ");
     
     $relative_path = 'uploads/meter_readings/' . $filename;
@@ -151,7 +172,7 @@ try {
     $billing_cycle_id = $current_cycle ? $current_cycle['id'] : null;
     $ocrReadingValue = ($ocrReading !== null && is_numeric($ocrReading)) ? $ocrReading : null;
     
-    $stmt->bind_param("iisssds", 
+    $stmt->bind_param("iisssdss", 
         $input['client_id'],
         $billing_cycle_id,
         $relative_path,
@@ -164,14 +185,16 @@ try {
     if (!$stmt->execute()) {
         // Clean up image if database insert fails
         unlink($filepath);
-        sendResponse(false, 'Failed to save reading record', null, 500);
+        sendResponse(false, 'Failed to save reading record: ' . $conn->error, null, 500);
     }
     
     $reading_id = $stmt->insert_id;
     
-    sendResponse(true, $processOcr ? 'Reading uploaded and OCR processed successfully' : 'Image uploaded successfully. OCR will be processed on web interface.', [
+    sendResponse(true, $ocrProcessed ? 'Reading uploaded and OCR processed successfully' : 'Reading uploaded but OCR processing failed', [
         'reading_id' => $reading_id,
         'status' => $status,
+        'ocr_processed' => $ocrProcessed,
+        'ocr_error' => $ocrError,
         'billing_cycle' => $current_cycle ? [
             'cycle_name' => $current_cycle['cycle_name'],
             'cycle_id' => $current_cycle['id']
@@ -182,8 +205,7 @@ try {
         ],
         'filename' => $filename,
         'ocr_reading' => $ocrReading,
-        'extracted_text' => $extractedText,
-        'ocr_processed' => $ocrProcessed
+        'extracted_text' => $extractedText
     ]);
 
 } catch (Exception $e) {

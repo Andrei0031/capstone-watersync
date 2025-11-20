@@ -25,7 +25,10 @@ if (!$is_local_network) {
 }
 
 $input = getInputData();
-validateRequiredFields($input, ['client_id', 'meter_reading', 'image_data']);
+validateRequiredFields($input, ['client_id', 'image_data']);
+
+// Include OCR functions for auto-processing
+require_once __DIR__ . '/ocr_functions.php';
 
 try {
     // Get current active billing cycle
@@ -48,7 +51,7 @@ try {
         SELECT cl.id, cl.meter_number, cl.meter_code, cl.customer_id,
                ca.firstname, ca.lastname, ca.email
         FROM client_list cl
-        JOIN customer_accounts ca ON cl.customer_id = ca.id
+        LEFT JOIN customer_accounts ca ON cl.customer_id = ca.id
         WHERE cl.id = ? AND cl.status = 1
     ");
     $client_stmt->bind_param("i", $input['client_id']);
@@ -57,12 +60,6 @@ try {
     
     if (!$client) {
         sendResponse(false, 'Invalid or inactive client ID', null, 404);
-    }
-    
-    // Validate meter reading
-    $meter_reading = floatval($input['meter_reading']);
-    if ($meter_reading <= 0) {
-        sendResponse(false, 'Invalid meter reading value', null, 400);
     }
     
     // Check for duplicate reading in current cycle
@@ -103,50 +100,119 @@ try {
         sendResponse(false, 'Failed to save meter image', null, 500);
     }
     
+    // AUTO-PROCESS OCR IMMEDIATELY
+    $ocrReading = null;
+    $extractedText = '';
+    $ocrProcessed = false;
+    $ocrError = null;
+    $status = 'failed'; // Default to failed, will change if OCR succeeds
+    
+    try {
+        // Try Roboflow digit detection first (preferred method)
+        if (function_exists('processImageWithRoboflowDigits')) {
+            $ocrResult = processImageWithRoboflowDigits($filepath);
+            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                $ocrReading = $ocrResult['meter_reading'];
+                $extractedText = $ocrResult['extracted_text'] ?? '';
+                $ocrProcessed = true;
+                $status = 'processed';
+                error_log("✓ Auto-OCR SUCCESS (Roboflow): Reading ID will be created with value: $ocrReading");
+            } else {
+                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+            }
+        }
+        
+        // If Roboflow failed, try Tesseract as fallback (if available)
+        if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
+            $tesseractResult = processImageWithTesseract($filepath);
+            if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
+                $ocrReading = $tesseractResult['meter_reading'];
+                $extractedText = $tesseractResult['extracted_text'] ?? '';
+                $ocrProcessed = true;
+                $status = 'processed';
+                error_log("✓ Auto-OCR SUCCESS (Tesseract): Reading ID will be created with value: $ocrReading");
+            } else {
+                $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
+            }
+        }
+        
+        // If both OCR methods failed, use manual reading if provided
+        if (!$ocrProcessed && isset($input['meter_reading'])) {
+            $meter_reading = floatval($input['meter_reading']);
+            if ($meter_reading > 0) {
+                $ocrReading = $meter_reading;
+                $extractedText = 'Manual reading from mobile app';
+                $ocrProcessed = true;
+                $status = 'processed';
+                error_log("✓ Using manual reading from mobile app: $meter_reading");
+            }
+        }
+        
+        if (!$ocrProcessed) {
+            $ocrError = $ocrError ?? 'OCR processing failed and no manual reading provided';
+            error_log("✗ Auto-OCR FAILED: $ocrError");
+        }
+        
+    } catch (Exception $e) {
+        $ocrError = 'OCR processing exception: ' . $e->getMessage();
+        error_log("✗ Auto-OCR EXCEPTION: $ocrError");
+    }
+    
     // Get mobile device info if provided
     $device_info = $input['device_info'] ?? null;
     $mobile_app_version = $input['app_version'] ?? null;
     $gps_location = $input['gps_location'] ?? null;
     
-    // Insert meter reading record
+    // Insert meter reading record with OCR results
     $insert_stmt = $conn->prepare("
         INSERT INTO pending_meter_readings 
         (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
-         mobile_upload_id, status, upload_date, device_info, app_version, gps_location) 
-        VALUES (?, ?, ?, ?, CURDATE(), ?, 'pending', NOW(), ?, ?, ?)
+         mobile_upload_id, status, upload_date, device_info, app_version, gps_location,
+         ocr_reading, extracted_text, processed_at) 
+        VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, ?, ?, ?, NOW())
     ");
     
     $mobile_upload_id = 'mobile_' . uniqid() . '_' . time();
+    $reading_value = $ocrReading ?? (isset($input['meter_reading']) ? floatval($input['meter_reading']) : null);
     
-    $insert_stmt->bind_param("iisdsss", 
+    // Count: client_id(i), billing_cycle_id(i), image_path(s), reading_value(d), mobile_upload_id(s), status(s), device_info(s), app_version(s), gps_location(s), ocr_reading(d), extracted_text(s) = 11 params
+    $insert_stmt->bind_param("iisdsssssdss", 
         $input['client_id'],
         $current_cycle['id'],
         $relative_path,
-        $meter_reading,
+        $reading_value,
         $mobile_upload_id,
+        $status,
         $device_info,
         $mobile_app_version,
-        $gps_location
+        $gps_location,
+        $ocrReading,
+        $extractedText
     );
     
     if ($insert_stmt->execute()) {
         $reading_id = $insert_stmt->insert_id;
         
         // Log the submission
-        error_log("Mobile meter reading submitted - Client: {$client['firstname']} {$client['lastname']}, Reading: $meter_reading, Cycle: {$current_cycle['cycle_name']}");
+        $client_name = ($client['firstname'] ?? '') . ' ' . ($client['lastname'] ?? '');
+        error_log("Mobile meter reading submitted - Client: $client_name, Reading: " . ($ocrReading ?? 'N/A') . ", Status: $status, Cycle: {$current_cycle['cycle_name']}");
         
-        sendResponse(true, 'Meter reading submitted successfully', [
+        sendResponse(true, $ocrProcessed ? 'Meter reading uploaded and OCR processed successfully' : 'Meter reading uploaded but OCR processing failed', [
             'reading_id' => $reading_id,
+            'status' => $status,
+            'ocr_processed' => $ocrProcessed,
+            'ocr_reading' => $ocrReading,
+            'ocr_error' => $ocrError,
             'cycle_info' => [
                 'cycle_name' => $current_cycle['cycle_name'],
                 'due_date' => $current_cycle['due_date']
             ],
             'client_info' => [
-                'name' => $client['firstname'] . ' ' . $client['lastname'],
-                'meter_number' => $client['meter_number']
+                'name' => $client_name,
+                'meter_code' => $client['meter_code'] ?? null
             ],
             'submission_details' => [
-                'reading_value' => $meter_reading,
+                'reading_value' => $reading_value,
                 'upload_id' => $mobile_upload_id,
                 'timestamp' => date('Y-m-d H:i:s')
             ]
@@ -156,7 +222,7 @@ try {
         if (file_exists($filepath)) {
             unlink($filepath);
         }
-        sendResponse(false, 'Failed to save meter reading', null, 500);
+        sendResponse(false, 'Failed to save meter reading: ' . $conn->error, null, 500);
     }
     
 } catch (Exception $e) {
