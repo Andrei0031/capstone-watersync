@@ -6,42 +6,10 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-require_once 'vendor/autoload.php';
-use thiagoalessio\TesseractOCR\TesseractOCR;
-
 include 'db.php';
 
-/**
- * Check if Tesseract OCR is available on the system
- */
-function isTesseractAvailable() {
-    $possiblePaths = [
-        'tesseract',
-        'C:\\Program Files\\Tesseract-OCR\\tesseract.exe',
-        'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe',
-        '/usr/bin/tesseract',
-        '/usr/local/bin/tesseract',
-    ];
-    
-    foreach ($possiblePaths as $path) {
-        $testCommand = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') 
-            ? "\"$path\" --version 2>nul" 
-            : "$path --version 2>/dev/null";
-        
-        $output = [];
-        $returnVar = 0;
-        @exec($testCommand, $output, $returnVar);
-        
-        if ($returnVar === 0) {
-            return true;
-        }
-    }
-    
-    // Try direct execution as fallback
-    $testOutput = [];
-    @exec('tesseract --version 2>&1', $testOutput, $testReturn);
-    return $testReturn === 0;
-}
+// Include OCR functions (Roboflow + Tesseract)
+require_once __DIR__ . '/api/ocr_functions.php';
 
 header('Content-Type: application/json');
 
@@ -63,47 +31,81 @@ try {
         throw new Exception('Reading not found or not in failed status');
     }
 
-    // Check if Tesseract is available
-    if (!isTesseractAvailable()) {
-        throw new Exception('Tesseract OCR is not installed. Please install Tesseract OCR or enter readings manually.');
+    // Resolve image path (handle both relative and absolute paths)
+    $imagePath = $reading['image_path'];
+    if (!file_exists($imagePath)) {
+        // Try relative path from root
+        $imagePath = __DIR__ . '/' . ltrim($reading['image_path'], '/');
+        if (!file_exists($imagePath)) {
+            throw new Exception('Image file not found: ' . $reading['image_path']);
+        }
     }
 
-    // Process image with OCR
-    $ocr = new TesseractOCR($reading['image_path']);
-    $ocr->digits(); // Only look for digits
-    $ocr->whitelist(range(0, 9)); // Whitelist numbers only
-    
-    // Get OCR result
-    $result = $ocr->run();
-    $numbers = preg_replace('/[^0-9.]/', '', $result);
-    
-    if (empty($numbers)) {
-        throw new Exception('No numbers found in the image');
+    $ocrProcessed = false;
+    $ocrReading = null;
+    $extractedText = '';
+    $ocrError = null;
+
+    // Try Roboflow digit detection first (preferred method)
+    if (function_exists('processImageWithRoboflowDigits')) {
+        $ocrResult = processImageWithRoboflowDigits($imagePath);
+        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+            $ocrReading = $ocrResult['meter_reading'];
+            $extractedText = $ocrResult['extracted_text'] ?? '';
+            $ocrProcessed = true;
+            error_log("✓ Retry OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
+        } else {
+            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+        }
     }
     
-    $reading_value = floatval($numbers);
+    // If Roboflow failed, try Tesseract as fallback (if available)
+    if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
+        $tesseractResult = processImageWithTesseract($imagePath);
+        if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
+            $ocrReading = $tesseractResult['meter_reading'];
+            $extractedText = $tesseractResult['extracted_text'] ?? '';
+            $ocrProcessed = true;
+            error_log("✓ Retry OCR SUCCESS (Tesseract): Reading ID $reading_id processed with value: $ocrReading");
+        } else {
+            $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
+        }
+    }
     
-    // Update reading status
+    if (!$ocrProcessed) {
+        $errorMsg = $ocrError ?? 'OCR processing failed. Both Roboflow and Tesseract failed to process the image.';
+        error_log("✗ Retry OCR FAILED for reading ID $reading_id: $errorMsg");
+        throw new Exception($errorMsg);
+    }
+    
+    // Convert reading to float (handle 5-digit reading like "00792")
+    $reading_value = floatval($ocrReading);
+    
+    // Update reading status with OCR results
     $update = $conn->prepare("UPDATE pending_meter_readings SET 
         status = 'processed',
         reading_value = ?,
+        ocr_reading = ?,
+        extracted_text = ?,
         error_message = NULL,
-        processed_date = CURRENT_TIMESTAMP
+        processed_at = NOW()
         WHERE id = ?");
-    $update->bind_param("di", $reading_value, $reading_id);
+    $update->bind_param("ddsi", $reading_value, $reading_value, $extractedText, $reading_id);
     
     if (!$update->execute()) {
-        throw new Exception('Failed to update reading status');
+        throw new Exception('Failed to update reading status: ' . $update->error);
     }
 
     echo json_encode([
         'success' => true,
         'message' => 'Reading processed successfully',
-        'reading_value' => $reading_value
+        'reading_value' => $reading_value,
+        'extracted_text' => $extractedText
     ]);
 
 } catch (Exception $e) {
     http_response_code(400);
+    error_log("Retry reading error: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()
