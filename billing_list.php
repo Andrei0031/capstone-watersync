@@ -1914,9 +1914,9 @@ if ($params) {
 <div class="modal fade" id="customerDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-user me-2"></i>Customer Details & Billing History
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-bottom: none;">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-user-circle me-2"></i>Customer Details & Billing History
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -2584,10 +2584,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
                                     <td>${parseFloat(bill.consumption).toFixed(2)} cu.m</td>
-                                    <td><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
-                                    <td>₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
-                                    <td><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
-                                    <td><span class="status-badge ${statusClass}">${bill.status_text}</span></td>
+                                    <td class="text-end"><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
+                                    <td class="text-end">₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
+                                    <td class="text-end"><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
+                                    <td class="text-center"><span class="status-badge ${statusClass}">${bill.status_text}</span></td>
                                 </tr>
                             `;
                         }).join('');
