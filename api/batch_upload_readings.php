@@ -351,7 +351,7 @@ try {
             $extractedText = '';
             $ocrProcessed = false;
             $ocrError = null;
-            $status = 'failed';
+            $status = 'pending'; // Default to pending - will change to processed if OCR succeeds
             
             try {
                 // Try Roboflow digit detection first
@@ -362,8 +362,10 @@ try {
                         $extractedText = $ocrResult['extracted_text'] ?? '';
                         $ocrProcessed = true;
                         $status = 'processed';
+                        error_log("Batch Upload: OCR SUCCESS (Roboflow) for client $client_id: $ocrReading");
                     } else {
                         $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+                        error_log("Batch Upload: OCR FAILED (Roboflow) for client $client_id: $ocrError");
                     }
                 }
                 
@@ -375,8 +377,10 @@ try {
                         $extractedText = $tesseractResult['extracted_text'] ?? '';
                         $ocrProcessed = true;
                         $status = 'processed';
+                        error_log("Batch Upload: OCR SUCCESS (Tesseract) for client $client_id: $ocrReading");
                     } else {
                         $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
+                        error_log("Batch Upload: OCR FAILED (Tesseract) for client $client_id: $ocrError");
                     }
                 }
                 
@@ -388,15 +392,20 @@ try {
                         $extractedText = 'Manual reading from mobile app';
                         $ocrProcessed = true;
                         $status = 'processed';
+                        error_log("Batch Upload: Using manual reading for client $client_id: $meter_reading");
                     }
                 }
                 
                 if (!$ocrProcessed) {
                     $ocrError = $ocrError ?? 'OCR processing failed and no manual reading provided';
+                    error_log("Batch Upload: OCR FAILED for client $client_id - setting status to 'pending' for manual processing");
+                    // Status remains 'pending' - will be shown in pending tab for manual processing
                 }
                 
             } catch (Exception $e) {
                 $ocrError = 'OCR processing exception: ' . $e->getMessage();
+                error_log("Batch Upload: OCR EXCEPTION for client $client_id: " . $e->getMessage());
+                // Status remains 'pending' - will be shown in pending tab for manual processing
             }
             
             // Get mobile device info if provided

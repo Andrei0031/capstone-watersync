@@ -1444,14 +1444,14 @@ if (!$failed_result) {
 
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="readingTabs" role="tablist">
-            <?php if ($pending_count > 0): ?>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
-                    <i class="fas fa-clock me-2"></i>Pending (Legacy)
+                <button class="nav-link <?php echo $pending_count > 0 ? 'active' : ''; ?>" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                    <i class="fas fa-clock me-2"></i>Pending
+                    <?php if ($pending_count > 0): ?>
                     <span class="badge bg-warning ms-2"><?php echo $pending_count; ?></span>
+                    <?php endif; ?>
                 </button>
             </li>
-            <?php endif; ?>
             <li class="nav-item" role="presentation">
                 <button class="nav-link <?php echo $pending_count == 0 ? 'active' : ''; ?>" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed" type="button" role="tab">
                     <i class="fas fa-check me-2"></i>Processed
@@ -1468,14 +1468,13 @@ if (!$failed_result) {
 
         <!-- Tab Content -->
         <div class="tab-content" id="readingTabsContent">
-            <!-- Pending Readings Tab (Legacy - Only shown if pending readings exist) -->
-            <?php if ($pending_count > 0): ?>
-            <div class="tab-pane fade" id="pending" role="tabpanel">
+            <!-- Pending Readings Tab - Always visible for readings that need manual OCR processing -->
+            <div class="tab-pane fade <?php echo $pending_count > 0 ? 'show active' : ''; ?>" id="pending" role="tabpanel">
                 <div class="card card-soft">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <div>
-                            <h5 class="mb-0">Legacy Pending Readings</h5>
-                            <small class="text-muted">These are old readings that need manual processing. New uploads are auto-processed.</small>
+                            <h5 class="mb-0">Pending Readings</h5>
+                            <small class="text-muted">Readings that need manual OCR processing. Batch uploads auto-process OCR, but failed OCR goes here for manual review.</small>
                         </div>
                         <form method="POST" id="processingForm" class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-primary" id="selectAllPendingBtn">
@@ -1573,7 +1572,6 @@ if (!$failed_result) {
                     </div>
                 </div>
             </div>
-            <?php endif; ?>
 
             <!-- Processed Readings Tab -->
             <div class="tab-pane fade <?php echo $pending_count == 0 ? 'show active' : ''; ?>" id="processed" role="tabpanel">
