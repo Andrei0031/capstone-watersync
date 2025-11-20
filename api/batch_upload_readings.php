@@ -1,4 +1,34 @@
 <?php
+// Enable error reporting for debugging (but don't display to client)
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors to client
+ini_set('log_errors', 1);
+
+// Start output buffering to catch any unexpected output
+ob_start();
+
+// Set error handler to catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        ob_end_clean(); // Clear any output
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $error['message'],
+            'timestamp' => date('Y-m-d H:i:s'),
+            'api_version' => '2.0',
+            'error_details' => [
+                'file' => $error['file'],
+                'line' => $error['line'],
+                'type' => $error['type']
+            ]
+        ], JSON_PRETTY_PRINT);
+        exit();
+    }
+});
+
 require_once 'config.php';
 
 // Headers for mobile app compatibility
@@ -17,6 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * Enhanced sendResponse for batch API (includes timestamp and api_version)
  */
 function sendBatchResponse($success, $message, $data = null, $status_code = 200) {
+    // Clear any output buffer
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
     http_response_code($status_code);
     
     $response = [
@@ -30,7 +65,20 @@ function sendBatchResponse($success, $message, $data = null, $status_code = 200)
         $response['data'] = $data;
     }
     
-    echo json_encode($response, JSON_PRETTY_PRINT);
+    $json_output = json_encode($response, JSON_PRETTY_PRINT);
+    
+    if ($json_output === false) {
+        // JSON encoding failed
+        error_log("Batch Upload API: JSON encoding failed: " . json_last_error_msg());
+        $json_output = json_encode([
+            'success' => false,
+            'message' => 'Response encoding error',
+            'timestamp' => date('Y-m-d H:i:s'),
+            'api_version' => '2.0'
+        ]);
+    }
+    
+    echo $json_output;
     exit();
 }
 
@@ -137,57 +185,79 @@ if (count($input['readings']) > $max_batch_size) {
 }
 
 try {
+    // Verify database connection
+    if (!isset($conn) || !$conn) {
+        throw new Exception('Database connection not available');
+    }
+    
+    // Test database connection
+    if (!$conn->ping()) {
+        throw new Exception('Database connection lost');
+    }
+    
     // Ensure required columns exist in pending_meter_readings table
     // Add columns in order: gps_location first, then device_info, then app_version
-    $check_gps = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
-    if ($check_gps->num_rows === 0) {
-        // Add gps_location after upload_date if it exists
-        $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
-        if ($check_upload_date && $check_upload_date->num_rows > 0) {
-            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL AFTER upload_date");
-        } else {
-            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL");
-        }
-        error_log("Added missing column 'gps_location' to pending_meter_readings table");
-    }
-    
-    $check_device = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
-    if ($check_device->num_rows === 0) {
-        // Add device_info after gps_location if it exists, otherwise after upload_date
-        $check_gps_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
-        if ($check_gps_again && $check_gps_again->num_rows > 0) {
-            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER gps_location");
-        } else {
+    try {
+        $check_gps = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+        if (!$check_gps || $check_gps->num_rows === 0) {
+            // Add gps_location after upload_date if it exists
             $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
             if ($check_upload_date && $check_upload_date->num_rows > 0) {
-                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER upload_date");
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL AFTER upload_date");
             } else {
-                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL");
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL");
             }
+            error_log("Added missing column 'gps_location' to pending_meter_readings table");
         }
-        error_log("Added missing column 'device_info' to pending_meter_readings table");
+    } catch (Exception $e) {
+        error_log("Error checking/adding gps_location column: " . $e->getMessage());
     }
     
-    $check_app = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
-    if ($check_app->num_rows === 0) {
-        // Add app_version after device_info if it exists
-        $check_device_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
-        if ($check_device_again && $check_device_again->num_rows > 0) {
-            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER device_info");
-        } else {
+    try {
+        $check_device = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+        if (!$check_device || $check_device->num_rows === 0) {
+            // Add device_info after gps_location if it exists, otherwise after upload_date
             $check_gps_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
             if ($check_gps_again && $check_gps_again->num_rows > 0) {
-                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER gps_location");
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER gps_location");
             } else {
                 $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
                 if ($check_upload_date && $check_upload_date->num_rows > 0) {
-                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER upload_date");
+                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER upload_date");
                 } else {
-                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL");
+                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL");
                 }
             }
+            error_log("Added missing column 'device_info' to pending_meter_readings table");
         }
-        error_log("Added missing column 'app_version' to pending_meter_readings table");
+    } catch (Exception $e) {
+        error_log("Error checking/adding device_info column: " . $e->getMessage());
+    }
+    
+    try {
+        $check_app = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
+        if (!$check_app || $check_app->num_rows === 0) {
+            // Add app_version after device_info if it exists
+            $check_device_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+            if ($check_device_again && $check_device_again->num_rows > 0) {
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER device_info");
+            } else {
+                $check_gps_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+                if ($check_gps_again && $check_gps_again->num_rows > 0) {
+                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER gps_location");
+                } else {
+                    $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
+                    if ($check_upload_date && $check_upload_date->num_rows > 0) {
+                        $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER upload_date");
+                    } else {
+                        $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL");
+                    }
+                }
+            }
+            error_log("Added missing column 'app_version' to pending_meter_readings table");
+        }
+    } catch (Exception $e) {
+        error_log("Error checking/adding app_version column: " . $e->getMessage());
     }
     
     // Get current active billing cycle
@@ -339,16 +409,35 @@ try {
             $mobile_upload_id = 'batch_' . uniqid() . '_' . time() . '_' . $index;
             $reading_value = $ocrReading ?? (isset($reading_data['meter_reading']) ? floatval($reading_data['meter_reading']) : null);
             
-            // Check if optional columns exist
-            $check_device_info = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
-            $check_app_version = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
-            $check_gps_location = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+            // Check if optional columns exist (with error handling)
+            $has_device_info = false;
+            $has_app_version = false;
+            $has_gps_location = false;
             
-            $has_device_info = $check_device_info && $check_device_info->num_rows > 0;
-            $has_app_version = $check_app_version && $check_app_version->num_rows > 0;
-            $has_gps_location = $check_gps_location && $check_gps_location->num_rows > 0;
+            try {
+                $check_device_info = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+                $has_device_info = $check_device_info && $check_device_info->num_rows > 0;
+            } catch (Exception $e) {
+                error_log("Error checking device_info column: " . $e->getMessage());
+            }
+            
+            try {
+                $check_app_version = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
+                $has_app_version = $check_app_version && $check_app_version->num_rows > 0;
+            } catch (Exception $e) {
+                error_log("Error checking app_version column: " . $e->getMessage());
+            }
+            
+            try {
+                $check_gps_location = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+                $has_gps_location = $check_gps_location && $check_gps_location->num_rows > 0;
+            } catch (Exception $e) {
+                error_log("Error checking gps_location column: " . $e->getMessage());
+            }
             
             // Build INSERT statement based on available columns
+            // Always use minimal INSERT to avoid column errors - columns were added above if needed
+            // But check again to be safe
             if ($has_device_info && $has_app_version && $has_gps_location) {
                 // All columns exist - use full INSERT
                 $insert_stmt = $conn->prepare("
@@ -358,6 +447,9 @@ try {
                      ocr_reading, extracted_text, processed_at) 
                     VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, ?, ?, ?, NOW())
                 ");
+                if (!$insert_stmt) {
+                    throw new Exception('Failed to prepare INSERT statement: ' . $conn->error);
+                }
                 $insert_stmt->bind_param("iisdsssssdss", 
                     $client_id,
                     $current_cycle['id'],
@@ -380,6 +472,9 @@ try {
                      ocr_reading, extracted_text, processed_at) 
                     VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, NOW())
                 ");
+                if (!$insert_stmt) {
+                    throw new Exception('Failed to prepare INSERT statement: ' . $conn->error);
+                }
                 $insert_stmt->bind_param("iisdsssdss", 
                     $client_id,
                     $current_cycle['id'],
@@ -392,7 +487,9 @@ try {
                 );
             }
             
-            if ($insert_stmt->execute()) {
+            $execute_result = $insert_stmt->execute();
+            
+            if ($execute_result) {
                 $reading_id = $insert_stmt->insert_id;
                 
                 $reading_result['success'] = true;
@@ -404,13 +501,18 @@ try {
                 $reading_result['meter_code'] = $client['meter_code'] ?? null;
                 
                 $success_count++;
+                error_log("Batch Upload: Successfully inserted reading ID $reading_id for client $client_id");
             } else {
                 // Delete uploaded image if database insert failed
                 if (file_exists($filepath)) {
                     unlink($filepath);
                 }
-                throw new Exception('Failed to save meter reading: ' . $conn->error);
+                $db_error = $insert_stmt->error ?: $conn->error;
+                error_log("Batch Upload: Database insert failed for client $client_id: $db_error");
+                throw new Exception('Failed to save meter reading: ' . $db_error);
             }
+            
+            $insert_stmt->close();
             
         } catch (Exception $e) {
             $reading_result['error'] = $e->getMessage();
@@ -420,6 +522,9 @@ try {
         
         $results[] = $reading_result;
     }
+    
+    // Clear any output buffer before sending response
+    ob_end_clean();
     
     // Log final results
     error_log("Batch Upload API: Completed - Success: $success_count, Failed: $failed_count, Total: " . count($input['readings']));
@@ -437,9 +542,25 @@ try {
     ]);
     
 } catch (Exception $e) {
+    // Clear output buffer
+    ob_end_clean();
+    
     $errorMsg = $e->getMessage();
     $errorTrace = $e->getTraceAsString();
     error_log("Batch Upload API ERROR: $errorMsg");
+    error_log("Batch Upload API STACK TRACE: $errorTrace");
+    sendBatchResponse(false, 'Server error occurred: ' . $errorMsg, [
+        'error_type' => get_class($e),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ], 500);
+} catch (Error $e) {
+    // Catch PHP 7+ errors (TypeError, ParseError, etc.)
+    ob_end_clean();
+    
+    $errorMsg = $e->getMessage();
+    $errorTrace = $e->getTraceAsString();
+    error_log("Batch Upload API FATAL ERROR: $errorMsg");
     error_log("Batch Upload API STACK TRACE: $errorTrace");
     sendBatchResponse(false, 'Server error occurred: ' . $errorMsg, [
         'error_type' => get_class($e),
