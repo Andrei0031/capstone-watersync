@@ -867,6 +867,26 @@ function detectDigitsWithRoboflow($imagePath) {
                     $digitValue = strval($classId);
                 }
             }
+            // Check if class name contains digit (e.g., "digit_5", "5_digit", "number_3", etc.)
+            elseif (preg_match('/[0-9]/', $className, $matches)) {
+                $isDigit = true;
+                $digitValue = $matches[0]; // Extract the first digit found
+                error_log("   Extracted digit '$digitValue' from class name '$className'");
+            }
+            // Check if prediction has 'predictions' key with class inside (nested structure)
+            elseif (isset($prediction['predictions']) && is_array($prediction['predictions'])) {
+                // Handle nested predictions structure
+                foreach ($prediction['predictions'] as $nestedPred) {
+                    $nestedClass = $nestedPred['class'] ?? $nestedPred['class_name'] ?? $nestedPred['name'] ?? '';
+                    if (preg_match('/^[0-9]$/', $nestedClass)) {
+                        $isDigit = true;
+                        $digitValue = $nestedClass;
+                        $confidence = isset($nestedPred['confidence']) ? floatval($nestedPred['confidence']) : $confidence;
+                        error_log("   Found nested digit '$digitValue' with confidence $confidence");
+                        break;
+                    }
+                }
+            }
             
             // Use confidence threshold of 0.1 (10%) - very low to catch all detections
             // Version 7 might have different confidence distribution
