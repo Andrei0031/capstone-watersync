@@ -2808,7 +2808,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Auto-fill previous reading when client is selected
-    const clientSelect = document.getElementById('clientSelect');
     const previousReadingInput = document.getElementById('previousReading');
     const getPreviousReadingBtn = document.getElementById('getPreviousReadingBtn');
     
