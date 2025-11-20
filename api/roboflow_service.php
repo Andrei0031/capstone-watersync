@@ -106,7 +106,7 @@ function detectMeterRegionWithRoboflow($imagePath) {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
-        /** @phpstan-ignore-next-line */
+        // @phpstan-ignore-next-line
         curl_close($ch);
         
         error_log("Roboflow: HTTP Response Code: $httpCode");
@@ -294,7 +294,7 @@ function cropMeterRegion($originalImagePath, $detection) {
         ]);
         
         if (!$croppedImage) {
-            /** @phpstan-ignore-next-line */
+            // @phpstan-ignore-next-line
             imagedestroy($image);
             return null;
         }
@@ -304,9 +304,9 @@ function cropMeterRegion($originalImagePath, $detection) {
         imagejpeg($croppedImage, $croppedPath, 95);
         
         // Clean up
-        /** @phpstan-ignore-next-line */
+        // @phpstan-ignore-next-line
         imagedestroy($image);
-        /** @phpstan-ignore-next-line */
+        // @phpstan-ignore-next-line
         imagedestroy($croppedImage);
         
         return $croppedPath;
