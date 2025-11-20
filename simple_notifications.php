@@ -30,9 +30,10 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         $email_to_use = !empty($client['registered_email']) ? $client['registered_email'] : $client['email'];
         $is_registered = !empty($client['account_id']);
         
-        // Only send notifications to registered customers (those with customer_accounts entry)
-        if (!$is_registered) {
-            return ['success' => false, 'error' => 'Customer not registered in customer accounts'];
+        // Send notifications to customers with email addresses (registered or not)
+        // Prefer registered email, but fall back to client email if available
+        if (empty($email_to_use)) {
+            return ['success' => false, 'error' => 'Customer has no email address'];
         }
         
         // Get bill information
