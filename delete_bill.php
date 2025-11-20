@@ -61,21 +61,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Delete associated records in the correct order to avoid foreign key constraints
         
-        // 1. Delete bill additional fees first
+        // 1. Delete notification logs (if they reference bill_id)
+        $delete_notifications = "DELETE FROM notification_logs WHERE bill_id = ?";
+        $stmt = $conn->prepare($delete_notifications);
+        $stmt->bind_param("i", $bill_id);
+        $stmt->execute();
+        $notifications_deleted = $stmt->affected_rows;
+        
+        // 2. Delete disconnection notices (if they reference billing_id)
+        $delete_notices = "DELETE FROM disconnection_notices WHERE billing_id = ?";
+        $stmt = $conn->prepare($delete_notices);
+        $stmt->bind_param("i", $bill_id);
+        $stmt->execute();
+        $notices_deleted = $stmt->affected_rows;
+        
+        // 3. Delete bill additional fees
         $delete_fees = "DELETE FROM bill_additional_fees WHERE bill_id = ?";
         $stmt = $conn->prepare($delete_fees);
         $stmt->bind_param("i", $bill_id);
         $stmt->execute();
         $fees_deleted = $stmt->affected_rows;
         
-        // 2. Delete associated payments
+        // 4. Delete associated payments
         $delete_payments = "DELETE FROM payment_list WHERE billing_id = ?";
         $stmt = $conn->prepare($delete_payments);
         $stmt->bind_param("i", $bill_id);
         $stmt->execute();
         $payments_deleted = $stmt->affected_rows;
         
-        // 3. Now delete the bill (works for all statuses: pending, paid, overdue)
+        // 5. Now delete the bill (works for all statuses: pending, paid, overdue)
         $delete_bill = "DELETE FROM billing_list WHERE id = ?";
         $stmt = $conn->prepare($delete_bill);
         $stmt->bind_param("i", $bill_id);
@@ -91,11 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         echo json_encode([
             'success' => true,
-            'message' => "Bill #{$bill_id} ({$status_text}) deleted successfully. Removed {$fees_deleted} fee record(s) and {$payments_deleted} payment record(s).",
+            'message' => "Bill #{$bill_id} ({$status_text}) deleted successfully. Removed {$notifications_deleted} notification(s), {$notices_deleted} notice(s), {$fees_deleted} fee record(s), and {$payments_deleted} payment record(s).",
             'debug' => [
                 'bill_id' => $bill_id,
                 'bill_status' => $status_text,
                 'bill_total' => $bill_total,
+                'notifications_deleted' => $notifications_deleted,
+                'notices_deleted' => $notices_deleted,
                 'fees_deleted' => $fees_deleted,
                 'payments_deleted' => $payments_deleted,
                 'bill_deleted' => $bill_deleted

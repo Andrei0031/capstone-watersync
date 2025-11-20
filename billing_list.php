@@ -1368,7 +1368,9 @@ if ($params) {
                                 </td>
                                 <td>
                                     <div>
-                                        <div class="customer-name">
+                                        <div class="customer-name" style="cursor: pointer; color: #0d6efd; text-decoration: underline;" 
+                                             onclick="viewCustomerDetails(<?php echo $row['client_id']; ?>)"
+                                             title="Click to view customer details and billing history">
                                             <?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>
                                         </div>
                                         <div class="customer-code">
@@ -1906,6 +1908,153 @@ if ($params) {
     </div>
 </div>
 
+<!-- Customer Details Modal -->
+<div class="modal fade" id="customerDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-user me-2"></i>Customer Details & Billing History
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="customerDetailsLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading customer details...</p>
+                </div>
+                
+                <div id="customerDetailsContent" style="display: none;">
+                    <!-- Customer Information Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Customer Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <strong>Name:</strong> <span id="customerFullName"></span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Meter Code:</strong> <span id="customerMeterCode"></span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Contact:</strong> <span id="customerContact"></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <strong>Address:</strong> <span id="customerAddress"></span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Category:</strong> <span id="customerCategory"></span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Rate:</strong> ₱<span id="customerRate"></span> (Base) / ₱<span id="customerExcessRate"></span> (Excess per cu.m)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistics Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-center border-primary">
+                                <div class="card-body">
+                                    <h3 class="text-primary mb-0" id="statTotalBills">0</h3>
+                                    <small class="text-muted">Total Bills</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center border-success">
+                                <div class="card-body">
+                                    <h3 class="text-success mb-0" id="statPaidBills">0</h3>
+                                    <small class="text-muted">Paid Bills</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center border-warning">
+                                <div class="card-body">
+                                    <h3 class="text-warning mb-0" id="statUnpaidBills">0</h3>
+                                    <small class="text-muted">Unpaid Bills</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center border-danger">
+                                <div class="card-body">
+                                    <h3 class="text-danger mb-0" id="statOverdueBills">0</h3>
+                                    <small class="text-muted">Overdue Bills</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-info">
+                                <div class="card-body">
+                                    <h6 class="text-info mb-2">Total Billed</h6>
+                                    <h4 class="mb-0">₱<span id="statTotalBilled">0.00</span></h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="text-success mb-2">Total Outstanding</h6>
+                                    <h4 class="mb-0">₱<span id="statTotalOutstanding">0.00</span></h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Billing History Table -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Billing History</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Bill #</th>
+                                            <th>Billing Month</th>
+                                            <th>Reading Date</th>
+                                            <th>Due Date</th>
+                                            <th>Consumption</th>
+                                            <th>Amount</th>
+                                            <th>Paid</th>
+                                            <th>Balance</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="billingHistoryTableBody">
+                                        <tr>
+                                            <td colspan="10" class="text-center text-muted">Loading...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Theme Toggle
@@ -2368,6 +2517,89 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Customer Details Modal Functionality
+    window.viewCustomerDetails = function(clientId) {
+        const modal = new bootstrap.Modal(document.getElementById('customerDetailsModal'));
+        const loadingDiv = document.getElementById('customerDetailsLoading');
+        const contentDiv = document.getElementById('customerDetailsContent');
+        
+        // Show loading, hide content
+        loadingDiv.style.display = 'block';
+        contentDiv.style.display = 'none';
+        
+        // Show modal
+        modal.show();
+        
+        // Fetch customer details
+        fetch(`get_customer_billing_details.php?client_id=${clientId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate customer information
+                    document.getElementById('customerFullName').textContent = 
+                        `${data.client.firstname} ${data.client.middlename || ''} ${data.client.lastname}`.trim();
+                    document.getElementById('customerMeterCode').textContent = data.client.meter_code || 'N/A';
+                    document.getElementById('customerContact').textContent = data.client.contact || 'N/A';
+                    document.getElementById('customerAddress').textContent = data.client.address || 'N/A';
+                    document.getElementById('customerCategory').textContent = data.client.category_name || 'N/A';
+                    document.getElementById('customerRate').textContent = parseFloat(data.client.rate || 0).toFixed(2);
+                    document.getElementById('customerExcessRate').textContent = parseFloat(data.client.excess_rate || 0).toFixed(2);
+                    
+                    // Populate statistics
+                    document.getElementById('statTotalBills').textContent = data.statistics.total_bills || 0;
+                    document.getElementById('statPaidBills').textContent = data.statistics.paid_bills || 0;
+                    document.getElementById('statUnpaidBills').textContent = data.statistics.unpaid_bills || 0;
+                    document.getElementById('statOverdueBills').textContent = data.statistics.overdue_bills || 0;
+                    document.getElementById('statTotalBilled').textContent = parseFloat(data.statistics.total_billed || 0).toFixed(2);
+                    document.getElementById('statTotalOutstanding').textContent = parseFloat(data.statistics.total_outstanding || 0).toFixed(2);
+                    
+                    // Populate billing history
+                    const tbody = document.getElementById('billingHistoryTableBody');
+                    if (data.bills && data.bills.length > 0) {
+                        tbody.innerHTML = data.bills.map(bill => {
+                            const statusClass = bill.status_text === 'Paid' ? 'status-paid' : 
+                                              bill.status_text === 'Overdue' ? 'status-overdue' : 'status-unpaid';
+                            const overdueBadge = bill.days_overdue > 0 ? 
+                                `<span class="badge bg-danger ms-2">${bill.days_overdue} day(s) overdue</span>` : '';
+                            
+                            return `
+                                <tr>
+                                    <td>#${bill.id}</td>
+                                    <td>${bill.billing_month || 'N/A'}</td>
+                                    <td>${bill.reading_date_formatted}</td>
+                                    <td>${bill.due_date_formatted}${overdueBadge}</td>
+                                    <td>${parseFloat(bill.consumption).toFixed(2)} cu.m</td>
+                                    <td>₱${parseFloat(bill.total).toFixed(2)}</td>
+                                    <td>₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
+                                    <td>₱${parseFloat(bill.remaining_balance).toFixed(2)}</td>
+                                    <td><span class="status-badge ${statusClass}">${bill.status_text}</span></td>
+                                    <td>
+                                        <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary view-btn" data-id="${bill.id}" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No billing history found</td></tr>';
+                    }
+                    
+                    // Hide loading, show content
+                    loadingDiv.style.display = 'none';
+                    contentDiv.style.display = 'block';
+                } else {
+                    alert('Error loading customer details: ' + (data.message || 'Unknown error'));
+                    modal.hide();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading customer details: ' + error.message);
+                modal.hide();
+            });
+    };
+    
     // Edit Bill Modal Functionality
     const editModalElement = document.getElementById('editBillModal');
     const editModal = new bootstrap.Modal(editModalElement, {
