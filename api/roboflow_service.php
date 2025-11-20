@@ -13,20 +13,20 @@ define('ROBOFLOW_WORKSPACE', 'watersync');
 // Meter Detection Model Configuration
 // Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
-define('ROBOFLOW_MODEL_VERSION', '2'); // Using version 2 (working model)
-define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/2'); // Model ID format: project/version
+define('ROBOFLOW_MODEL_VERSION', '7'); // Latest trained model version 7
+define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/7'); // Model ID format: project/version
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
-// Format: "project-name/version" (e.g., "watersync-oekrf/2")
-// Using version 2 which is the working model
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/2'); // Using version 2 (working model)
+// Format: "project-name/version" (e.g., "watersync-oekrf/7")
+// Using latest trained model version 7 with same config as version 2
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Latest trained model version 7
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
-define('ROBOFLOW_DIGIT_MODEL_VERSION', '2'); // Using version 2 (working model)
+define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Latest trained model version 7
 
 // Build inference URL - try both serverless and detect endpoints
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
