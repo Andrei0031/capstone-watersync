@@ -105,7 +105,7 @@ try {
     $extractedText = '';
     $ocrProcessed = false;
     $ocrError = null;
-    $status = 'failed'; // Default to failed, will change if OCR succeeds
+    $status = 'pending'; // Default to pending - will change to 'processed' if OCR succeeds, stays 'pending' if OCR fails (for manual processing)
     
     try {
         // Try Roboflow digit detection first (preferred method)
@@ -139,6 +139,8 @@ try {
         if (!$ocrProcessed) {
             $ocrError = $ocrError ?? 'OCR processing failed and no manual reading provided';
             error_log("✗ Auto-OCR FAILED: $ocrError");
+            // Set status to 'pending' instead of 'failed' so it can be manually processed from web interface
+            $status = 'pending';
         }
         
     } catch (Exception $e) {
