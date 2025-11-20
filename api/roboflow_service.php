@@ -95,7 +95,8 @@ function detectMeterRegionWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded'
         ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         
         error_log("Roboflow: Sending request to API...");
