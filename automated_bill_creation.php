@@ -4,6 +4,9 @@
  * Automatically creates bills when meter readings are processed
  */
 
+// Include notification system
+require_once __DIR__ . '/simple_notifications.php';
+
 function createAutomatedBill($client_id, $reading_value, $billing_cycle_id, $conn) {
     try {
         // Get client info and category
@@ -118,6 +121,19 @@ function createAutomatedBill($client_id, $reading_value, $billing_cycle_id, $con
                 $fee_stmt->bind_param("iid", $bill_id, $applied_fee['fee_id'], $applied_fee['fee_amount']);
                 $fee_stmt->execute();
             }
+        }
+        
+        // Send notification to registered customer
+        try {
+            $notification_result = sendBillingNotification($client_id, $bill_id, 'bill_approved');
+            if ($notification_result['success']) {
+                error_log("Notification sent for automated bill $bill_id: " . json_encode($notification_result['results']));
+            } else {
+                error_log("Notification failed for automated bill $bill_id: " . ($notification_result['error'] ?? 'Unknown error'));
+            }
+        } catch (Exception $e) {
+            error_log("Notification system error for automated bill $bill_id: " . $e->getMessage());
+            // Don't fail bill creation if notifications fail
         }
         
         return [

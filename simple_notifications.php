@@ -130,32 +130,62 @@ function sendDummySMS($phone, $message) {
     */
 }
 
-// Dummy Email function (replace with real API later)
+// Email function - supports both dummy mode and real email sending
 function sendDummyEmail($email, $subject, $message) {
-    // This is dummy mode - no actual email sent
-    return [
-        'success' => true,
-        'status' => 'dummy_sent',
-        'message' => 'Email logged successfully (dummy mode)',
-        'email' => $email,
-        'subject' => $subject,
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
+    // Set to true to enable real email sending, false for dummy mode
+    $ENABLE_REAL_EMAIL = false; // CHANGE THIS TO true TO ENABLE REAL EMAIL SENDING
     
-    // When ready for real Email API, replace above with:
-    /*
-    // Example using PHP mail() function:
-    $headers = "From: noreply@watersync.com\r\n";
+    if (!$ENABLE_REAL_EMAIL) {
+        // Dummy mode - logs but doesn't send
+        error_log("EMAIL (DUMMY MODE): To: $email | Subject: $subject");
+        return [
+            'success' => true,
+            'status' => 'dummy_sent',
+            'message' => 'Email logged successfully (dummy mode)',
+            'email' => $email,
+            'subject' => $subject,
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    }
+    
+    // Real email sending using PHP mail() function
+    // Note: This requires proper mail server configuration
+    // For XAMPP, you may need to configure sendmail or use SMTP
+    
+    $from_email = 'noreply@watersync.com'; // Change this to your domain email
+    $from_name = 'WaterSync';
+    
+    // Prepare headers
+    $headers = "From: $from_name <$from_email>\r\n";
+    $headers .= "Reply-To: $from_email\r\n";
     $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= "X-Mailer: PHP/" . phpversion();
     
-    $sent = mail($email, $subject, $message, $headers);
+    // Send email
+    $sent = @mail($email, $subject, $message, $headers);
     
-    return [
-        'success' => $sent,
-        'status' => $sent ? 'sent' : 'failed',
-        'message' => $sent ? 'Email sent successfully' : 'Failed to send email'
-    ];
-    */
+    if ($sent) {
+        error_log("EMAIL SENT: To: $email | Subject: $subject");
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'message' => 'Email sent successfully',
+            'email' => $email,
+            'subject' => $subject,
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    } else {
+        error_log("EMAIL FAILED: To: $email | Subject: $subject | Error: " . error_get_last()['message']);
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'message' => 'Failed to send email. Check server mail configuration.',
+            'error' => error_get_last()['message'] ?? 'Unknown error',
+            'email' => $email,
+            'subject' => $subject,
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    }
 }
 
 // Log notifications to database

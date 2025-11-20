@@ -33,6 +33,7 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 define('TESSERACT_AVAILABLE', $tesseract_available);
 
 include 'db.php';
+include 'simple_notifications.php';
 include 'automated_bill_creation.php';
 
 /**
@@ -422,6 +423,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
             );
             
             if ($bill_stmt->execute()) {
+                $bill_id = $conn->insert_id; // Get the newly created bill ID
+                
+                // Send notification to registered customer
+                try {
+                    $notification_result = sendBillingNotification($reading['client_id'], $bill_id, 'bill_approved');
+                    if ($notification_result['success']) {
+                        error_log("Notification sent for bill $bill_id (from meter reading): " . json_encode($notification_result['results']));
+                    } else {
+                        error_log("Notification failed for bill $bill_id: " . ($notification_result['error'] ?? 'Unknown error'));
+                    }
+                } catch (Exception $e) {
+                    error_log("Notification system error for bill $bill_id: " . $e->getMessage());
+                    // Don't fail bill creation if notifications fail
+                }
+                
                 // Mark reading as processed
                 $update = $conn->prepare("UPDATE pending_meter_readings SET 
                     status = 'processed',
