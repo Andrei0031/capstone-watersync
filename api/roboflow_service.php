@@ -684,14 +684,24 @@ function detectDigitsWithRoboflow($imagePath) {
         }
         
         // Log raw response for debugging
-        error_log("Roboflow Digit Detection: Raw API Response (first 500 chars): " . substr($response, 0, 500));
+        error_log("Roboflow Digit Detection: Raw API Response (first 1000 chars): " . substr($response, 0, 1000));
+        error_log("Roboflow Digit Detection: Full response length: " . strlen($response) . " bytes");
         
         $data = json_decode($response, true);
         
         if (!$data) {
             $jsonError = json_last_error_msg();
             error_log('✗ Roboflow Digit Detection: JSON decode failed: ' . $jsonError);
-            error_log('✗ Roboflow Digit Detection: Response was: ' . substr($response, 0, 500));
+            error_log('✗ Roboflow Digit Detection: Full response was: ' . $response);
+            
+            // Check if response is empty or just whitespace
+            if (empty(trim($response))) {
+                error_log('⚠ WARNING: API returned empty response. This usually means:');
+                error_log('   1. Version 7 is NOT deployed for "Hosted Image Inference"');
+                error_log('   2. You need to click "View Code" in "Hosted Image Inference" section to deploy it');
+                error_log('   3. The model is only deployed for "Embedded Device" (not for API)');
+            }
+            
             return [
                 'success' => false,
                 'digits' => [],
@@ -700,7 +710,16 @@ function detectDigitsWithRoboflow($imagePath) {
         }
         
         // Log full API response structure
-        error_log("Roboflow Digit Detection: API Response structure: " . json_encode($data));
+        error_log("Roboflow Digit Detection: API Response structure: " . json_encode($data, JSON_PRETTY_PRINT));
+        
+        // Check if response is empty object/array
+        if (empty($data) || (is_array($data) && count($data) === 0)) {
+            error_log('⚠ WARNING: API returned empty data structure. This usually means:');
+            error_log('   1. Version 7 is NOT deployed for "Hosted Image Inference"');
+            error_log('   2. You need to go to Roboflow → Deploy → "Hosted Image Inference" → Click "View Code"');
+            error_log('   3. The model may only be deployed for "Embedded Device" (not for API calls)');
+            error_log('   4. Check if version 7 shows a cURL example in "Hosted Image Inference" section');
+        }
         
         // Parse digit detections - check multiple possible response formats
         $predictions = [];
