@@ -589,9 +589,11 @@ function detectDigitsWithRoboflow($imagePath) {
         }
         
         error_log("Roboflow Digit Detection: Final method used: $methodUsed, HTTP Code: $httpCode");
-        
+        error_log("Roboflow Digit Detection: API URL used: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        error_log("Roboflow Digit Detection: Model ID: " . ROBOFLOW_DIGIT_MODEL_ID);
         error_log("Roboflow Digit Detection: HTTP Response Code: $httpCode");
         error_log("Roboflow Digit Detection: Response length: " . strlen($response) . " bytes");
+        error_log("Roboflow Digit Detection: Raw response (first 1000 chars): " . substr($response, 0, 1000));
         
         if ($error) {
             error_log("Roboflow Digit Detection: cURL Error: $error");
@@ -607,13 +609,17 @@ function detectDigitsWithRoboflow($imagePath) {
             if ($httpCode === 401) {
                 $errorMsg .= ' - Unauthorized. Check your API key in roboflow_service.php';
             } elseif ($httpCode === 404) {
-                $errorMsg .= ' - Not found. Check workspace/project/model version. Model may need to be deployed first.';
+                $errorMsg .= ' - Not found. Model version 7 may not be deployed. Check Roboflow dashboard and deploy the model.';
+                $errorMsg .= ' If version 2 works, you may need to deploy version 7 in Roboflow.';
             } elseif ($httpCode === 405) {
-                $errorMsg .= ' - Method Not Allowed. The digit detection model may not be deployed yet. Please deploy your model in Roboflow dashboard.';
+                $errorMsg .= ' - Method Not Allowed. The digit detection model version 7 may not be deployed yet.';
+                $errorMsg .= ' Please deploy your model version 7 in Roboflow dashboard.';
             } else {
                 $errorMsg .= ' - Response: ' . substr($response, 0, 500);
             }
             error_log('✗ Roboflow Digit Detection API HTTP Error: ' . $errorMsg);
+            error_log('✗ API URL: ' . ROBOFLOW_DIGIT_INFERENCE_URL);
+            error_log('✗ Model ID: ' . ROBOFLOW_DIGIT_MODEL_ID);
             error_log('✗ Full API Response: ' . substr($response, 0, 1000));
             return [
                 'success' => false,
