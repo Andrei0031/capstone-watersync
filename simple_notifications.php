@@ -65,7 +65,8 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         
         // Send Email if email exists (prefer registered email)
         if (!empty($email_to_use)) {
-            $email_subject = "Water Bill Created - Amount Due: ₱$amount";
+            // Remove peso sign from subject to avoid encoding issues - use PHP instead
+            $email_subject = "Water Bill Created - Amount Due: PHP $amount";
             $email_message = "Dear $customer_name,\n\nYour water bill has been created:\n\n" .
                            "Bill ID: $bill_id\n" .
                            "Amount Due: ₱$amount\n" .
@@ -165,18 +166,22 @@ function sendDummyEmail($email, $subject, $message) {
     $from_email = 'brgymali@brgymalitbog-watersync.site'; // Use your actual working email address
     $from_name = 'Barangay New Malitbog WaterSync';
     
-    // Prepare headers
+    // Prepare headers with proper encoding
     $headers = "From: $from_name <$from_email>\r\n";
     $headers .= "Reply-To: $from_email\r\n";
     $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= "Content-Transfer-Encoding: 8bit\r\n";
     $headers .= "X-Mailer: PHP/" . phpversion() . "\r\n";
     $headers .= "MIME-Version: 1.0";
+    
+    // Encode subject line properly to avoid invalid characters
+    $encoded_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
     
     // Clear any previous errors
     error_clear_last();
     
-    // Send email (remove @ to see actual errors)
-    $sent = mail($email, $subject, $message, $headers);
+    // Send email with properly encoded subject to avoid invalid character errors
+    $sent = mail($email, $encoded_subject, $message, $headers);
     
     // Get the last error if any
     $last_error = error_get_last();
