@@ -258,35 +258,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     }
                 }
                 
-                $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
+                // Step 2a: Try Roboflow digit detection first (preferred method)
+                $ocrProcessed = false;
+                $ocrReading = null;
+                $extractedText = '';
+                $ocrError = null;
                 
-                if (!$ocrResult['success']) {
-                    $errorMsg = 'Roboflow digit detection failed';
-                    if (isset($ocrResult['error']) && !empty($ocrResult['error'])) {
-                        $errorMsg .= ': ' . $ocrResult['error'];
-                    } elseif (isset($ocrResult['message']) && !empty($ocrResult['message'])) {
-                        $errorMsg .= ': ' . $ocrResult['message'];
+                if (function_exists('processImageWithRoboflowDigits')) {
+                    $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
+                    if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                        $ocrReading = $ocrResult['meter_reading'];
+                        $extractedText = $ocrResult['extracted_text'] ?? '';
+                        $ocrProcessed = true;
+                        error_log("✓ OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
                     } else {
-                        $errorMsg .= ': Unknown error. Check if Roboflow digit detection model is deployed and configured correctly.';
+                        $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+                        error_log("⚠ Roboflow OCR failed for reading ID $reading_id: $ocrError");
+                    }
+                }
+                
+                // Step 2b: If Roboflow failed, try Tesseract as fallback (if available)
+                if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
+                    error_log("Trying Tesseract fallback for reading ID $reading_id...");
+                    $tesseractResult = processImageWithTesseract($croppedImagePath);
+                    if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
+                        $ocrReading = $tesseractResult['meter_reading'];
+                        $extractedText = $tesseractResult['extracted_text'] ?? '';
+                        $ocrProcessed = true;
+                        error_log("✓ OCR SUCCESS (Tesseract): Reading ID $reading_id processed with value: $ocrReading");
+                    } else {
+                        $tesseractError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
+                        error_log("⚠ Tesseract OCR also failed for reading ID $reading_id: $tesseractError");
+                        if ($ocrError) {
+                            $ocrError .= ' | Tesseract: ' . $tesseractError;
+                        } else {
+                            $ocrError = 'Tesseract: ' . $tesseractError;
+                        }
+                    }
+                }
+                
+                // Step 2c: If both failed, throw exception with details
+                if (!$ocrProcessed) {
+                    $errorMsg = 'OCR processing failed. ';
+                    if ($ocrError) {
+                        $errorMsg .= $ocrError;
+                    } else {
+                        $errorMsg .= 'Both Roboflow and Tesseract failed to process the image.';
                     }
                     $errorMsg .= ' Image path: ' . $croppedImagePath;
                     throw new Exception($errorMsg);
-                }
-                
-                $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrReading = $ocrResult['meter_reading'] ?? null;
-                
-                if (empty($ocrReading)) {
-                    $errorDetails = 'No meter reading detected in image.';
-                    if ($roboflowError) {
-                        $errorDetails .= ' Roboflow: ' . $roboflowError . '.';
-                    } elseif (!$roboflowUsed) {
-                        $errorDetails .= ' Roboflow was not used (using original image).';
-                    } else {
-                        $errorDetails .= ' Roboflow was used but reading not found.';
-                    }
-                    $errorDetails .= ' Extracted text: ' . substr($extractedText, 0, 200);
-                    throw new Exception($errorDetails);
                 }
                 
                 // Clean up cropped image if it was created by Roboflow

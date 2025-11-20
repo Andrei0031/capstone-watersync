@@ -460,6 +460,8 @@ function processImageWithRoboflowDigits($imagePath) {
             }
             error_log('✗ Roboflow OCR: ' . $errorMsg);
             error_log("=== ROBOFLOW OCR PROCESSING END (FAILED) ===");
+            error_log("NOTE: Tesseract fallback should be called by the calling function");
+            // Return failure - let calling function handle Tesseract fallback
             return [
                 'success' => false,
                 'extracted_text' => '',
