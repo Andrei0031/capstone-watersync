@@ -55,14 +55,14 @@ $payments_sql = "SELECT
     cl.lastname, 
     cl.meter_code, 
     bl.reading_date,
+    bl.total as bill_total,
+    COALESCE((SELECT SUM(amount) FROM payment_list WHERE billing_id = bl.id AND status = 1), 0) as total_paid,
     CASE 
-        WHEN pl.status = 1 THEN 'Verified'
-        ELSE 'Pending'
+        WHEN pl.status = 1 AND pl.amount >= (bl.total - COALESCE((SELECT SUM(amount) FROM payment_list WHERE billing_id = bl.id AND status = 1 AND id != pl.id), 0)) THEN 'Fully Paid'
+        WHEN pl.status = 1 THEN 'Partial Payment'
+        ELSE 'Partial Payment'
     END as status_text,
-    CASE 
-        WHEN pl.status = 1 THEN pl.amount 
-        ELSE pl.amount
-    END as display_amount
+    pl.amount as display_amount
 FROM payment_list pl 
 JOIN client_list cl ON pl.client_id = cl.id 
 JOIN billing_list bl ON pl.billing_id = bl.id 
@@ -342,25 +342,29 @@ $payments_result = $conn->query($payments_sql);
             font-size: 0.875rem;
         }
 
-        .status-verified { 
+        .status-verified, .status-fully-paid { 
             background-color: #19875420; 
             color: #198754; 
         }
 
-        .status-pending { 
+        .status-pending, .status-partial-payment { 
             background-color: #ffc10720; 
             color: #ffc107; 
         }
 
         html[data-theme="dark"] .status-verified,
-        [data-theme="dark"] .status-verified { 
+        [data-theme="dark"] .status-verified,
+        html[data-theme="dark"] .status-fully-paid,
+        [data-theme="dark"] .status-fully-paid { 
             background-color: #19875430 !important; 
             color: #4caf50 !important; 
             border: 1px solid #19875460;
         }
 
         html[data-theme="dark"] .status-pending,
-        [data-theme="dark"] .status-pending { 
+        [data-theme="dark"] .status-pending,
+        html[data-theme="dark"] .status-partial-payment,
+        [data-theme="dark"] .status-partial-payment { 
             background-color: #ffc10730 !important; 
             color: #ffc107 !important; 
             border: 1px solid #ffc10760;
@@ -829,9 +833,9 @@ $payments_result = $conn->query($payments_sql);
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-white-50">Verified Payments</h6>
+                            <h6 class="text-white-50">Fully Paid Payments</h6>
                             <h3 class="mb-0 text-white"><?php echo number_format($stats['verified_count']); ?></h3>
-                            <small class="text-white-50">Processed successfully</small>
+                            <small class="text-white-50">Completed payments</small>
                         </div>
                         <i class="fas fa-check-circle fa-2x text-white-50"></i>
                     </div>
@@ -843,9 +847,9 @@ $payments_result = $conn->query($payments_sql);
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-white-50">Pending Verification</h6>
+                            <h6 class="text-white-50">Partial Payments</h6>
                             <h3 class="mb-0 text-white"><?php echo number_format($stats['pending_count']); ?></h3>
-                            <small class="text-white-50">Awaiting verification</small>
+                            <small class="text-white-50">Incomplete payments</small>
                         </div>
                         <i class="fas fa-clock fa-2x text-white-50"></i>
                     </div>
@@ -890,7 +894,7 @@ $payments_result = $conn->query($payments_sql);
                                 <td><?php echo date('M d, Y', strtotime($row['payment_date'])); ?></td>
                                 <td><?php echo date('M d, Y', strtotime($row['reading_date'])); ?></td>
                                 <td>
-                                    <span class="status-badge status-verified">Verified</span>
+                                    <span class="status-badge status-verified"><?php echo htmlspecialchars($row['status_text']); ?></span>
                                 </td>
                                 <td>
                                     <div class="btn-group">
@@ -1807,8 +1811,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set status
                 const statusBadge = document.getElementById('statusBadgeView');
-                statusBadge.textContent = payment.status_text;
-                statusBadge.className = 'status-badge ' + (payment.status == 1 ? 'status-verified' : 'status-pending');
+                statusBadge.textContent = payment.status_text || (payment.status == 1 ? 'Fully Paid' : 'Partial Payment');
+                const statusClass = (payment.status_text === 'Fully Paid' || payment.status == 1) ? 'status-fully-paid' : 'status-partial-payment';
+                statusBadge.className = 'status-badge ' + statusClass;
                 
                 // Show verified date if payment is verified
                 const verifiedDateContainer = document.getElementById('verifiedDateContainer');

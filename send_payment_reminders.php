@@ -1,0 +1,98 @@
+<?php
+/**
+ * Automated Payment Reminder and Overdue Notifications
+ * Run this via cron job daily to send reminders
+ */
+
+include 'db.php';
+include 'simple_notifications.php';
+
+// Get all unpaid bills
+$unpaid_bills_sql = "
+    SELECT 
+        b.id as bill_id,
+        b.client_id,
+        b.due_date,
+        b.total,
+        b.reading_date,
+        DATEDIFF(CURRENT_DATE(), b.due_date) as days_overdue,
+        cl.firstname,
+        cl.lastname,
+        cl.contact as phone,
+        cl.email,
+        ca.email as registered_email,
+        ca.id as account_id
+    FROM billing_list b
+    JOIN client_list cl ON b.client_id = cl.id
+    LEFT JOIN customer_accounts ca ON cl.id = ca.client_id
+    WHERE b.status = 0
+    AND cl.status = 1
+    AND ca.id IS NOT NULL  -- Only registered customers
+    ORDER BY b.due_date ASC
+";
+
+$result = $conn->query($unpaid_bills_sql);
+$notifications_sent = 0;
+
+while ($bill = $result->fetch_assoc()) {
+    $days_overdue = $bill['days_overdue'];
+    $is_overdue = $days_overdue > 0;
+    $days_until_due = -$days_overdue; // Negative means days until due
+    
+    $email_to_use = !empty($bill['registered_email']) ? $bill['registered_email'] : $bill['email'];
+    $customer_name = $bill['firstname'] . ' ' . $bill['lastname'];
+    $amount = number_format($bill['total'], 2);
+    $due_date = date('M d, Y', strtotime($bill['due_date']));
+    
+    // Send payment deadline reminder (3 days before due date)
+    if ($days_until_due == 3 && !$is_overdue) {
+        // SMS
+        if (!empty($bill['phone'])) {
+            $sms_message = "Hi $customer_name! Reminder: Your water bill of ₱$amount is due in 3 days ($due_date). Please pay on time! - WaterSync";
+            sendDummySMS($bill['phone'], $sms_message);
+            logNotification($bill['client_id'], $bill['bill_id'], 'sms', $bill['phone'], $sms_message, 'sent');
+        }
+        
+        // Email
+        if (!empty($email_to_use)) {
+            $email_subject = "Payment Reminder - Bill Due in 3 Days";
+            $email_message = "Dear $customer_name,\n\nThis is a reminder that your water bill payment is due in 3 days:\n\n" .
+                           "Amount Due: ₱$amount\n" .
+                           "Due Date: $due_date\n\n" .
+                           "Please make your payment on or before the due date to avoid late fees.\n\n" .
+                           "Thank you,\nWaterSync Team";
+            sendDummyEmail($email_to_use, $email_subject, $email_message);
+            logNotification($bill['client_id'], $bill['bill_id'], 'email', $email_to_use, $email_message, 'sent');
+        }
+        $notifications_sent++;
+    }
+    
+    // Send overdue notifications (daily for overdue bills)
+    if ($is_overdue) {
+        // SMS
+        if (!empty($bill['phone'])) {
+            $sms_message = "Hi $customer_name! Your water bill of ₱$amount is OVERDUE by $days_overdue day(s). Due: $due_date. Please pay immediately to avoid disconnection! - WaterSync";
+            sendDummySMS($bill['phone'], $sms_message);
+            logNotification($bill['client_id'], $bill['bill_id'], 'sms', $bill['phone'], $sms_message, 'sent');
+        }
+        
+        // Email
+        if (!empty($email_to_use)) {
+            $email_subject = "URGENT: Overdue Water Bill - $days_overdue Day(s) Late";
+            $email_message = "Dear $customer_name,\n\n" .
+                           "URGENT: Your water bill payment is OVERDUE!\n\n" .
+                           "Amount Due: ₱$amount\n" .
+                           "Due Date: $due_date\n" .
+                           "Days Overdue: $days_overdue day(s)\n\n" .
+                           "Please pay immediately to avoid late fees and potential service disconnection.\n\n" .
+                           "Thank you,\nWaterSync Team";
+            sendDummyEmail($email_to_use, $email_subject, $email_message);
+            logNotification($bill['client_id'], $bill['bill_id'], 'email', $email_to_use, $email_message, 'sent');
+        }
+        $notifications_sent++;
+    }
+}
+
+echo "Sent $notifications_sent notifications\n";
+?>
+

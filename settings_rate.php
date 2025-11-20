@@ -1772,10 +1772,14 @@ if ($mobile_users_result) {
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label for="clientSelectQR" class="form-label">Select Client:</label>
-                        <select id="clientSelectQR" class="form-select">
-                            <option value="all">All Active Clients</option>
-                            <!-- Options will be populated by JavaScript -->
-                        </select>
+                        <div class="position-relative">
+                            <input type="text" class="form-control" id="qrClientSearch" placeholder="Search client by name or meter code..." autocomplete="off">
+                            <select id="clientSelectQR" class="form-select" style="display: none;">
+                                <option value="all">All Active Clients</option>
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
+                            <div id="qrClientDropdown" class="position-absolute w-100 bg-white border rounded shadow-lg" style="max-height: 200px; overflow-y: auto; z-index: 1000; display: none; top: 100%;"></div>
+                        </div>
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
                         <button id="generateQRCodesBtn" class="btn btn-success me-2"><i class="fas fa-qrcode me-2"></i>Generate Selected QR Codes</button>
@@ -2151,6 +2155,58 @@ if ($mobile_users_result) {
             }
         }
 
+        // QR Client Search functionality
+        const qrClientSearch = document.getElementById('qrClientSearch');
+        const qrClientDropdown = document.getElementById('qrClientDropdown');
+        let qrClientsData = [];
+        
+        if (qrClientSearch && qrClientDropdown) {
+            qrClientSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    qrClientDropdown.style.display = 'none';
+                    clientSelectQR.value = 'all';
+                    return;
+                }
+                
+                const filtered = qrClientsData.filter(client => {
+                    const name = (client.name || '').toLowerCase();
+                    const meter = (client.meter_code || '').toLowerCase();
+                    return name.includes(searchTerm) || meter.includes(searchTerm);
+                });
+                
+                if (filtered.length > 0) {
+                    qrClientDropdown.innerHTML = filtered.map(client => 
+                        `<div class="p-2 border-bottom cursor-pointer qr-client-option" data-value="${client.id}" style="cursor: pointer;">
+                            ${client.name} (Meter: ${client.meter_code})
+                        </div>`
+                    ).join('');
+                    qrClientDropdown.style.display = 'block';
+                } else {
+                    qrClientDropdown.innerHTML = '<div class="p-2 text-muted">No clients found</div>';
+                    qrClientDropdown.style.display = 'block';
+                }
+            });
+            
+            qrClientDropdown.addEventListener('click', function(e) {
+                if (e.target.classList.contains('qr-client-option')) {
+                    const value = e.target.dataset.value;
+                    const text = e.target.textContent.trim();
+                    clientSelectQR.value = value;
+                    qrClientSearch.value = text;
+                    qrClientDropdown.style.display = 'none';
+                    fetchAndDisplayQRCodes(value === 'all' ? null : value);
+                }
+            });
+            
+            document.addEventListener('click', function(e) {
+                if (qrClientSearch && qrClientDropdown && !qrClientSearch.contains(e.target) && !qrClientDropdown.contains(e.target)) {
+                    qrClientDropdown.style.display = 'none';
+                }
+            });
+        }
+        
         // Fetch clients for dropdown
         async function fetchClientsForQR() {
             try {
@@ -2161,11 +2217,14 @@ if ($mobile_users_result) {
                 }
                 const data = await response.json();
                 if (data.success && data.clients) {
+                    qrClientsData = data.clients; // Store for search
                     clientSelectQR.innerHTML = '<option value="all">All Active Clients</option>'; // Reset
                     data.clients.forEach(client => {
                         const option = document.createElement('option');
                         option.value = client.id;
                         option.textContent = `${client.name} (Meter: ${client.meter_code})`;
+                        option.dataset.name = (client.name || '').toLowerCase();
+                        option.dataset.meter = (client.meter_code || '').toLowerCase();
                         clientSelectQR.appendChild(option);
                     });
                 } else {

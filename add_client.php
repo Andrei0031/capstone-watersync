@@ -30,6 +30,14 @@ if (!empty($last_code)) {
     }
 }
 
+// Get last meter code for auto-generation
+$last_meter_sql = "SELECT meter_code FROM client_list WHERE meter_code IS NOT NULL AND meter_code != '' ORDER BY id DESC LIMIT 1";
+$last_meter_result = $conn->query($last_meter_sql);
+$last_meter_code = '';
+if ($last_meter_result && $row = $last_meter_result->fetch_assoc()) {
+    $last_meter_code = $row['meter_code'];
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $category_id = $_POST['category_id'];
@@ -38,35 +46,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $lastname = $_POST['lastname'];
     $contact = $_POST['contact'];
     $address = $_POST['address'];
-    $meter_code = $_POST['meter_code'];
+    $meter_code = trim($_POST['meter_code']);
     $status = 1;
     $delete_flag = 0;
 
-if (isset($_POST['code'])) {
-    // Use the generated code instead of user input
-    $code = $_POST['code'];
-} else {
-    $code = $year_prefix . '001';
-}
-
-    // Prepare and execute SQL statement to insert new client
-    $stmt = $conn->prepare("INSERT INTO client_list (code, category_id, firstname, middlename, lastname, contact, address, meter_code, status, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sisssssdii", $code, $category_id, $firstname, $middlename, $lastname, $contact, $address, $meter_code, $status, $delete_flag);
-
-    if ($stmt->execute()) {
-        $message = "New client added successfully";
-        $messageClass = "alert alert-success";
-        // Regenerate next code for next client
-        $last_number++;
-        if ($last_number <= 999) {
-            $code = $year_prefix . str_pad($last_number, 3, '0', STR_PAD_LEFT);
-        }
+    if (isset($_POST['code'])) {
+        // Use the generated code instead of user input
+        $code = $_POST['code'];
     } else {
-        $message = "Error: " . $stmt->error;
-        $messageClass = "alert alert-danger";
+        $code = $year_prefix . '001';
     }
+    
+    // Check if meter code already exists
+    $check_meter_sql = "SELECT id FROM client_list WHERE meter_code = ? AND delete_flag = 0";
+    $check_stmt = $conn->prepare($check_meter_sql);
+    $check_stmt->bind_param("s", $meter_code);
+    $check_stmt->execute();
+    if ($check_stmt->get_result()->num_rows > 0) {
+        $message = "Error: Meter code '$meter_code' already exists. Please use a different meter code.";
+        $messageClass = "alert alert-danger";
+        $check_stmt->close();
+    } else {
+        $check_stmt->close();
+        
+        // Prepare and execute SQL statement to insert new client
+        $stmt = $conn->prepare("INSERT INTO client_list (code, category_id, firstname, middlename, lastname, contact, address, meter_code, status, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sisssssdii", $code, $category_id, $firstname, $middlename, $lastname, $contact, $address, $meter_code, $status, $delete_flag);
 
-    $stmt->close();
+        if ($stmt->execute()) {
+            $message = "New client added successfully";
+            $messageClass = "alert alert-success";
+            // Regenerate next code for next client
+            $last_number++;
+            if ($last_number <= 999) {
+                $code = $year_prefix . str_pad($last_number, 3, '0', STR_PAD_LEFT);
+            }
+            // Update last meter code for next generation
+            $last_meter_code = $meter_code;
+        } else {
+            $message = "Error: " . $stmt->error;
+            $messageClass = "alert alert-danger";
+        }
+
+        $stmt->close();
+    }
 }
 
 // Close database connection
@@ -135,7 +158,14 @@ $conn->close();
                         </div>
                         <div class="col-md-12">
                             <label for="meter_code" class="form-label">Meter Code</label>
-                            <input type="text" id="meter_code" name="meter_code" class="form-control" required />
+                            <div class="input-group">
+                                <input type="text" id="meter_code" name="meter_code" class="form-control" required />
+                                <button type="button" class="btn btn-outline-secondary" id="generateMeterCode" title="Auto-generate next meter code">
+                                    <i class="fas fa-magic"></i> Auto-Generate
+                                </button>
+                            </div>
+                            <small class="text-muted" id="meterCodeHint">Last meter code: <span id="lastMeterCode">-</span></small>
+                            <div class="invalid-feedback" id="meterCodeError"></div>
                         </div>
                     </div>
                     <div class="d-grid mt-4">
@@ -148,5 +178,77 @@ $conn->close();
     </div>
     <!-- Bootstrap JS Bundle with Popper (optional for some components) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const meterCodeInput = document.getElementById('meter_code');
+        const generateBtn = document.getElementById('generateMeterCode');
+        const lastMeterCodeSpan = document.getElementById('lastMeterCode');
+        const meterCodeError = document.getElementById('meterCodeError');
+        
+        // Display last meter code
+        if (lastMeterCodeSpan) {
+            lastMeterCodeSpan.textContent = '<?php echo htmlspecialchars($last_meter_code ?: "None"); ?>';
+        }
+        
+        // Auto-generate meter code
+        if (generateBtn && meterCodeInput) {
+            generateBtn.addEventListener('click', function() {
+                const lastMeter = '<?php echo htmlspecialchars($last_meter_code); ?>';
+                if (lastMeter) {
+                    // Extract numeric part and increment
+                    const match = lastMeter.match(/(\d+)$/);
+                    if (match) {
+                        const numPart = parseInt(match[1]);
+                        const prefix = lastMeter.substring(0, lastMeter.length - match[1].length);
+                        const nextCode = prefix + String(numPart + 1).padStart(match[1].length, '0');
+                        meterCodeInput.value = nextCode;
+                        validateMeterCode(nextCode);
+                    } else {
+                        // If no number found, append 1
+                        meterCodeInput.value = lastMeter + '1';
+                    }
+                } else {
+                    meterCodeInput.value = 'METER001';
+                }
+            });
+        }
+        
+        // Validate meter code on input
+        if (meterCodeInput) {
+            meterCodeInput.addEventListener('blur', function() {
+                validateMeterCode(this.value);
+            });
+        }
+        
+        function validateMeterCode(code) {
+            if (!code.trim()) {
+                if (meterCodeError) {
+                    meterCodeError.textContent = '';
+                    meterCodeInput.classList.remove('is-invalid');
+                }
+                return;
+            }
+            
+            // Check via AJAX if meter code exists
+            fetch('check_meter_code.php?meter_code=' + encodeURIComponent(code))
+                .then(response => response.json())
+                .then(data => {
+                    if (meterCodeError) {
+                        if (data.exists) {
+                            meterCodeError.textContent = 'Meter code already exists!';
+                            meterCodeInput.classList.add('is-invalid');
+                        } else {
+                            meterCodeError.textContent = '';
+                            meterCodeInput.classList.remove('is-invalid');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking meter code:', error);
+                });
+        }
+    });
+    </script>
 </body>
 </html>

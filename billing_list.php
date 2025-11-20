@@ -7,6 +7,7 @@ if (!isset($_SESSION['admin_id'])) {
 
 include 'db.php';
 include 'comprehensive_fee_manager.php';
+include 'simple_notifications.php';
 
 $showNotificationModal = false; // Initialize to avoid undefined variable warning
 $message = ''; // Initialize message variable
@@ -32,14 +33,14 @@ if ($paid_result && $row = $paid_result->fetch_assoc()) {
     $paid_bills = $row['count'];
 }
 
-// Calculate number of pending bills
-$pending_bills = 0;
-$pending_query = "SELECT COUNT(*) as count FROM billing_list 
+// Calculate number of unpaid bills
+$unpaid_bills = 0;
+$unpaid_query = "SELECT COUNT(*) as count FROM billing_list 
                  WHERE status = 0 
                  AND due_date >= CURRENT_DATE()";
-$pending_result = $conn->query($pending_query);
-if ($pending_result && $row = $pending_result->fetch_assoc()) {
-    $pending_bills = $row['count'];
+$unpaid_result = $conn->query($unpaid_query);
+if ($unpaid_result && $row = $unpaid_result->fetch_assoc()) {
+    $unpaid_bills = $row['count'];
 }
 
 // Calculate number of overdue bills
@@ -756,7 +757,7 @@ if ($params) {
             color: #1cc88a;
         }
 
-        .status-pending {
+        .status-pending, .status-unpaid {
             background-color: #f6c23e20;
             color: #f6c23e;
         }
@@ -1261,8 +1262,8 @@ if ($params) {
             <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #f6c23e 0%, #dda20a 100%);">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-white-50">Pending Bills</h6>
-                        <h3 class="mb-0"><?php echo $pending_bills; ?></h3>
+                        <h6 class="text-white-50">Unpaid Bills</h6>
+                        <h3 class="mb-0"><?php echo $unpaid_bills; ?></h3>
                         <small class="text-white-50">Needs Action</small>
                     </div>
                     <i class="fas fa-clock stat-icon"></i>
@@ -1297,7 +1298,7 @@ if ($params) {
                     <select class="form-select" id="statusSelect" name="status">
                         <option value="">All Status</option>
                         <option value="paid" <?php echo $status_filter === 'paid' ? 'selected' : ''; ?>>Paid</option>
-                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Unpaid</option>
                         <option value="overdue" <?php echo $status_filter === 'overdue' ? 'selected' : ''; ?>>Overdue</option>
                     </select>
                 </div>
@@ -1416,7 +1417,7 @@ if ($params) {
                                     <?php
                                         // Initialize variables
                                         $status_class = '';
-                                        $status_text = 'Pending';
+                                        $status_text = 'Unpaid';
                                         $status = $row['status'] ?? 0;
 
                                         // Recalculate total based on current rates if status is not paid
@@ -1458,13 +1459,13 @@ if ($params) {
                                                     $status_class = 'status-overdue';
                                                     $status_text = 'Overdue';
                                                 } else {
-                                                    $status_class = 'status-pending';
-                                                    $status_text = 'Pending';
+                                                    $status_class = 'status-unpaid';
+                                                    $status_text = 'Unpaid';
                                                 }
                                                 break;
                                             default:
-                                                $status_class = 'status-pending';
-                                                $status_text = 'Pending';
+                                                $status_class = 'status-unpaid';
+                                                $status_text = 'Unpaid';
                                         }
                                     ?>
                                     <span class="status-badge <?php echo $status_class; ?>">
@@ -1700,7 +1701,7 @@ if ($params) {
                     <div class="mb-3">
                         <label class="form-label">Status</label>
                         <select class="form-select" name="status" required>
-                            <option value="0">Pending</option>
+                            <option value="0">Unpaid</option>
                             <option value="1">Paid</option>
                         </select>
                     </div>
@@ -1848,7 +1849,7 @@ if ($params) {
                                 <div class="mb-3">
                                     <label class="bill-detail-label">Status</label>
                                     <select class="form-select form-select-sm" id="editStatus" name="status">
-                                        <option value="0">Pending</option>
+                                        <option value="0">Unpaid</option>
                                         <option value="1">Paid</option>
                                     </select>
                                 </div>
@@ -2091,7 +2092,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const totalAmountDue = currentBillAmount + previousBalance;
                 
                 // Get status from API or table
-                let status = 'Pending';
+                let status = 'Unpaid';
                 if (bill.status == 1) {
                     status = 'Paid';
                 } else if (bill.due_date) {
@@ -2146,7 +2147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     statusElem.textContent = status;
                     statusElem.className = 'status-badge ' + (
                         status === 'Paid' ? 'status-paid' :
-                        status === 'Overdue' ? 'status-overdue' : 'status-pending'
+                        status === 'Overdue' ? 'status-overdue' : 'status-unpaid'
                     );
                 }
 

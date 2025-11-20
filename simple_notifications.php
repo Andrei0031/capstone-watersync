@@ -9,14 +9,30 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
     global $conn;
     
     try {
-        // Get client information
-        $stmt = $conn->prepare("SELECT firstname, lastname, phone, email FROM client_list WHERE id = ?");
+        // Get client information - check both client_list and customer_accounts for registered customers
+        $stmt = $conn->prepare("
+            SELECT 
+                cl.id, cl.firstname, cl.lastname, cl.contact as phone, cl.email,
+                ca.email as registered_email, ca.id as account_id
+            FROM client_list cl
+            LEFT JOIN customer_accounts ca ON cl.id = ca.client_id
+            WHERE cl.id = ? AND cl.status = 1
+        ");
         $stmt->bind_param("i", $client_id);
         $stmt->execute();
         $client = $stmt->get_result()->fetch_assoc();
         
         if (!$client) {
             return ['success' => false, 'error' => 'Client not found'];
+        }
+        
+        // Use registered email if available, otherwise use client email
+        $email_to_use = !empty($client['registered_email']) ? $client['registered_email'] : $client['email'];
+        $is_registered = !empty($client['account_id']);
+        
+        // Only send notifications to registered customers (those with customer_accounts entry)
+        if (!$is_registered) {
+            return ['success' => false, 'error' => 'Customer not registered in customer accounts'];
         }
         
         // Get bill information
@@ -46,10 +62,10 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
             logNotification($client_id, $bill_id, 'sms', $client['phone'], $sms_message, $sms_result['status']);
         }
         
-        // Send Email if email exists
-        if (!empty($client['email'])) {
-            $email_subject = "Water Bill Approved - Amount Due: ₱$amount";
-            $email_message = "Dear $customer_name,\n\nYour water bill has been approved:\n\n" .
+        // Send Email if email exists (prefer registered email)
+        if (!empty($email_to_use)) {
+            $email_subject = "Water Bill Created - Amount Due: ₱$amount";
+            $email_message = "Dear $customer_name,\n\nYour water bill has been created:\n\n" .
                            "Bill ID: $bill_id\n" .
                            "Amount Due: ₱$amount\n" .
                            "Due Date: $due_date\n" .
@@ -59,11 +75,11 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
                            "Please pay on or before the due date to avoid late fees.\n\n" .
                            "Thank you,\nWaterSync Team";
             
-            $email_result = sendDummyEmail($client['email'], $email_subject, $email_message);
+            $email_result = sendDummyEmail($email_to_use, $email_subject, $email_message);
             $results['email'] = $email_result;
             
             // Log Email notification
-            logNotification($client_id, $bill_id, 'email', $client['email'], $email_message, $email_result['status']);
+            logNotification($client_id, $bill_id, 'email', $email_to_use, $email_message, $email_result['status']);
         }
         
         return ['success' => true, 'results' => $results];
