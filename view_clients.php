@@ -625,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
         }
         exit();
- elseif (isset($_POST['add_historical_reading'])) {
+    } elseif (isset($_POST['add_historical_reading'])) {
         // Handle historical meter reading submission
         $client_id = $_POST['client_id'];
         $billing_cycle_id = $_POST['billing_cycle_id'];
