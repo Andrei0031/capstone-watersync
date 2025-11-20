@@ -1914,11 +1914,9 @@ if ($params) {
 <div class="modal fade" id="customerDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-bottom: none;">
-                <h5 class="modal-title fw-bold">
-                    <i class="fas fa-user-circle me-2"></i>Customer Details & Billing History
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold">Customer Details & Billing History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="customerDetailsLoading" class="text-center py-5">
