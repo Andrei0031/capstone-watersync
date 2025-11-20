@@ -27,15 +27,19 @@ define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Updated to version 7
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
 define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Updated to version 7
 
-// Build inference URL - using serverless.roboflow.com endpoint (Hosted Image Inference)
+// Build inference URL - try both serverless and detect endpoints
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
+// Alternative: https://detect.roboflow.com/{workspace}/{project}/{version}
 // If model_id is set, use it directly; otherwise use project/version format
 if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
-    // Use model_id format directly (serverless API format)
+    // Primary: Use serverless endpoint
     define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
+    // Alternative: Use detect endpoint (fallback)
+    define('ROBOFLOW_DIGIT_INFERENCE_URL_ALT', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 } else {
     // Use project/version format (legacy)
     define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
+    define('ROBOFLOW_DIGIT_INFERENCE_URL_ALT', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 }
 
 /**
@@ -421,16 +425,25 @@ function detectDigitsWithRoboflow($imagePath) {
             ];
         }
         
-        // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
+        // Try multiple methods to send image to Roboflow API
+        // Method 1: Base64 in POST body (original method)
+        // Method 2: Multipart form-data with file
+        // Method 3: Base64 with different content type
+        
+        $response = null;
+        $httpCode = 0;
+        $error = '';
+        $methodUsed = '';
+        
+        // METHOD 1: Try base64 in POST body (original)
+        error_log("Roboflow Digit Detection: Trying Method 1 - Base64 POST body");
         $base64Image = base64_encode($imageData);
         error_log("Roboflow Digit Detection: Base64 encoded size: " . round(strlen($base64Image) / 1024, 2) . " KB");
         
-        // Initialize cURL
-        // Roboflow serverless API: POST with base64-encoded image data in body
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send base64 data in POST body
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded'
@@ -438,11 +451,143 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         
-        error_log("Roboflow Digit Detection: Sending request to API...");
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
+        
+        // Check if Method 1 returned valid predictions
+        $method1Success = false;
+        if ($httpCode === 200 && !$error && !empty($response)) {
+            $testData = json_decode($response, true);
+            if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
+                $method1Success = true;
+                $methodUsed = 'base64-form';
+                error_log("Roboflow Digit Detection: Method 1 (base64-form) succeeded with " . count($testData['predictions']) . " predictions");
+            }
+        }
+        
+        // If Method 1 failed or returned empty predictions, try Method 2: Multipart form-data
+        if (!$method1Success) {
+            error_log("Roboflow Digit Detection: Method 1 failed or no predictions, trying Method 2 - Multipart form-data");
+            $methodUsed = 'multipart';
+            
+            $boundary = uniqid();
+            $delimiter = '-------------' . $boundary;
+            
+            $postData = '';
+            $postData .= '--' . $delimiter . "\r\n";
+            $postData .= 'Content-Disposition: form-data; name="file"; filename="meter_image.jpg"' . "\r\n";
+            $postData .= 'Content-Type: image/jpeg' . "\r\n\r\n";
+            $postData .= $imageData . "\r\n";
+            $postData .= '--' . $delimiter . '--';
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: multipart/form-data; boundary=' . $delimiter
+            ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            // Check if Method 2 returned valid predictions
+            $method2Success = false;
+            if ($httpCode === 200 && !$error && !empty($response)) {
+                $testData = json_decode($response, true);
+                if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
+                    $method2Success = true;
+                    error_log("Roboflow Digit Detection: Method 2 (multipart) succeeded with " . count($testData['predictions']) . " predictions");
+                }
+            }
+            
+            // If Method 2 also failed, try Method 3: Base64 with text/plain
+            if (!$method2Success) {
+                error_log("Roboflow Digit Detection: Method 2 failed, trying Method 3 - Base64 with text/plain");
+                $methodUsed = 'base64-text';
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: text/plain'
+                ]);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                // Check if Method 3 returned valid predictions
+                $method3Success = false;
+                if ($httpCode === 200 && !$error && !empty($response)) {
+                    $testData = json_decode($response, true);
+                    if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
+                        $method3Success = true;
+                        error_log("Roboflow Digit Detection: Method 3 (base64-text) succeeded with " . count($testData['predictions']) . " predictions");
+                    }
+                }
+                
+                // If Method 3 failed, try Method 4: CURLFile (PHP 5.5+)
+                if (!$method3Success && class_exists('CURLFile')) {
+                    error_log("Roboflow Digit Detection: Method 3 failed, trying Method 4 - CURLFile");
+                    $methodUsed = 'curlfile';
+                    
+                    $cfile = new CURLFile($imagePath, 'image/jpeg', 'meter_image.jpg');
+                    $postData = ['file' => $cfile];
+                    
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $error = curl_error($ch);
+                    curl_close($ch);
+                }
+                
+                // If all methods failed with serverless endpoint, try detect.roboflow.com endpoint
+                if ($httpCode !== 200 || $error || empty($response)) {
+                    if (defined('ROBOFLOW_DIGIT_INFERENCE_URL_ALT')) {
+                        error_log("Roboflow Digit Detection: All methods failed with serverless endpoint, trying alternative detect.roboflow.com endpoint");
+                        $methodUsed = 'detect-endpoint-base64';
+                        
+                        $ch = curl_init();
+                        curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL_ALT);
+                        curl_setopt($ch, CURLOPT_POST, true);
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                            'Content-Type: application/x-www-form-urlencoded'
+                        ]);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                        
+                        $response = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $error = curl_error($ch);
+                        curl_close($ch);
+                    }
+                }
+            }
+        }
+        
+        error_log("Roboflow Digit Detection: Final method used: $methodUsed, HTTP Code: $httpCode");
         
         error_log("Roboflow Digit Detection: HTTP Response Code: $httpCode");
         error_log("Roboflow Digit Detection: Response length: " . strlen($response) . " bytes");
