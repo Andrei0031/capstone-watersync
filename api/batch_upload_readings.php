@@ -13,9 +13,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+/**
+ * Enhanced sendResponse for batch API (includes timestamp and api_version)
+ */
+function sendBatchResponse($success, $message, $data = null, $status_code = 200) {
+    http_response_code($status_code);
+    
+    $response = [
+        'success' => $success,
+        'message' => $message,
+        'timestamp' => date('Y-m-d H:i:s'),
+        'api_version' => '2.0'
+    ];
+    
+    if ($data !== null) {
+        $response['data'] = $data;
+    }
+    
+    echo json_encode($response, JSON_PRETTY_PRINT);
+    exit();
+}
+
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sendResponse(false, 'Only POST method allowed', null, 405);
+    sendBatchResponse(false, 'Only POST method allowed', null, 405);
 }
 
 // Validate API key or allow local network access
@@ -31,17 +52,17 @@ $input = getInputData();
 
 // Validate batch data structure
 if (!isset($input['readings']) || !is_array($input['readings'])) {
-    sendResponse(false, 'Invalid batch data. Expected "readings" array.', null, 400);
+    sendBatchResponse(false, 'Invalid batch data. Expected "readings" array.', null, 400);
 }
 
 if (empty($input['readings'])) {
-    sendResponse(false, 'No readings provided in batch', null, 400);
+    sendBatchResponse(false, 'No readings provided in batch', null, 400);
 }
 
 // Limit batch size to prevent timeout
 $max_batch_size = 50;
 if (count($input['readings']) > $max_batch_size) {
-    sendResponse(false, "Batch size exceeds maximum of $max_batch_size readings", null, 400);
+    sendBatchResponse(false, "Batch size exceeds maximum of $max_batch_size readings", null, 400);
 }
 
 try {
@@ -57,7 +78,7 @@ try {
     $current_cycle = $cycle_stmt->get_result()->fetch_assoc();
     
     if (!$current_cycle) {
-        sendResponse(false, 'No active billing cycle found. Please contact administrator.', null, 400);
+        sendBatchResponse(false, 'No active billing cycle found. Please contact administrator.', null, 400);
     }
     
     $results = [];
@@ -245,7 +266,7 @@ try {
     }
     
     // Return batch results
-    sendResponse(true, "Batch upload completed: $success_count succeeded, $failed_count failed", [
+    sendBatchResponse(true, "Batch upload completed: $success_count succeeded, $failed_count failed", [
         'total' => count($input['readings']),
         'success_count' => $success_count,
         'failed_count' => $failed_count,
@@ -258,7 +279,7 @@ try {
     
 } catch (Exception $e) {
     error_log("Batch upload API error: " . $e->getMessage());
-    sendResponse(false, 'Server error occurred: ' . $e->getMessage(), null, 500);
+    sendBatchResponse(false, 'Server error occurred: ' . $e->getMessage(), null, 500);
 }
 
 /**
@@ -280,26 +301,5 @@ function isLocalNetworkRequest() {
     }
     
     return false;
-}
-
-/**
- * Enhanced sendResponse function
- */
-function sendResponse($success, $message, $data = null, $status_code = 200) {
-    http_response_code($status_code);
-    
-    $response = [
-        'success' => $success,
-        'message' => $message,
-        'timestamp' => date('Y-m-d H:i:s'),
-        'api_version' => '2.0'
-    ];
-    
-    if ($data !== null) {
-        $response['data'] = $data;
-    }
-    
-    echo json_encode($response, JSON_PRETTY_PRINT);
-    exit();
 }
 
