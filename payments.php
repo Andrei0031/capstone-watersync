@@ -11,21 +11,27 @@ include 'late_payment_processor.php';
 // Calculate statistics
 $total_sql = "SELECT 
     COUNT(*) as total,
-    SUM(CASE WHEN status = 1 THEN amount ELSE 0 END) as total_amount,
-    SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as verified_count,
-    SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as pending_count
+    COALESCE(SUM(CASE WHEN status = 1 THEN amount ELSE 0 END), 0) as total_amount,
+    COALESCE(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END), 0) as verified_count,
+    COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) as pending_count
     FROM payment_list";
 $total_result = $conn->query($total_sql);
 $stats = $total_result->fetch_assoc();
+if (!$stats) {
+    $stats = ['total' => 0, 'total_amount' => 0, 'verified_count' => 0, 'pending_count' => 0];
+}
 
 // Get today's payments
 $today_sql = "SELECT 
     COUNT(*) as today_count, 
-    SUM(CASE WHEN status = 1 THEN amount ELSE 0 END) as today_amount 
+    COALESCE(SUM(CASE WHEN status = 1 THEN amount ELSE 0 END), 0) as today_amount 
     FROM payment_list 
     WHERE DATE(payment_date) = CURRENT_DATE()";
 $today_result = $conn->query($today_sql);
 $today_stats = $today_result->fetch_assoc();
+if (!$today_stats) {
+    $today_stats = ['today_count' => 0, 'today_amount' => 0];
+}
 
 // Process payment verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
@@ -687,6 +693,22 @@ $payments_result = $conn->query($payments_sql);
             background-color: #4caf50;
             color: #fff;
         }
+        /* Client Search Dropdown Styles */
+        .client-option {
+            transition: background-color 0.2s;
+        }
+        .client-option:hover {
+            background-color: var(--hover-bg, #f0f0f0) !important;
+        }
+        html[data-theme="dark"] .client-option:hover {
+            background-color: var(--hover-bg, #3a3c42) !important;
+        }
+        #clientDropdown {
+            margin-top: 2px;
+        }
+        .cursor-pointer {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -794,8 +816,8 @@ $payments_result = $conn->query($payments_sql);
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-white-50">Total Amount</h6>
-                            <h3 class="mb-0 text-white">₱<?php echo number_format($stats['total_amount'], 2); ?></h3>
-                            <small class="text-white-50">₱<?php echo number_format($today_stats['today_amount'], 2); ?> today</small>
+                            <h3 class="mb-0 text-white">₱<?php echo number_format($stats['total_amount'] ?? 0, 2); ?></h3>
+                            <small class="text-white-50">₱<?php echo number_format($today_stats['today_amount'] ?? 0, 2); ?> today</small>
                         </div>
                         <i class="fas fa-peso-sign fa-2x text-white-50"></i>
                     </div>
@@ -918,16 +940,20 @@ $payments_result = $conn->query($payments_sql);
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Client</label>
-                            <select class="form-select" name="client_id" required>
-                                <option value="">Select Client</option>
-                                <?php
-                                $client_sql = "SELECT id, CONCAT(firstname, ' ', lastname, ' (', meter_code, ')') as client_name FROM client_list ORDER BY firstname";
-                                $client_result = $conn->query($client_sql);
-                                while ($client = $client_result->fetch_assoc()) {
-                                    echo "<option value='" . $client['id'] . "'>" . htmlspecialchars($client['client_name']) . "</option>";
-                                }
-                                ?>
-                            </select>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="clientSearch" placeholder="Search client by name or meter code..." autocomplete="off">
+                                <select class="form-select" name="client_id" id="clientSelect" required style="display: none;">
+                                    <option value="">Select Client</option>
+                                    <?php
+                                    $client_sql = "SELECT id, CONCAT(firstname, ' ', lastname, ' (', meter_code, ')') as client_name, firstname, lastname, meter_code FROM client_list ORDER BY firstname";
+                                    $client_result = $conn->query($client_sql);
+                                    while ($client = $client_result->fetch_assoc()) {
+                                        echo "<option value='" . $client['id'] . "' data-name='" . htmlspecialchars(strtolower($client['firstname'] . ' ' . $client['lastname'])) . "' data-meter='" . htmlspecialchars(strtolower($client['meter_code'])) . "'>" . htmlspecialchars($client['client_name']) . "</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <div id="clientDropdown" class="position-absolute w-100 bg-white border rounded shadow-lg" style="max-height: 200px; overflow-y: auto; z-index: 1000; display: none; top: 100%;"></div>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Reference Number</label>
@@ -940,6 +966,10 @@ $payments_result = $conn->query($payments_sql);
                     <div class="card mb-3">
                         <div class="card-body bg-light">
                             <h6 class="card-title mb-3">Payment Summary</h6>
+                            <div id="selectedBillsSummary" class="mb-3" style="display: none;">
+                                <small class="text-muted">Selected Bills:</small>
+                                <div id="selectedBillsList" class="mt-1"></div>
+                            </div>
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label class="form-label">Total Amount Due</label>
@@ -968,7 +998,12 @@ $payments_result = $conn->query($payments_sql);
 
                     <div class="row mb-3">
                         <div class="col-12">
-                            <label class="form-label">Select Bills to Pay</label>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Select Bills to Pay</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBills" style="display: none;">
+                                    <i class="fas fa-check-square me-1"></i>Select All
+                                </button>
+                            </div>
                             <div class="bill-selection-container border rounded p-3" style="max-height: 300px; overflow-y: auto;">
                                 <div id="billsList" class="d-flex flex-column gap-2">
                                     <!-- Bills will be populated here -->
@@ -1149,14 +1184,95 @@ document.addEventListener('DOMContentLoaded', function() {
         setThemePreference(theme);
     });
 
-    const clientSelect = document.querySelector('select[name="client_id"]');
+    const clientSearch = document.getElementById('clientSearch');
+    const clientSelect = document.getElementById('clientSelect');
+    const clientDropdown = document.getElementById('clientDropdown');
     const billsList = document.getElementById('billsList');
     const totalAmountInput = document.getElementById('totalDue');
     const amountToPayInput = document.getElementById('amountToPay');
     const remainingBalanceInput = document.getElementById('remainingBalance');
+    const selectAllBillsBtn = document.getElementById('selectAllBills');
+    const selectedBillsSummary = document.getElementById('selectedBillsSummary');
+    const selectedBillsList = document.getElementById('selectedBillsList');
     let selectedBills = new Set();
+    let allBills = [];
+    
+    // Client search functionality
+    clientSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        const options = clientSelect.querySelectorAll('option');
+        const filteredOptions = [];
+        
+        if (searchTerm === '') {
+            clientDropdown.style.display = 'none';
+            return;
+        }
+        
+        options.forEach(option => {
+            if (option.value === '') return;
+            const name = option.dataset.name || '';
+            const meter = option.dataset.meter || '';
+            const text = option.textContent.toLowerCase();
+            
+            if (name.includes(searchTerm) || meter.includes(searchTerm) || text.includes(searchTerm)) {
+                filteredOptions.push(option);
+            }
+        });
+        
+        if (filteredOptions.length > 0) {
+            clientDropdown.innerHTML = filteredOptions.map(option => 
+                `<div class="p-2 border-bottom cursor-pointer client-option" data-value="${option.value}" style="cursor: pointer;">
+                    ${option.textContent}
+                </div>`
+            ).join('');
+            clientDropdown.style.display = 'block';
+        } else {
+            clientDropdown.innerHTML = '<div class="p-2 text-muted">No clients found</div>';
+            clientDropdown.style.display = 'block';
+        }
+    });
+    
+    // Handle client selection from dropdown
+    clientDropdown.addEventListener('click', function(e) {
+        if (e.target.classList.contains('client-option')) {
+            const value = e.target.dataset.value;
+            const text = e.target.textContent.trim();
+            clientSelect.value = value;
+            clientSearch.value = text;
+            clientDropdown.style.display = 'none';
+            
+            if (value) {
+                generateReference();
+                loadClientBills(value);
+            } else {
+                resetPaymentForm();
+            }
+        }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!clientSearch.contains(e.target) && !clientDropdown.contains(e.target)) {
+            clientDropdown.style.display = 'none';
+        }
+    });
+    
+    // Update client select change handler
+    const originalClientSelect = document.querySelector('select[name="client_id"]');
+    if (originalClientSelect) {
+        originalClientSelect.addEventListener('change', function() {
+            if (this.value) {
+                clientSelect.value = this.value;
+                clientSearch.value = this.options[this.selectedIndex].textContent;
+                generateReference();
+                loadClientBills(this.value);
+            } else {
+                resetPaymentForm();
+            }
+        });
+    }
 
-    // Auto-generate reference number when client is selected
+    // Auto-generate reference number when client is selected (using hidden select)
     clientSelect.addEventListener('change', function() {
         if (this.value) {
             generateReference();
@@ -1165,6 +1281,76 @@ document.addEventListener('DOMContentLoaded', function() {
             resetPaymentForm();
         }
     });
+    
+    // Select All Bills functionality
+    selectAllBillsBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.bill-checkbox');
+        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+        
+        checkboxes.forEach(cb => {
+            cb.checked = !allSelected;
+            if (!allSelected) {
+                selectedBills.add(cb.value);
+            } else {
+                selectedBills.delete(cb.value);
+            }
+        });
+        
+        updateSelectedBillsSummary();
+        updateAmountToPay();
+        this.innerHTML = allSelected ? 
+            '<i class="fas fa-check-square me-1"></i>Select All' : 
+            '<i class="fas fa-square me-1"></i>Deselect All';
+    });
+    
+    function updateSelectedBillsSummary() {
+        if (selectedBills.size === 0) {
+            selectedBillsSummary.style.display = 'none';
+            return;
+        }
+        
+        const selectedBillsData = allBills.filter(bill => selectedBills.has(bill.id.toString()));
+        const totalSelected = selectedBillsData.reduce((sum, bill) => {
+            let billAmount = parseFloat(bill.balance);
+            if (bill.late_fee_info && bill.late_fee_info.has_late_fee && !bill.late_fee_info.already_applied) {
+                billAmount += parseFloat(bill.late_fee_info.fee_amount);
+            }
+            return sum + billAmount;
+        }, 0);
+        
+        selectedBillsList.innerHTML = selectedBillsData.map(bill => {
+            let billAmount = parseFloat(bill.balance);
+            if (bill.late_fee_info && bill.late_fee_info.has_late_fee && !bill.late_fee_info.already_applied) {
+                billAmount += parseFloat(bill.late_fee_info.fee_amount);
+            }
+            return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <span class="small">${bill.reading_date}</span>
+                <strong class="text-primary">₱${billAmount.toFixed(2)}</strong>
+            </div>`;
+        }).join('') + 
+        `<div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
+            <strong>Total Selected:</strong>
+            <strong class="text-success">₱${totalSelected.toFixed(2)}</strong>
+        </div>`;
+        
+        selectedBillsSummary.style.display = 'block';
+    }
+    
+    function updateAmountToPay() {
+        const selectedBillsData = allBills.filter(bill => selectedBills.has(bill.id.toString()));
+        const totalSelected = selectedBillsData.reduce((sum, bill) => {
+            let billAmount = parseFloat(bill.balance);
+            if (bill.late_fee_info && bill.late_fee_info.has_late_fee && !bill.late_fee_info.already_applied) {
+                billAmount += parseFloat(bill.late_fee_info.fee_amount);
+            }
+            return sum + billAmount;
+        }, 0);
+        
+        amountToPayInput.value = totalSelected.toFixed(2);
+        const totalDue = parseFloat(totalAmountInput.value) || 0;
+        const remainingBalance = Math.max(0, totalDue - totalSelected);
+        remainingBalanceInput.value = remainingBalance.toFixed(2);
+    }
 
     // Handle amount to pay changes
     amountToPayInput.addEventListener('input', function() {
@@ -1350,6 +1536,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             }).join('');
 
+            // Store all bills for later use
+            allBills = bills;
+            
+            // Show Select All button
+            selectAllBillsBtn.style.display = 'block';
+            
             // Add event listeners to checkboxes
             document.querySelectorAll('.bill-checkbox').forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
@@ -1358,8 +1550,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         selectedBills.delete(this.value);
                     }
+                    updateSelectedBillsSummary();
+                    updateAmountToPay();
+                    
+                    // Update Select All button text
+                    const allCheckboxes = document.querySelectorAll('.bill-checkbox');
+                    const allSelected = Array.from(allCheckboxes).every(cb => cb.checked);
+                    selectAllBillsBtn.innerHTML = allSelected ? 
+                        '<i class="fas fa-square me-1"></i>Deselect All' : 
+                        '<i class="fas fa-check-square me-1"></i>Select All';
                 });
             });
+            
+            // Auto-select all bills by default
+            document.querySelectorAll('.bill-checkbox').forEach(cb => {
+                cb.checked = true;
+                selectedBills.add(cb.value);
+            });
+            updateSelectedBillsSummary();
+            updateAmountToPay();
+            selectAllBillsBtn.innerHTML = '<i class="fas fa-square me-1"></i>Deselect All';
 
             // Show total unpaid balance
             const totalBalanceDiv = document.createElement('div');
@@ -1408,6 +1618,10 @@ document.addEventListener('DOMContentLoaded', function() {
         remainingBalanceInput.value = '0.00';
         document.getElementById('referenceNumber').value = '';
         selectedBills.clear();
+        allBills = [];
+        selectAllBillsBtn.style.display = 'none';
+        selectedBillsSummary.style.display = 'none';
+        clientSearch.value = '';
     }
 
     // Handle form submission
@@ -1704,4 +1918,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 </body>
+</html> 
 </html> 

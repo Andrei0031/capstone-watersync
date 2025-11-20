@@ -1,0 +1,75 @@
+===============================================
+  QUICK START: Upload Dataset to Roboflow
+===============================================
+
+STEP 1: Get Your API Key (2 minutes)
+-------------------------------------
+1. Open browser: https://app.roboflow.com
+2. Login to your account
+3. Click "Settings" → "Roboflow API"
+4. Copy your API key (long string of letters/numbers)
+
+
+STEP 2: Update the Script (1 minute)
+-------------------------------------
+1. Open file: upload_to_roboflow.py (in this folder)
+2. Find line 12:
+   API_KEY = "YOUR_ROBOFLOW_API_KEY"
+3. Replace with your actual key:
+   API_KEY = "abc123xyz789..."
+4. Save the file
+
+
+STEP 3: Run the Upload (5-10 minutes)
+--------------------------------------
+OPTION A - Double-click:
+  → Double-click: run_roboflow_upload.bat
+
+OPTION B - Command line:
+  → Open PowerShell/CMD in this folder
+  → Type: python upload_to_roboflow.py
+  → Press Enter
+
+
+STEP 4: Confirm Upload
+-----------------------
+The script will ask:
+  "Ready to upload to Roboflow? (y/n):"
+
+Type: y
+Press Enter
+
+Wait for upload to complete.
+
+
+STEP 5: Verify in Roboflow
+---------------------------
+1. Go to: https://app.roboflow.com/watersync/watersync-digits
+2. You should see all your images uploaded
+3. Check that bounding boxes look correct
+4. Click "Generate" → "Create Dataset Version"
+5. Click "Train" → Train your model
+
+
+===============================================
+               THAT'S IT!
+===============================================
+
+Your images from D:\archive\WaterMeters will be
+automatically converted and uploaded to Roboflow.
+
+No manual drawing needed! ✅
+
+
+TROUBLESHOOTING:
+----------------
+• If Python not found → Install Python from python.org
+• If packages fail → Run: pip install roboflow opencv-python numpy
+• If upload fails → Check your API key
+• If no boxes found → Check that masks are in the right folder
+
+
+NEED HELP?
+----------
+Read: UPLOAD_DATASET_TO_ROBOFLOW.md (detailed guide)
+

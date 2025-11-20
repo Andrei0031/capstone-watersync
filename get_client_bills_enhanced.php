@@ -30,7 +30,7 @@ try {
             ), 0) as paid_amount
         FROM billing_list b
         WHERE b.client_id = ? AND b.status = 0
-        ORDER BY b.reading_date ASC
+        ORDER BY b.reading_date DESC
     ");
     
     $stmt->bind_param("i", $client_id);

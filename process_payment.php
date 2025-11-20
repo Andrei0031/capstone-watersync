@@ -108,11 +108,25 @@ try {
         // Calculate payment amount for this bill
         $payment_amount = min($remaining_payment, $remaining_bill);
 
+        // Determine payment status: auto-verify if full payment
+        $is_full_payment = ($payment_amount >= $remaining_bill);
+        $payment_status = $is_full_payment ? 1 : 0; // Auto-verify if full payment
+        $verified_date = $is_full_payment ? date('Y-m-d H:i:s') : null;
+        
         // Insert payment record
-        $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) 
-                       VALUES (?, ?, ?, ?, ?, ?, 0)";
-        $stmt = $conn->prepare($payment_sql);
-        $stmt->bind_param('iisdss', $client_id, $bill_id, $payment_date, $payment_amount, $payment_method, $reference_number);
+        if ($is_full_payment) {
+            // Full payment - auto-verify with verified_date
+            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($payment_sql);
+            $stmt->bind_param('iisdssss', $client_id, $bill_id, $payment_date, $payment_amount, $payment_method, $reference_number, $payment_status, $verified_date);
+        } else {
+            // Partial payment - pending verification
+            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($payment_sql);
+            $stmt->bind_param('iisdssi', $client_id, $bill_id, $payment_date, $payment_amount, $payment_method, $reference_number, $payment_status);
+        }
         
         if (!$stmt->execute()) {
             throw new Exception("Failed to save payment record.");
