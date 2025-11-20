@@ -98,8 +98,8 @@ function detectMeterRegionWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded'
         ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         
         error_log("Roboflow: Sending request to API...");
@@ -456,8 +456,8 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10); // 10 seconds max - fail fast
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // Connection timeout 5 seconds
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // Increased to 60 seconds - Roboflow API can be slow
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15); // Connection timeout 15 seconds
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // Force HTTP/1.1
@@ -473,15 +473,17 @@ function detectDigitsWithRoboflow($imagePath) {
         
         error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None') . ", Size: " . strlen($response ?? '') . " bytes");
         
-        // If request took too long or failed, log the issue
-        if ($elapsedTime > 8 || $error || $httpCode !== 200) {
-            error_log("⚠ Roboflow request too slow or failed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None'));
+        // If request failed, log the issue (but don't fail on slow responses)
+        if ($error || $httpCode !== 200) {
+            error_log("⚠ Roboflow request failed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None'));
+        } else {
+            error_log("✓ Roboflow request completed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s");
         }
         
         // Check if Method 1 returned valid predictions
         $method1Success = false;
-        // Only process if we got a valid response quickly
-        if ($httpCode === 200 && !$error && !empty($response) && $elapsedTime < 8) {
+        // Process if we got a valid response (removed time limit - API can be slow but still work)
+        if ($httpCode === 200 && !$error && !empty($response)) {
             error_log("Roboflow Digit Detection: Method 1 - HTTP 200, response length: " . strlen($response));
             $testData = json_decode($response, true);
             
@@ -550,8 +552,8 @@ function detectDigitsWithRoboflow($imagePath) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: multipart/form-data; boundary=' . $delimiter
             ]);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             
             $response = curl_exec($ch);
@@ -599,8 +601,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 curl_setopt($ch, CURLOPT_HTTPHEADER, [
                     'Content-Type: text/plain'
                 ]);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 
                 $response = curl_exec($ch);
@@ -648,8 +650,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     curl_setopt($ch, CURLOPT_POST, true);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     
                     $response = curl_exec($ch);
@@ -672,8 +674,8 @@ function detectDigitsWithRoboflow($imagePath) {
                         curl_setopt($ch, CURLOPT_HTTPHEADER, [
                             'Content-Type: application/x-www-form-urlencoded'
                         ]);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced timeout to fail faster
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
                         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                         
                         $response = curl_exec($ch);

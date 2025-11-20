@@ -478,8 +478,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
 }
 
 // Set longer timeout for OCR processing
-set_time_limit(300); // 5 minutes for batch processing
-ini_set('max_execution_time', 300);
+set_time_limit(600); // 10 minutes for batch processing (Roboflow API can be slow)
+ini_set('max_execution_time', 600);
 
 // Automated bill creation for all pending readings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['auto_create_bills'])) {
@@ -2055,8 +2055,8 @@ if (!$failed_result) {
                     const timeoutId = setTimeout(() => {
                         controller.abort();
                         loadingModal.hide();
-                        alert('Processing timed out after 2 minutes. Please try again or check server logs.');
-                    }, 120000); // 2 minute timeout
+                        alert('Processing timed out after 5 minutes. The Roboflow API may be slow. Please try again or check server logs.');
+                    }, 300000); // 5 minute timeout (increased from 2 minutes)
                     
                     // Submit via AJAX
                     fetch('pending_readings.php', {

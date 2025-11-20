@@ -455,15 +455,9 @@ function processImageWithRoboflowDigits($imagePath) {
             error_log("  api_response keys: " . implode(', ', array_keys($digitResult['api_response'])));
         }
         
-        // If Roboflow took too long (>10s), return error
-        if ($elapsedTime > 10) {
-            error_log('⚠ Roboflow took too long (' . round($elapsedTime, 2) . 's) - API timeout');
-            return [
-                'success' => false,
-                'extracted_text' => '',
-                'meter_reading' => null,
-                'error' => 'Roboflow YOLOv8 API timeout (>10s). Please check if model version 7 is deployed and accessible.'
-            ];
+        // Log timing but don't fail on slow responses - Roboflow API can be slow but still work
+        if ($elapsedTime > 30) {
+            error_log('⚠ Roboflow took a long time (' . round($elapsedTime, 2) . 's) but continuing...');
         }
         
         if (!$digitResult['success']) {
