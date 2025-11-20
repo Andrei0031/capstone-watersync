@@ -897,10 +897,10 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.1 (10%) - very low to catch all detections
-            // Version 7 might have different confidence distribution
-            // Lower threshold ensures we catch all valid digits
-            if ($isDigit && $confidence > 0.1) {
+            // Use confidence threshold of 0.05 (5%) - extremely low to catch ALL detections
+            // Version 7 trained model - accept any digit detection with minimal confidence
+            // This ensures we catch all digits from your trained YOLOv8 model
+            if ($isDigit && $confidence > 0.05) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -910,8 +910,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.1) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.1)");
+            } elseif ($isDigit && $confidence <= 0.05) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.05)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
@@ -923,15 +923,34 @@ function detectDigitsWithRoboflow($imagePath) {
         
         // If we have predictions but no digits, log ALL prediction details for debugging
         if (count($predictions) > 0 && count($digits) === 0) {
-            error_log('⚠ Roboflow Digit Detection: Found ' . count($predictions) . ' predictions but none recognized as digits');
+            error_log('⚠⚠⚠ Roboflow Digit Detection: Found ' . count($predictions) . ' predictions but NONE recognized as digits ⚠⚠⚠');
+            error_log('   This means the API returned predictions but they are not in expected format.');
             error_log('   Checking all predictions for digit patterns...');
             foreach ($predictions as $idx => $pred) {
                 $allKeys = array_keys($pred);
-                $classVal = $pred['class'] ?? $pred['class_name'] ?? $pred['name'] ?? $pred['class_id'] ?? 'N/A';
-                $confVal = $pred['confidence'] ?? 'N/A';
+                $classVal = $pred['class'] ?? $pred['class_name'] ?? $pred['name'] ?? $pred['label'] ?? $pred['class_id'] ?? 'N/A';
+                $confVal = $pred['confidence'] ?? $pred['confidence_score'] ?? $pred['score'] ?? 'N/A';
                 error_log("   Prediction #$idx: keys=[" . implode(',', $allKeys) . "], class='$classVal', confidence=$confVal");
-                error_log("   Full prediction: " . json_encode($pred));
+                error_log("   Full prediction: " . json_encode($pred, JSON_PRETTY_PRINT));
+                
+                // Try to manually extract digit from this prediction
+                $manualDigit = null;
+                foreach (['class', 'class_name', 'name', 'label', 'class_id'] as $field) {
+                    if (isset($pred[$field])) {
+                        $val = strval($pred[$field]);
+                        if (preg_match('/^[0-9]$/', $val)) {
+                            $manualDigit = $val;
+                            error_log("   ⚠ MANUAL EXTRACTION: Found digit '$manualDigit' in field '$field' but it wasn't recognized!");
+                            break;
+                        } elseif (preg_match('/[0-9]/', $val, $matches)) {
+                            $manualDigit = $matches[0];
+                            error_log("   ⚠ MANUAL EXTRACTION: Found digit '$manualDigit' in field '$field' (extracted from '$val') but it wasn't recognized!");
+                            break;
+                        }
+                    }
+                }
             }
+            error_log('   ACTION REQUIRED: Check the prediction format above and update the parsing logic to match version 7 response format.');
         }
         
         if (count($digits) > 0) {
