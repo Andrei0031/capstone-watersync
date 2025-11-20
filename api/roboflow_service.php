@@ -1063,14 +1063,21 @@ function extractMeterReadingFromDigits($digits) {
         return null;
     }
     
-    // Step 1: Filter digits by confidence (remove low-confidence detections)
-    $minConfidence = 0.4; // Increased from 0.3 for better accuracy
+    // Step 1: Filter digits by confidence (remove very low-confidence detections)
+    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.05)
+    // We already filtered to 0.05 in detectDigitsWithRoboflow, so we can be more lenient here
+    $minConfidence = 0.05; // Match the detection threshold - accept all digits that passed initial filter
     $filteredDigits = array_filter($digits, function($digit) use ($minConfidence) {
         return isset($digit['confidence']) && $digit['confidence'] >= $minConfidence;
     });
     
     if (count($filteredDigits) < 3) {
-        error_log("⚠ Not enough high-confidence digits. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
+        error_log("⚠ Not enough digits after confidence filter. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
+        error_log("   Original digits count: " . count($digits));
+        if (count($digits) > 0) {
+            $confidences = array_map(function($d) { return round($d['confidence'] ?? 0, 3); }, $digits);
+            error_log("   Digit confidences: " . implode(', ', $confidences));
+        }
         // Fallback: use all digits if we don't have enough high-confidence ones
         $filteredDigits = $digits;
     }
@@ -1114,8 +1121,14 @@ function extractMeterReadingFromDigits($digits) {
     }
     
     if (count($deduplicatedDigits) < 3) {
-        error_log("⚠ Not enough digits after deduplication. Found " . count($deduplicatedDigits) . " unique digits");
-        return null;
+        error_log("⚠ Not enough digits after deduplication. Found " . count($deduplicatedDigits) . " unique digits (need at least 3)");
+        error_log("   Original digits: " . count($digits) . ", After confidence filter: " . count($filteredDigits));
+        // Try to form reading with fewer digits if we have at least 2
+        if (count($deduplicatedDigits) >= 2) {
+            error_log("   Attempting to form reading with " . count($deduplicatedDigits) . " digits (less than ideal)");
+        } else {
+            return null;
+        }
     }
     
     // Step 3: Group digits by Y position (to handle multi-row displays)
