@@ -42,20 +42,91 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Validate API key or allow local network access
 $is_local_network = isLocalNetworkRequest();
 if (!$is_local_network) {
-    validateApiKey();
+    try {
+        validateApiKey();
+    } catch (Exception $e) {
+        error_log("Batch Upload API: API key validation failed: " . $e->getMessage());
+        sendBatchResponse(false, 'Authentication failed: ' . $e->getMessage(), null, 401);
+    }
 }
 
 // Include OCR functions for auto-processing
 require_once __DIR__ . '/ocr_functions.php';
 
-$input = getInputData();
+// Log incoming request for debugging
+error_log("Batch Upload API: Request received from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+error_log("Batch Upload API: Request method: " . $_SERVER['REQUEST_METHOD']);
+error_log("Batch Upload API: Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+
+/**
+ * Get input data for batch upload (custom version to avoid sendResponse conflict)
+ */
+function getBatchInputData() {
+    $raw_input = file_get_contents('php://input');
+    
+    if (empty($raw_input)) {
+        error_log("Batch Upload API: No input data received");
+        return null;
+    }
+    
+    $input = json_decode($raw_input, true);
+    $json_error = json_last_error();
+    
+    if ($json_error !== JSON_ERROR_NONE) {
+        $error_msg = json_last_error_msg();
+        error_log("Batch Upload API: JSON decode failed: $error_msg (Error code: $json_error)");
+        return ['error' => $error_msg, 'error_code' => $json_error];
+    }
+    
+    return $input;
+}
+
+// Get input data with better error handling
+$raw_input = file_get_contents('php://input');
+error_log("Batch Upload API: Raw input length: " . strlen($raw_input) . " bytes");
+
+if (empty($raw_input)) {
+    error_log("Batch Upload API: No input data received");
+    sendBatchResponse(false, 'No data received. Please send JSON data in request body.', null, 400);
+}
+
+$input = getBatchInputData();
+
+if (is_array($input) && isset($input['error'])) {
+    sendBatchResponse(false, 'Invalid JSON data: ' . $input['error'], [
+        'json_error_code' => $input['error_code'] ?? 0,
+        'json_error_message' => $input['error'],
+        'input_preview' => substr($raw_input, 0, 200)
+    ], 400);
+}
+
+if (!$input || !is_array($input)) {
+    error_log("Batch Upload API: Input data is null or not an array after JSON decode");
+    sendBatchResponse(false, 'Invalid or empty JSON data', null, 400);
+}
+
+// Log input data structure (without full image data)
+$logInput = $input;
+if (isset($logInput['readings']) && is_array($logInput['readings'])) {
+    foreach ($logInput['readings'] as &$reading) {
+        if (isset($reading['image_data'])) {
+            $reading['image_data'] = '[BASE64_DATA_LENGTH: ' . strlen($reading['image_data']) . ']';
+        }
+    }
+}
+error_log("Batch Upload API: Input data structure: " . json_encode($logInput));
 
 // Validate batch data structure
 if (!isset($input['readings']) || !is_array($input['readings'])) {
-    sendBatchResponse(false, 'Invalid batch data. Expected "readings" array.', null, 400);
+    error_log("Batch Upload API: Validation failed - readings array missing or invalid");
+    sendBatchResponse(false, 'Invalid batch data. Expected "readings" array.', [
+        'received_keys' => array_keys($input ?? []),
+        'readings_type' => isset($input['readings']) ? gettype($input['readings']) : 'not set'
+    ], 400);
 }
 
 if (empty($input['readings'])) {
+    error_log("Batch Upload API: Validation failed - readings array is empty");
     sendBatchResponse(false, 'No readings provided in batch', null, 400);
 }
 
@@ -66,6 +137,59 @@ if (count($input['readings']) > $max_batch_size) {
 }
 
 try {
+    // Ensure required columns exist in pending_meter_readings table
+    // Add columns in order: gps_location first, then device_info, then app_version
+    $check_gps = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+    if ($check_gps->num_rows === 0) {
+        // Add gps_location after upload_date if it exists
+        $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
+        if ($check_upload_date && $check_upload_date->num_rows > 0) {
+            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL AFTER upload_date");
+        } else {
+            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN gps_location VARCHAR(100) NULL");
+        }
+        error_log("Added missing column 'gps_location' to pending_meter_readings table");
+    }
+    
+    $check_device = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+    if ($check_device->num_rows === 0) {
+        // Add device_info after gps_location if it exists, otherwise after upload_date
+        $check_gps_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+        if ($check_gps_again && $check_gps_again->num_rows > 0) {
+            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER gps_location");
+        } else {
+            $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
+            if ($check_upload_date && $check_upload_date->num_rows > 0) {
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL AFTER upload_date");
+            } else {
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN device_info VARCHAR(255) NULL");
+            }
+        }
+        error_log("Added missing column 'device_info' to pending_meter_readings table");
+    }
+    
+    $check_app = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
+    if ($check_app->num_rows === 0) {
+        // Add app_version after device_info if it exists
+        $check_device_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+        if ($check_device_again && $check_device_again->num_rows > 0) {
+            $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER device_info");
+        } else {
+            $check_gps_again = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+            if ($check_gps_again && $check_gps_again->num_rows > 0) {
+                $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER gps_location");
+            } else {
+                $check_upload_date = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'upload_date'");
+                if ($check_upload_date && $check_upload_date->num_rows > 0) {
+                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL AFTER upload_date");
+                } else {
+                    $conn->query("ALTER TABLE pending_meter_readings ADD COLUMN app_version VARCHAR(50) NULL");
+                }
+            }
+        }
+        error_log("Added missing column 'app_version' to pending_meter_readings table");
+    }
+    
     // Get current active billing cycle
     $cycle_stmt = $conn->prepare("
         SELECT id, cycle_name, start_date, end_date, due_date 
@@ -211,30 +335,62 @@ try {
             $gps_location = $reading_data['gps_location'] ?? null;
             
             // Insert meter reading record
-            $insert_stmt = $conn->prepare("
-                INSERT INTO pending_meter_readings 
-                (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
-                 mobile_upload_id, status, upload_date, device_info, app_version, gps_location,
-                 ocr_reading, extracted_text, processed_at) 
-                VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, ?, ?, ?, NOW())
-            ");
-            
+            // Use conditional INSERT - only include columns that exist
             $mobile_upload_id = 'batch_' . uniqid() . '_' . time() . '_' . $index;
             $reading_value = $ocrReading ?? (isset($reading_data['meter_reading']) ? floatval($reading_data['meter_reading']) : null);
             
-            $insert_stmt->bind_param("iisdsssssdss", 
-                $client_id,
-                $current_cycle['id'],
-                $relative_path,
-                $reading_value,
-                $mobile_upload_id,
-                $status,
-                $device_info,
-                $mobile_app_version,
-                $gps_location,
-                $ocrReading,
-                $extractedText
-            );
+            // Check if optional columns exist
+            $check_device_info = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'device_info'");
+            $check_app_version = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'app_version'");
+            $check_gps_location = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'gps_location'");
+            
+            $has_device_info = $check_device_info && $check_device_info->num_rows > 0;
+            $has_app_version = $check_app_version && $check_app_version->num_rows > 0;
+            $has_gps_location = $check_gps_location && $check_gps_location->num_rows > 0;
+            
+            // Build INSERT statement based on available columns
+            if ($has_device_info && $has_app_version && $has_gps_location) {
+                // All columns exist - use full INSERT
+                $insert_stmt = $conn->prepare("
+                    INSERT INTO pending_meter_readings 
+                    (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
+                     mobile_upload_id, status, upload_date, device_info, app_version, gps_location,
+                     ocr_reading, extracted_text, processed_at) 
+                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, ?, ?, ?, NOW())
+                ");
+                $insert_stmt->bind_param("iisdsssssdss", 
+                    $client_id,
+                    $current_cycle['id'],
+                    $relative_path,
+                    $reading_value,
+                    $mobile_upload_id,
+                    $status,
+                    $device_info,
+                    $mobile_app_version,
+                    $gps_location,
+                    $ocrReading,
+                    $extractedText
+                );
+            } else {
+                // Some columns missing - use minimal INSERT (without optional columns)
+                $insert_stmt = $conn->prepare("
+                    INSERT INTO pending_meter_readings 
+                    (client_id, billing_cycle_id, image_path, reading_value, reading_date, 
+                     mobile_upload_id, status, upload_date,
+                     ocr_reading, extracted_text, processed_at) 
+                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, NOW(), ?, ?, NOW())
+                ");
+                $insert_stmt->bind_param("iisdsssdss", 
+                    $client_id,
+                    $current_cycle['id'],
+                    $relative_path,
+                    $reading_value,
+                    $mobile_upload_id,
+                    $status,
+                    $ocrReading,
+                    $extractedText
+                );
+            }
             
             if ($insert_stmt->execute()) {
                 $reading_id = $insert_stmt->insert_id;
@@ -265,6 +421,9 @@ try {
         $results[] = $reading_result;
     }
     
+    // Log final results
+    error_log("Batch Upload API: Completed - Success: $success_count, Failed: $failed_count, Total: " . count($input['readings']));
+    
     // Return batch results
     sendBatchResponse(true, "Batch upload completed: $success_count succeeded, $failed_count failed", [
         'total' => count($input['readings']),
@@ -278,8 +437,15 @@ try {
     ]);
     
 } catch (Exception $e) {
-    error_log("Batch upload API error: " . $e->getMessage());
-    sendBatchResponse(false, 'Server error occurred: ' . $e->getMessage(), null, 500);
+    $errorMsg = $e->getMessage();
+    $errorTrace = $e->getTraceAsString();
+    error_log("Batch Upload API ERROR: $errorMsg");
+    error_log("Batch Upload API STACK TRACE: $errorTrace");
+    sendBatchResponse(false, 'Server error occurred: ' . $errorMsg, [
+        'error_type' => get_class($e),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ], 500);
 }
 
 /**
