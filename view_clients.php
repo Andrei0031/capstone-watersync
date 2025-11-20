@@ -625,35 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
         }
         exit();
-    } elseif (isset($_POST['apply_connection_fee'])) {
-        // Handle connection fee application
-        $client_id = $_POST['client_id'];
-        $result = applyConnectionFee($client_id, $conn);
-        
-        if ($result['success']) {
-            $notification = 'Connection fee applied successfully!';
-            $notificationClass = 'alert-success';
-        } else {
-            $notification = 'Error applying connection fee: ' . $result['message'];
-            $notificationClass = 'alert-danger';
-        }
-        header("Location: view_clients.php?fee_status=" . ($result['success'] ? 'success' : 'error') . "&message=" . urlencode($notification));
-        exit();
-    } elseif (isset($_POST['apply_reconnection_fee'])) {
-        // Handle reconnection fee application
-        $client_id = $_POST['client_id'];
-        $result = applyReconnectionFee($client_id, $conn);
-        
-        if ($result['success']) {
-            $notification = 'Reconnection fee applied successfully!';
-            $notificationClass = 'alert-success';
-        } else {
-            $notification = 'Error applying reconnection fee: ' . $result['message'];
-            $notificationClass = 'alert-danger';
-        }
-        header("Location: view_clients.php?fee_status=" . ($result['success'] ? 'success' : 'error') . "&message=" . urlencode($notification));
-        exit();
-    } elseif (isset($_POST['add_historical_reading'])) {
+ elseif (isset($_POST['add_historical_reading'])) {
         // Handle historical meter reading submission
         $client_id = $_POST['client_id'];
         $billing_cycle_id = $_POST['billing_cycle_id'];
@@ -2699,11 +2671,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Meter code validation function
+    function validateMeterCode(code) {
+        if (!code || code.trim() === '') {
+            meterCodeInput.classList.remove('is-invalid', 'is-valid');
+            meterCodeError.textContent = '';
+            return;
+        }
+        
+        // Check if meter code already exists
+        fetch(`check_meter_code.php?meter_code=${encodeURIComponent(code)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    meterCodeInput.classList.add('is-invalid');
+                    meterCodeInput.classList.remove('is-valid');
+                    meterCodeError.textContent = 'This meter code already exists.';
+                } else {
+                    meterCodeInput.classList.add('is-valid');
+                    meterCodeInput.classList.remove('is-invalid');
+                    meterCodeError.textContent = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error validating meter code:', error);
+            });
+    }
+    
     // Meter code validation - only allow numbers
     const meterCodeInput = document.getElementById('add_meter_code');
     if (meterCodeInput) {
         meterCodeInput.addEventListener('input', function() {
             this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        
+        // Validate on blur
+        meterCodeInput.addEventListener('blur', function() {
+            if (this.value.trim()) {
+                validateMeterCode(this.value.trim());
+            }
         });
     }
 
