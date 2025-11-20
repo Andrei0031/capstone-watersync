@@ -49,13 +49,30 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         $customer_name = $client['firstname'] . ' ' . $client['lastname'];
         $amount = number_format($bill['total'], 2);
         $due_date = date('M d, Y', strtotime($bill['due_date']));
+        $reading_date = isset($bill['reading_date']) ? $bill['reading_date'] : date('Y-m-d');
+        $billing_month = date('F Y', strtotime($reading_date)); // e.g., "November 2025"
         $consumption = $bill['reading'] - $bill['previous'];
+        
+        // Check if bill is overdue
+        $is_overdue = false;
+        $days_overdue = 0;
+        $overdue_message = '';
+        if ($bill['status'] == 0 && !empty($bill['due_date'])) {
+            $due_timestamp = strtotime($bill['due_date']);
+            $current_timestamp = time();
+            if ($current_timestamp > $due_timestamp) {
+                $is_overdue = true;
+                $days_overdue = floor(($current_timestamp - $due_timestamp) / (60 * 60 * 24));
+                $overdue_message = "\n⚠️ OVERDUE: This bill is {$days_overdue} day(s) overdue. Please pay immediately to avoid disconnection.";
+            }
+        }
         
         $results = [];
         
         // Send SMS if phone number exists
         if (!empty($client['phone'])) {
-            $sms_message = "Hi $customer_name! Your water bill has been approved. Amount: ₱$amount. Due: $due_date. Consumption: {$consumption} cubic meters. Thank you! - WaterSync";
+            $sms_overdue = $is_overdue ? " OVERDUE by {$days_overdue} day(s)!" : "";
+            $sms_message = "Hi $customer_name! Your water bill for $billing_month has been created. Amount: PHP $amount. Due: $due_date.$sms_overdue Consumption: {$consumption} cubic meters. - WaterSync";
             $sms_result = sendDummySMS($client['phone'], $sms_message);
             $results['sms'] = $sms_result;
             
@@ -66,14 +83,17 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         // Send Email if email exists (prefer registered email)
         if (!empty($email_to_use)) {
             // Remove peso sign from subject to avoid encoding issues - use PHP instead
-            $email_subject = "Water Bill Created - Amount Due: PHP $amount";
+            $subject_overdue = $is_overdue ? " - OVERDUE by {$days_overdue} day(s)" : "";
+            $email_subject = "Water Bill Created for $billing_month - Amount Due: PHP $amount$subject_overdue";
             $email_message = "Dear $customer_name,\n\nYour water bill has been created:\n\n" .
+                           "Billing Month: $billing_month\n" .
                            "Bill ID: $bill_id\n" .
                            "Amount Due: ₱$amount\n" .
                            "Due Date: $due_date\n" .
                            "Current Reading: {$bill['reading']}\n" .
                            "Previous Reading: {$bill['previous']}\n" .
-                           "Consumption: $consumption cubic meters\n\n" .
+                           "Consumption: $consumption cubic meters" .
+                           ($is_overdue ? $overdue_message : "") . "\n\n" .
                            "Please pay on or before the due date to avoid late fees.\n\n" .
                            "Thank you,\nWaterSync Team";
             
