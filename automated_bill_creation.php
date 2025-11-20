@@ -255,5 +255,4 @@ function processOCRReadingsAutomatically($conn) {
         'errors' => $errors,
         'cycle_name' => $active_cycle['cycle_name']
     ];
-}
-?> 
+} 
