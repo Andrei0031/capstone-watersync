@@ -455,14 +455,14 @@ function processImageWithRoboflowDigits($imagePath) {
             error_log("  api_response keys: " . implode(', ', array_keys($digitResult['api_response'])));
         }
         
-        // If Roboflow took too long (>10s) or failed, return quickly for Tesseract fallback
+        // If Roboflow took too long (>10s), return error
         if ($elapsedTime > 10) {
-            error_log('⚠ Roboflow took too long (' . round($elapsedTime, 2) . 's), skipping for Tesseract fallback');
+            error_log('⚠ Roboflow took too long (' . round($elapsedTime, 2) . 's) - API timeout');
             return [
                 'success' => false,
                 'extracted_text' => '',
                 'meter_reading' => null,
-                'error' => 'Roboflow API timeout (>10s)'
+                'error' => 'Roboflow YOLOv8 API timeout (>10s). Please check if model version 7 is deployed and accessible.'
             ];
         }
         

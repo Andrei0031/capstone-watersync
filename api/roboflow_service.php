@@ -466,9 +466,9 @@ function detectDigitsWithRoboflow($imagePath) {
         
         error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None') . ", Size: " . strlen($response ?? '') . " bytes");
         
-        // If request took too long or failed, skip to Tesseract immediately
+        // If request took too long or failed, log the issue
         if ($elapsedTime > 8 || $error || $httpCode !== 200) {
-            error_log("⚠ Roboflow request too slow or failed, will try Tesseract fallback");
+            error_log("⚠ Roboflow request too slow or failed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None'));
         }
         
         // Check if Method 1 returned valid predictions
