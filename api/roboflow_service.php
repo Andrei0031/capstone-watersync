@@ -435,26 +435,31 @@ function detectDigitsWithRoboflow($imagePath) {
         $error = '';
         $methodUsed = '';
         
-        // METHOD 1: Try base64 in POST body (original)
-        error_log("Roboflow Digit Detection: Trying Method 1 - Base64 POST body");
+        // METHOD 1: Try base64 in POST body (matching cURL: base64 IMAGE | curl -d @-)
+        // This is the EXACT format from Roboflow cURL example
+        error_log("Roboflow Digit Detection: Trying Method 1 - Base64 POST body (matching cURL format)");
         $base64Image = base64_encode($imageData);
         error_log("Roboflow Digit Detection: Base64 encoded size: " . round(strlen($base64Image) / 1024, 2) . " KB");
+        error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/x-www-form-urlencoded'
-        ]);
+        // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
+        error_log("Roboflow Digit Detection: Sending request to: " . ROBOFLOW_DIGIT_INFERENCE_URL);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $curlInfo = curl_getinfo($ch);
         curl_close($ch);
+        
+        error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Error: " . ($error ?: 'None'), ", Size: " . strlen($response ?? '') . " bytes");
         
         // Check if Method 1 returned valid predictions
         $method1Success = false;
@@ -702,28 +707,44 @@ function detectDigitsWithRoboflow($imagePath) {
         }
         
         // Log raw response for debugging
-        error_log("Roboflow Digit Detection: Raw API Response (first 1000 chars): " . substr($response, 0, 1000));
-        error_log("Roboflow Digit Detection: Full response length: " . strlen($response) . " bytes");
+        error_log("Roboflow Digit Detection: Raw API Response (first 2000 chars): " . substr($response ?? '', 0, 2000));
+        error_log("Roboflow Digit Detection: Full response length: " . strlen($response ?? '') . " bytes");
+        
+        // Check if response is completely empty
+        if (empty($response) || trim($response) === '') {
+            error_log('✗ Roboflow Digit Detection: API returned EMPTY response');
+            error_log('   HTTP Code: ' . $httpCode);
+            error_log('   cURL Error: ' . ($error ?: 'None'));
+            error_log('   This usually means the model is not deployed or the endpoint is wrong');
+            return [
+                'success' => false,
+                'digits' => [],
+                'message' => 'Roboflow API returned empty response. HTTP Code: ' . $httpCode . '. Check if model version 7 is deployed for "Hosted Image Inference" in Roboflow dashboard.'
+            ];
+        }
         
         $data = json_decode($response, true);
         
         if (!$data) {
             $jsonError = json_last_error_msg();
             error_log('✗ Roboflow Digit Detection: JSON decode failed: ' . $jsonError);
-            error_log('✗ Roboflow Digit Detection: Full response was: ' . $response);
+            error_log('✗ Roboflow Digit Detection: Response type: ' . gettype($response));
+            error_log('✗ Roboflow Digit Detection: Full response (first 2000 chars): ' . substr($response, 0, 2000));
             
-            // Check if response is empty or just whitespace
-            if (empty(trim($response))) {
-                error_log('⚠ WARNING: API returned empty response. This usually means:');
-                error_log('   1. Version 7 is NOT deployed for "Hosted Image Inference"');
-                error_log('   2. You need to click "View Code" in "Hosted Image Inference" section to deploy it');
-                error_log('   3. The model is only deployed for "Embedded Device" (not for API)');
+            // Check if it's HTML (error page) or other non-JSON
+            if (stripos($response, '<html') !== false || stripos($response, '<!DOCTYPE') !== false) {
+                error_log('⚠ Response appears to be HTML (error page), not JSON');
+                return [
+                    'success' => false,
+                    'digits' => [],
+                    'message' => 'Roboflow API returned HTML instead of JSON. This usually means the endpoint is wrong or the model is not deployed. Check: ' . ROBOFLOW_DIGIT_INFERENCE_URL
+                ];
             }
             
             return [
                 'success' => false,
                 'digits' => [],
-                'message' => 'Invalid JSON response from Roboflow API: ' . $jsonError . '. Response: ' . substr($response, 0, 200)
+                'message' => 'Invalid JSON response from Roboflow API: ' . $jsonError . '. Response preview: ' . substr($response, 0, 200)
             ];
         }
         
