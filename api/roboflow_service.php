@@ -842,15 +842,21 @@ function detectDigitsWithRoboflow($imagePath) {
             $className = '';
             $digitValue = null;
             
+            // Try multiple possible class name fields (check all possible formats)
             if (isset($prediction['class'])) {
                 $className = trim(strval($prediction['class']));
             } elseif (isset($prediction['class_name'])) {
                 $className = trim(strval($prediction['class_name']));
             } elseif (isset($prediction['name'])) {
                 $className = trim(strval($prediction['name']));
+            } elseif (isset($prediction['label'])) {
+                $className = trim(strval($prediction['label']));
             } elseif (isset($prediction['class_id'])) {
                 // class_id is numeric (0-9), convert to string
                 $className = strval($prediction['class_id']);
+            } elseif (isset($prediction['id'])) {
+                // Some APIs use 'id' for class
+                $className = trim(strval($prediction['id']));
             }
             
             $confidence = isset($prediction['confidence']) ? floatval($prediction['confidence']) : 0.0;
