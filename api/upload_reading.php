@@ -75,18 +75,7 @@ try {
             }
         }
         
-        // If Roboflow failed, try Tesseract as fallback (if available)
-        if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
-            $tesseractResult = processImageWithTesseract($filepath);
-            if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
-                $ocrReading = $tesseractResult['meter_reading'];
-                $extractedText = $tesseractResult['extracted_text'] ?? '';
-                $ocrProcessed = true;
-                error_log("✓ Auto-OCR SUCCESS (Tesseract): Reading will be created with value: $ocrReading");
-            } else {
-                $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
-            }
-        }
+        // Roboflow YOLOv8 only - no Tesseract fallback
         
         if (!$ocrProcessed) {
             $ocrError = $ocrError ?? 'OCR processing failed';

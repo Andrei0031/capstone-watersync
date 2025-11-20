@@ -277,35 +277,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     }
                 }
                 
-                // Step 2b: If Roboflow failed, try Tesseract as fallback (if available)
-                if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
-                    error_log("Trying Tesseract fallback for reading ID $reading_id...");
-                    $tesseractResult = processImageWithTesseract($croppedImagePath);
-                    if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
-                        $ocrReading = $tesseractResult['meter_reading'];
-                        $extractedText = $tesseractResult['extracted_text'] ?? '';
-                        $ocrProcessed = true;
-                        error_log("✓ OCR SUCCESS (Tesseract): Reading ID $reading_id processed with value: $ocrReading");
-                    } else {
-                        $tesseractError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
-                        error_log("⚠ Tesseract OCR also failed for reading ID $reading_id: $tesseractError");
-                        if ($ocrError) {
-                            $ocrError .= ' | Tesseract: ' . $tesseractError;
-                        } else {
-                            $ocrError = 'Tesseract: ' . $tesseractError;
-                        }
-                    }
-                }
-                
-                // Step 2c: If both failed, throw exception with details
+                // Step 2b: If Roboflow failed, throw exception (no fallback - Roboflow YOLOv8 only)
                 if (!$ocrProcessed) {
-                    $errorMsg = 'OCR processing failed. ';
+                    $errorMsg = 'Roboflow YOLOv8 OCR processing failed. ';
                     if ($ocrError) {
                         $errorMsg .= $ocrError;
                     } else {
-                        $errorMsg .= 'Both Roboflow and Tesseract failed to process the image.';
+                        $errorMsg .= 'Roboflow digit detection failed to process the image.';
                     }
                     $errorMsg .= ' Image path: ' . $croppedImagePath;
+                    $errorMsg .= ' Please check if Roboflow model version 7 is deployed and accessible.';
                     throw new Exception($errorMsg);
                 }
                 

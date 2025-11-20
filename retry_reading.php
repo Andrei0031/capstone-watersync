@@ -82,23 +82,9 @@ try {
         }
     }
     
-    // If Roboflow failed, try Tesseract as fallback (if available)
-    if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
-        $tesseractResult = processImageWithTesseract($imagePath);
-        if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
-            $ocrReading = $tesseractResult['meter_reading'];
-            $extractedText = $tesseractResult['extracted_text'] ?? '';
-            $ocrProcessed = true;
-            error_log("✓ Retry OCR SUCCESS (Tesseract): Reading ID $reading_id processed with value: $ocrReading");
-        } else {
-            $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
-        }
-    }
-    
+    // Roboflow YOLOv8 only - no Tesseract fallback
     if (!$ocrProcessed) {
-        // If Roboflow failed, Tesseract should still work as fallback
-        // But if both failed, provide helpful error message
-        $errorMsg = $ocrError ?? 'OCR processing failed. Both Roboflow and Tesseract failed to process the image.';
+        $errorMsg = $ocrError ?? 'Roboflow YOLOv8 OCR processing failed. Please check if Roboflow model version 7 is deployed and accessible.';
         error_log("✗ Retry OCR FAILED for reading ID $reading_id: $errorMsg");
         
         // Don't throw exception - instead update status to failed with error message
