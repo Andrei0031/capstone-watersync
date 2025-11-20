@@ -486,26 +486,36 @@ $pending_result = $conn->query($pending_sql);
 
 // Fetch processed readings with billing cycle info
 // Prioritize verified_reading (manually corrected) over ocr_reading
-$processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code,
+// Use LEFT JOIN to show readings even if client is missing/inactive
+$processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value
     FROM pending_meter_readings pmr 
-    JOIN client_list cl ON pmr.client_id = cl.id 
+    LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
     WHERE pmr.status = 'processed'
     ORDER BY pmr.processed_at DESC, pmr.processed_date DESC";
 $processed_result = $conn->query($processed_sql);
+if (!$processed_result) {
+    error_log("Error fetching processed readings: " . $conn->error);
+    $processed_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'processed' LIMIT 0");
+}
 
 // Fetch failed readings with billing cycle info
-$failed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code,
+// Use LEFT JOIN to show readings even if client is missing/inactive
+$failed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                bc.cycle_name, bc.due_date as cycle_due_date,
                pmr.admin_notes as error_message
     FROM pending_meter_readings pmr 
-    JOIN client_list cl ON pmr.client_id = cl.id 
+    LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
     WHERE pmr.status = 'failed'
     ORDER BY pmr.processed_at DESC";
 $failed_result = $conn->query($failed_sql);
+if (!$failed_result) {
+    error_log("Error fetching failed readings: " . $conn->error);
+    $failed_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'failed' LIMIT 0");
+}
 
 ?>
 <!DOCTYPE html>
@@ -1611,13 +1621,26 @@ $failed_result = $conn->query($failed_sql);
                                                 <div class="d-flex align-items-center">
                                                     <div class="avatar-sm bg-success">
                                                         <?php 
-                                                            $initials = strtoupper(substr($row['firstname'], 0, 1) . substr($row['lastname'], 0, 1));
-                                                            echo $initials;
+                                                            $firstname = $row['firstname'] ?? '';
+                                                            $lastname = $row['lastname'] ?? '';
+                                                            $initials = strtoupper(substr($firstname, 0, 1) . substr($lastname, 0, 1));
+                                                            echo $initials ?: '?';
                                                         ?>
                                                     </div>
                                                     <div>
-                                                        <div class="fw-bold"><?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?></div>
-                                                        <div class="text-muted"><?php echo htmlspecialchars($row['meter_code']); ?></div>
+                                                        <div class="fw-bold">
+                                                            <?php 
+                                                                if ($firstname || $lastname) {
+                                                                    echo htmlspecialchars(trim($firstname . ' ' . $lastname));
+                                                                } else {
+                                                                    echo '<span class="text-muted">Client ID: ' . $row['client_id'] . '</span>';
+                                                                    if (isset($row['client_status']) && $row['client_status'] != 1) {
+                                                                        echo ' <span class="badge bg-warning">Inactive</span>';
+                                                                    }
+                                                                }
+                                                            ?>
+                                                        </div>
+                                                        <div class="text-muted"><?php echo htmlspecialchars($row['meter_code'] ?? 'N/A'); ?></div>
                                                     </div>
                                                 </div>
                                             </td>
