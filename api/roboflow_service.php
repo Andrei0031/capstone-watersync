@@ -374,6 +374,42 @@ function detectDigitsWithRoboflow($imagePath) {
         error_log("Roboflow Digit Detection: Calling API for image: $imagePath");
         error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
         
+        // Check if image file exists and is readable
+        if (!file_exists($imagePath)) {
+            error_log("✗ Roboflow Digit Detection: Image file does not exist: $imagePath");
+            return [
+                'success' => false,
+                'digits' => [],
+                'message' => 'Image file not found: ' . $imagePath
+            ];
+        }
+        
+        // Check image file size
+        $fileSize = filesize($imagePath);
+        error_log("Roboflow Digit Detection: Image file size: " . round($fileSize / 1024, 2) . " KB");
+        
+        if ($fileSize === false || $fileSize === 0) {
+            error_log("✗ Roboflow Digit Detection: Image file is empty or unreadable");
+            return [
+                'success' => false,
+                'digits' => [],
+                'message' => 'Image file is empty or unreadable'
+            ];
+        }
+        
+        // Verify it's a valid image
+        $imageInfo = @getimagesize($imagePath);
+        if ($imageInfo === false) {
+            error_log("✗ Roboflow Digit Detection: Invalid image file format");
+            return [
+                'success' => false,
+                'digits' => [],
+                'message' => 'Invalid image file format'
+            ];
+        }
+        
+        error_log("Roboflow Digit Detection: Image dimensions: " . $imageInfo[0] . "x" . $imageInfo[1] . ", type: " . $imageInfo['mime']);
+        
         // Prepare image data - encode to base64 for POST body
         // Method: base64 YOUR_IMAGE.jpg | curl -d @- (sends base64 data in POST body)
         $imageData = file_get_contents($imagePath);
@@ -387,6 +423,7 @@ function detectDigitsWithRoboflow($imagePath) {
         
         // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
         $base64Image = base64_encode($imageData);
+        error_log("Roboflow Digit Detection: Base64 encoded size: " . round(strlen($base64Image) / 1024, 2) . " KB");
         
         // Initialize cURL
         // Roboflow serverless API: POST with base64-encoded image data in body
@@ -408,11 +445,10 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_close($ch);
         
         error_log("Roboflow Digit Detection: HTTP Response Code: $httpCode");
-        if ($error) {
-            error_log("Roboflow Digit Detection: cURL Error: $error");
-        }
+        error_log("Roboflow Digit Detection: Response length: " . strlen($response) . " bytes");
         
         if ($error) {
+            error_log("Roboflow Digit Detection: cURL Error: $error");
             return [
                 'success' => false,
                 'digits' => [],
@@ -429,9 +465,10 @@ function detectDigitsWithRoboflow($imagePath) {
             } elseif ($httpCode === 405) {
                 $errorMsg .= ' - Method Not Allowed. The digit detection model may not be deployed yet. Please deploy your model in Roboflow dashboard.';
             } else {
-                $errorMsg .= ' - Response: ' . substr($response, 0, 200);
+                $errorMsg .= ' - Response: ' . substr($response, 0, 500);
             }
             error_log('✗ Roboflow Digit Detection API HTTP Error: ' . $errorMsg);
+            error_log('✗ Full API Response: ' . substr($response, 0, 1000));
             return [
                 'success' => false,
                 'digits' => [],
@@ -439,21 +476,42 @@ function detectDigitsWithRoboflow($imagePath) {
             ];
         }
         
+        // Log raw response for debugging
+        error_log("Roboflow Digit Detection: Raw API Response (first 500 chars): " . substr($response, 0, 500));
+        
         $data = json_decode($response, true);
         
         if (!$data) {
+            $jsonError = json_last_error_msg();
+            error_log('✗ Roboflow Digit Detection: JSON decode failed: ' . $jsonError);
+            error_log('✗ Roboflow Digit Detection: Response was: ' . substr($response, 0, 500));
             return [
                 'success' => false,
                 'digits' => [],
-                'message' => 'Invalid response from Roboflow Digit Detection API'
+                'message' => 'Invalid JSON response from Roboflow API: ' . $jsonError . '. Response: ' . substr($response, 0, 200)
             ];
         }
         
-        // Parse digit detections
-        $predictions = isset($data['predictions']) ? $data['predictions'] : [];
+        // Log full API response structure
+        error_log("Roboflow Digit Detection: API Response structure: " . json_encode($data));
         
-        error_log('Roboflow Digit Detection API response: ' . json_encode($data));
+        // Parse digit detections - check multiple possible response formats
+        $predictions = [];
+        if (isset($data['predictions']) && is_array($data['predictions'])) {
+            $predictions = $data['predictions'];
+        } elseif (isset($data['detections']) && is_array($data['detections'])) {
+            $predictions = $data['detections'];
+        } elseif (isset($data['results']) && is_array($data['results'])) {
+            $predictions = $data['results'];
+        }
+        
+        error_log('Roboflow Digit Detection API response keys: ' . implode(', ', array_keys($data)));
+        error_log('Roboflow Digit Detection API full response: ' . json_encode($data));
         error_log('Number of digit predictions: ' . count($predictions));
+        
+        if (count($predictions) === 0 && !empty($data)) {
+            error_log('⚠ Roboflow Digit Detection: API returned data but no predictions array found. Response structure: ' . json_encode(array_keys($data)));
+        }
         
         // Extract digits with their positions
         $digits = [];
