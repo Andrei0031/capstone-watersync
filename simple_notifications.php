@@ -150,40 +150,61 @@ function sendDummyEmail($email, $subject, $message) {
     
     // Real email sending using PHP mail() function
     // Note: This requires proper mail server configuration
-    // For XAMPP, you may need to configure sendmail or use SMTP
+    // For production, you may need to configure SMTP or use a mail service
     
-    $from_email = 'noreply@watersync.com'; // Update this to your actual domain email if needed
+    // Use domain email if available, otherwise use a generic one
+    $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'watersync.com';
+    $from_email = 'noreply@' . $domain; // Use your actual domain
     $from_name = 'WaterSync';
     
     // Prepare headers
     $headers = "From: $from_name <$from_email>\r\n";
     $headers .= "Reply-To: $from_email\r\n";
     $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    $headers .= "X-Mailer: PHP/" . phpversion();
+    $headers .= "X-Mailer: PHP/" . phpversion() . "\r\n";
+    $headers .= "MIME-Version: 1.0";
     
-    // Send email
-    $sent = @mail($email, $subject, $message, $headers);
+    // Clear any previous errors
+    error_clear_last();
+    
+    // Send email (remove @ to see actual errors)
+    $sent = mail($email, $subject, $message, $headers);
+    
+    // Get the last error if any
+    $last_error = error_get_last();
+    $error_message = $last_error ? $last_error['message'] : null;
+    
+    // Log detailed information
+    error_log("EMAIL ATTEMPT: To: $email | Subject: $subject | From: $from_email | Sent: " . ($sent ? 'YES' : 'NO') . ($error_message ? " | Error: $error_message" : ''));
     
     if ($sent) {
-        error_log("EMAIL SENT: To: $email | Subject: $subject");
+        // Note: mail() returning true doesn't guarantee delivery
+        // It only means PHP accepted the request
         return [
             'success' => true,
             'status' => 'sent',
-            'message' => 'Email sent successfully',
+            'message' => 'Email sent successfully (Note: Delivery not guaranteed - check spam folder)',
             'email' => $email,
             'subject' => $subject,
-            'timestamp' => date('Y-m-d H:i:s')
+            'from' => $from_email,
+            'timestamp' => date('Y-m-d H:i:s'),
+            'warning' => 'PHP mail() function was used. For reliable delivery, configure SMTP or use a mail service provider.'
         ];
     } else {
-        error_log("EMAIL FAILED: To: $email | Subject: $subject | Error: " . error_get_last()['message']);
+        // Email sending failed
+        $error_msg = $error_message ?? 'Mail server not configured or unavailable';
+        error_log("EMAIL FAILED: To: $email | Subject: $subject | Error: $error_msg");
+        
         return [
             'success' => false,
             'status' => 'failed',
-            'message' => 'Failed to send email. Check server mail configuration.',
-            'error' => error_get_last()['message'] ?? 'Unknown error',
+            'message' => 'Failed to send email. Server mail configuration may be missing.',
+            'error' => $error_msg,
             'email' => $email,
             'subject' => $subject,
-            'timestamp' => date('Y-m-d H:i:s')
+            'from' => $from_email,
+            'timestamp' => date('Y-m-d H:i:s'),
+            'suggestion' => 'Configure SMTP settings or use a mail service provider (SendGrid, Mailgun, etc.)'
         ];
     }
 }
