@@ -912,8 +912,22 @@ function detectDigitsWithRoboflow($imagePath) {
             }
         }
         
+        // If we have predictions but no digits, log ALL prediction details for debugging
+        if (count($predictions) > 0 && count($digits) === 0) {
+            error_log('⚠ Roboflow Digit Detection: Found ' . count($predictions) . ' predictions but none recognized as digits');
+            error_log('   Checking all predictions for digit patterns...');
+            foreach ($predictions as $idx => $pred) {
+                $allKeys = array_keys($pred);
+                $classVal = $pred['class'] ?? $pred['class_name'] ?? $pred['name'] ?? $pred['class_id'] ?? 'N/A';
+                $confVal = $pred['confidence'] ?? 'N/A';
+                error_log("   Prediction #$idx: keys=[" . implode(',', $allKeys) . "], class='$classVal', confidence=$confVal");
+                error_log("   Full prediction: " . json_encode($pred));
+            }
+        }
+        
         if (count($digits) > 0) {
             error_log('✓ Roboflow Digit Detection: Found ' . count($digits) . ' digit(s)');
+            error_log('   Digits: ' . implode(', ', array_map(function($d) { return $d['digit'] . '(' . round($d['confidence'], 2) . ')'; }, $digits)));
             return [
                 'success' => true,
                 'digits' => $digits,
