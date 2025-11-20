@@ -524,9 +524,26 @@ function detectDigitsWithRoboflow($imagePath) {
             $method2Success = false;
             if ($httpCode === 200 && !$error && !empty($response)) {
                 $testData = json_decode($response, true);
-                if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
-                    $method2Success = true;
-                    error_log("Roboflow Digit Detection: Method 2 (multipart) succeeded with " . count($testData['predictions']) . " predictions");
+                if ($testData) {
+                    // Check multiple possible response formats
+                    $hasPredictions = false;
+                    $predictionCount = 0;
+                    
+                    if (isset($testData['predictions']) && is_array($testData['predictions'])) {
+                        $hasPredictions = true;
+                        $predictionCount = count($testData['predictions']);
+                    } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
+                        $hasPredictions = true;
+                        $predictionCount = count($testData['detections']);
+                    } elseif (isset($testData['results']) && is_array($testData['results'])) {
+                        $hasPredictions = true;
+                        $predictionCount = count($testData['results']);
+                    }
+                    
+                    if ($hasPredictions && $predictionCount > 0) {
+                        $method2Success = true;
+                        error_log("Roboflow Digit Detection: Method 2 (multipart) succeeded with $predictionCount predictions");
+                    }
                 }
             }
             
