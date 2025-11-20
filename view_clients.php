@@ -7,7 +7,9 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 include 'db.php';
-include 'comprehensive_fee_manager.php';
+if (file_exists('comprehensive_fee_manager.php')) {
+    include 'comprehensive_fee_manager.php';
+}
 
 $notification = '';
 $notificationClass = '';
