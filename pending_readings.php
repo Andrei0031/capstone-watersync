@@ -1265,12 +1265,6 @@ $failed_result = $conn->query($failed_sql);
         <!-- Header Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Meter Reading Management</h2>
-            <div>
-                <button class="btn btn-primary" onclick="document.getElementById('uploadInput').click()">
-                    <i class="fas fa-upload me-2"></i>Upload Readings
-                </button>
-                <input type="file" id="uploadInput" style="display: none" multiple accept="image/*">
-            </div>
         </div>
 
         <!-- Current Billing Cycle Info -->
