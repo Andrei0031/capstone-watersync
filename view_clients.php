@@ -1890,24 +1890,6 @@ $result = $conn->query($sql);
                                         <i class="fas fa-dollar-sign"></i>
                                     </button>
                                     <ul class="dropdown-menu">
-                                        <li>
-                                            <form method="POST" style="display: inline;">
-                                                <input type="hidden" name="client_id" value="<?php echo $row['id']; ?>">
-                                                <button type="submit" name="apply_connection_fee" class="dropdown-item" 
-                                                        onclick="return confirm('Apply connection fee to this client?')">
-                                                    <i class="fas fa-plug me-2"></i>Connection Fee
-                                                </button>
-                                            </form>
-                                        </li>
-                                        <li>
-                                            <form method="POST" style="display: inline;">
-                                                <input type="hidden" name="client_id" value="<?php echo $row['id']; ?>">
-                                                <button type="submit" name="apply_reconnection_fee" class="dropdown-item"
-                                                        onclick="return confirm('Apply reconnection fee to this client?')">
-                                                    <i class="fas fa-sync-alt me-2"></i>Reconnection Fee
-                                                </button>
-                                            </form>
-                                        </li>
                                     </ul>
                                 </div>
                                 <a href="#" class="btn btn-sm btn-outline-warning historical-reading-btn" 
@@ -1978,7 +1960,14 @@ $result = $conn->query($sql);
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="add_meter_code" class="form-label">Meter Code <span class="text-danger">*</span></label>
-                  <input type="text" id="add_meter_code" name="meter_code" class="form-control" placeholder="Enter meter code (numbers only)" pattern="[0-9]+" required />
+                  <div class="input-group">
+                      <input type="text" id="add_meter_code" name="meter_code" class="form-control" placeholder="Enter meter code (numbers only)" pattern="[0-9]+" required />
+                      <button type="button" class="btn btn-outline-secondary" id="autoGenerateMeterCode" title="Auto-generate next meter code">
+                          <i class="fas fa-magic"></i> Auto-Generate
+                      </button>
+                  </div>
+                  <small class="text-muted" id="meterCodeHint">Last meter code: <span id="lastMeterCodeDisplay">-</span></small>
+                  <div class="invalid-feedback" id="meterCodeError"></div>
                   <small class="form-text text-muted">Only numbers are allowed</small>
                 </div>
               </div>
