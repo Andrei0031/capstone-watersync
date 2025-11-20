@@ -158,10 +158,12 @@ function sendDummyEmail($email, $subject, $message) {
     // Note: This requires proper mail server configuration
     // For production, you may need to configure SMTP or use a mail service
     
-    // Use domain email if available, otherwise use a generic one
-    $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'watersync.com';
-    $from_email = 'noreply@' . $domain; // Use your actual domain
-    $from_name = 'WaterSync';
+    // Use a valid email address - IMPORTANT: This must be a real email address on your domain
+    // Change this to your actual email address (e.g., admin@yourdomain.com or info@yourdomain.com)
+    $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'brgymalitbog-watersync.site';
+    // Use a real email address that exists on your domain, not noreply@
+    $from_email = 'brgymali@brgymalitbog-watersync.site'; // Use your actual working email address
+    $from_name = 'Barangay New Malitbog WaterSync';
     
     // Prepare headers
     $headers = "From: $from_name <$from_email>\r\n";
