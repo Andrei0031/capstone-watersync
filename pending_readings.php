@@ -1402,18 +1402,20 @@ $failed_result = $conn->query($failed_sql);
                     </div>
                 </div>
             </div>
+            <?php if ($pending_count > 0): ?>
             <div class="col-md-3">
                 <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #f6c23e 0%, #dda20a 100%);">
                     <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
                         <div>
-                            <h6 class="text-white-50 mb-2">Pending</h6>
+                            <h6 class="text-white-50 mb-2">Pending (Legacy)</h6>
                             <h3 class="mb-1 text-white"><?php echo $pending_count; ?></h3>
-                            <small class="text-white-50">Awaiting processing</small>
+                            <small class="text-white-50">Old readings</small>
                         </div>
                         <i class="fas fa-clock stat-icon"></i>
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
             <div class="col-md-3">
                 <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #e74a3b 0%, #be2617 100%);">
                     <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
@@ -1428,16 +1430,26 @@ $failed_result = $conn->query($failed_sql);
             </div>
         </div>
 
+        <!-- Auto-Processing Notice -->
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Auto-Processing Enabled:</strong> Meter readings uploaded from mobile devices are now automatically processed with OCR. No manual processing required! 
+            <strong>Batch upload</strong> is available via <code>api/batch_upload_readings.php</code> for uploading multiple readings at once.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="readingTabs" role="tablist">
+            <?php if ($pending_count > 0): ?>
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
-                    <i class="fas fa-clock me-2"></i>Pending
+                <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                    <i class="fas fa-clock me-2"></i>Pending (Legacy)
                     <span class="badge bg-warning ms-2"><?php echo $pending_count; ?></span>
                 </button>
             </li>
+            <?php endif; ?>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed" type="button" role="tab">
+                <button class="nav-link <?php echo $pending_count == 0 ? 'active' : ''; ?>" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed" type="button" role="tab">
                     <i class="fas fa-check me-2"></i>Processed
                     <span class="badge bg-success ms-2"><?php echo $processed_count; ?></span>
                 </button>
@@ -1452,11 +1464,15 @@ $failed_result = $conn->query($failed_sql);
 
         <!-- Tab Content -->
         <div class="tab-content" id="readingTabsContent">
-            <!-- Pending Readings Tab -->
-            <div class="tab-pane fade show active" id="pending" role="tabpanel">
+            <!-- Pending Readings Tab (Legacy - Only shown if pending readings exist) -->
+            <?php if ($pending_count > 0): ?>
+            <div class="tab-pane fade" id="pending" role="tabpanel">
                 <div class="card card-soft">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
-                        <h5 class="mb-0">Pending OCR Processing</h5>
+                        <div>
+                            <h5 class="mb-0">Legacy Pending Readings</h5>
+                            <small class="text-muted">These are old readings that need manual processing. New uploads are auto-processed.</small>
+                        </div>
                         <form method="POST" id="processingForm" class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-primary" id="selectAllPendingBtn">
                                 <i class="fas fa-check-square me-2"></i>Select All
@@ -1553,9 +1569,10 @@ $failed_result = $conn->query($failed_sql);
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- Processed Readings Tab -->
-            <div class="tab-pane fade" id="processed" role="tabpanel">
+            <div class="tab-pane fade <?php echo $pending_count == 0 ? 'show active' : ''; ?>" id="processed" role="tabpanel">
                 <div class="card card-soft">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <h5 class="mb-0">Processed Readings</h5>
@@ -2017,28 +2034,32 @@ $failed_result = $conn->query($failed_sql);
                 });
             }
 
-            // Handle checkboxes for pending readings
+            // Handle checkboxes for pending readings (only if pending tab exists)
             const selectAllPending = document.getElementById('selectAllPending');
             const pendingCheckboxes = document.querySelectorAll('.pending-checkbox');
             const processSelectedBtn = document.getElementById('processSelectedBtn');
 
-            selectAllPending.addEventListener('change', function() {
-                pendingCheckboxes.forEach(checkbox => {
-                    checkbox.checked = this.checked;
+            if (selectAllPending && pendingCheckboxes.length > 0) {
+                selectAllPending.addEventListener('change', function() {
+                    pendingCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    updateProcessButton();
                 });
-                updateProcessButton();
-            });
 
-            pendingCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', updateProcessButton);
-            });
+                pendingCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', updateProcessButton);
+                });
 
-            function updateProcessButton() {
-                const checkedCount = document.querySelectorAll('.pending-checkbox:checked').length;
-                processSelectedBtn.disabled = checkedCount === 0;
-                const deleteSelectedPendingBtn = document.getElementById('deleteSelectedPendingBtn');
-                if (deleteSelectedPendingBtn) {
-                    deleteSelectedPendingBtn.disabled = checkedCount === 0;
+                function updateProcessButton() {
+                    const checkedCount = document.querySelectorAll('.pending-checkbox:checked').length;
+                    if (processSelectedBtn) {
+                        processSelectedBtn.disabled = checkedCount === 0;
+                    }
+                    const deleteSelectedPendingBtn = document.getElementById('deleteSelectedPendingBtn');
+                    if (deleteSelectedPendingBtn) {
+                        deleteSelectedPendingBtn.disabled = checkedCount === 0;
+                    }
                 }
             }
 
