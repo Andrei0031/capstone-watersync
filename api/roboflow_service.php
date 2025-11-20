@@ -449,23 +449,32 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Reduced to 15 seconds to fail faster
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Connection timeout 10 seconds
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10); // 10 seconds max - fail fast
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // Connection timeout 5 seconds
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // Force HTTP/1.1
         
         error_log("Roboflow Digit Detection: Sending request to: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        $startTime = microtime(true);
         $response = curl_exec($ch);
+        $elapsedTime = microtime(true) - $startTime;
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         $curlInfo = curl_getinfo($ch);
         curl_close($ch);
         
-        error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Error: " . ($error ?: 'None'), ", Size: " . strlen($response ?? '') . " bytes");
+        error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None') . ", Size: " . strlen($response ?? '') . " bytes");
+        
+        // If request took too long or failed, skip to Tesseract immediately
+        if ($elapsedTime > 8 || $error || $httpCode !== 200) {
+            error_log("⚠ Roboflow request too slow or failed, will try Tesseract fallback");
+        }
         
         // Check if Method 1 returned valid predictions
         $method1Success = false;
-        if ($httpCode === 200 && !$error && !empty($response)) {
+        // Only process if we got a valid response quickly
+        if ($httpCode === 200 && !$error && !empty($response) && $elapsedTime < 8) {
             error_log("Roboflow Digit Detection: Method 1 - HTTP 200, response length: " . strlen($response));
             $testData = json_decode($response, true);
             

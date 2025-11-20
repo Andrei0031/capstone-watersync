@@ -441,16 +441,29 @@ function processImageWithRoboflowDigits($imagePath) {
             }
         }
         
-        // Step 1: Detect digits using Roboflow API
-        error_log("Calling detectDigitsWithRoboflow()...");
+        // Step 1: Detect digits using Roboflow API (YOLOv8)
+        error_log("Calling detectDigitsWithRoboflow() (YOLOv8)...");
+        $startTime = microtime(true);
         $digitResult = detectDigitsWithRoboflow($imagePath);
+        $elapsedTime = microtime(true) - $startTime;
         
-        error_log("detectDigitsWithRoboflow() returned:");
+        error_log("detectDigitsWithRoboflow() returned in " . round($elapsedTime, 2) . "s:");
         error_log("  success: " . ($digitResult['success'] ? 'true' : 'false'));
         error_log("  digits count: " . count($digitResult['digits'] ?? []));
         error_log("  message: " . ($digitResult['message'] ?? 'N/A'));
         if (isset($digitResult['api_response'])) {
             error_log("  api_response keys: " . implode(', ', array_keys($digitResult['api_response'])));
+        }
+        
+        // If Roboflow took too long (>10s) or failed, return quickly for Tesseract fallback
+        if ($elapsedTime > 10) {
+            error_log('⚠ Roboflow took too long (' . round($elapsedTime, 2) . 's), skipping for Tesseract fallback');
+            return [
+                'success' => false,
+                'extracted_text' => '',
+                'meter_reading' => null,
+                'error' => 'Roboflow API timeout (>10s)'
+            ];
         }
         
         if (!$digitResult['success']) {
