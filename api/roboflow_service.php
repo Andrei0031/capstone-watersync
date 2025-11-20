@@ -66,7 +66,7 @@ function detectMeterRegionWithRoboflow($imagePath) {
         error_log("Roboflow: API URL: " . ROBOFLOW_INFERENCE_URL);
         error_log("Roboflow: Workspace: " . ROBOFLOW_WORKSPACE . ", Project: " . ROBOFLOW_PROJECT . ", Version: " . ROBOFLOW_MODEL_VERSION);
         
-        // Prepare image data and encode to base64 (matching Roboflow's cURL example)
+        // Prepare image data - use base64 data URL format
         $imageData = file_get_contents($imagePath);
         if (!$imageData) {
             return [
@@ -76,16 +76,24 @@ function detectMeterRegionWithRoboflow($imagePath) {
             ];
         }
         
-        // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
+        // Encode image to base64 and create data URL
         $base64Image = base64_encode($imageData);
+        $imageMimeType = mime_content_type($imagePath) ?: 'image/jpeg';
+        $dataUrl = 'data:' . $imageMimeType . ';base64,' . $base64Image;
+        
+        // URL encode the data URL for use as query parameter
+        $encodedImageUrl = urlencode($dataUrl);
+        
+        // Build URL with image parameter (matching: curl -X POST "...&image=URL_OF_YOUR_IMAGE")
+        $apiUrl = ROBOFLOW_INFERENCE_URL . '&image=' . $encodedImageUrl;
         
         // Initialize cURL
-        // Roboflow serverless API requires POST with base64-encoded image data
+        // Roboflow serverless API supports image as URL parameter
         // API key is in URL as query parameter
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, ROBOFLOW_INFERENCE_URL);
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send base64 data directly
+        curl_setopt($ch, CURLOPT_POSTFIELDS, ''); // Empty POST body when using URL parameter
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded'
@@ -373,7 +381,7 @@ function detectDigitsWithRoboflow($imagePath) {
         error_log("Roboflow Digit Detection: Calling API for image: $imagePath");
         error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
         
-        // Prepare image data and encode to base64 (matching Roboflow's cURL example)
+        // Prepare image data - use base64 data URL format
         $imageData = file_get_contents($imagePath);
         if (!$imageData) {
             return [
@@ -383,15 +391,23 @@ function detectDigitsWithRoboflow($imagePath) {
             ];
         }
         
-        // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
+        // Encode image to base64 and create data URL
         $base64Image = base64_encode($imageData);
+        $imageMimeType = mime_content_type($imagePath) ?: 'image/jpeg';
+        $dataUrl = 'data:' . $imageMimeType . ';base64,' . $base64Image;
+        
+        // URL encode the data URL for use as query parameter
+        $encodedImageUrl = urlencode($dataUrl);
+        
+        // Build URL with image parameter (matching: curl -X POST "...&image=URL_OF_YOUR_IMAGE")
+        $apiUrl = ROBOFLOW_DIGIT_INFERENCE_URL . '&image=' . $encodedImageUrl;
         
         // Initialize cURL
-        // Roboflow serverless API requires POST with base64-encoded image data
+        // Roboflow serverless API supports image as URL parameter
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send base64 data directly
+        curl_setopt($ch, CURLOPT_POSTFIELDS, ''); // Empty POST body when using URL parameter
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded'
