@@ -11,12 +11,12 @@ define('ROBOFLOW_API_KEY', 'plVsmWuM0KjEA8Pz6RqB'); // Private API Key
 define('ROBOFLOW_WORKSPACE', 'watersync');
 
 // Meter Detection Model Configuration
-// Using detect.roboflow.com API endpoint (standard Roboflow API)
+// Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
 define('ROBOFLOW_MODEL_VERSION', '4'); // Updated to version 4
 define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/4'); // Model ID format: project/version
-// Standard Roboflow API endpoint format: https://detect.roboflow.com/{workspace}/{project}/{version}
-define('ROBOFLOW_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
+// Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
+define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
@@ -27,23 +27,15 @@ define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/4'); // Updated to version 4
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
 define('ROBOFLOW_DIGIT_MODEL_VERSION', '4'); // Updated to version 4
 
-// Build inference URL - using detect.roboflow.com endpoint (standard Roboflow API)
-// Standard API endpoint format: https://detect.roboflow.com/{workspace}/{project}/{version}
-// If model_id is set, parse it to extract project and version; otherwise use project/version format
+// Build inference URL - using serverless.roboflow.com endpoint (Hosted Image Inference)
+// Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
+// If model_id is set, use it directly; otherwise use project/version format
 if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
-    // Parse model_id format (e.g., "watersync-oekrf/4") to extract project and version
-    $modelParts = explode('/', ROBOFLOW_DIGIT_MODEL_ID);
-    if (count($modelParts) === 2) {
-        $digitProject = $modelParts[0];
-        $digitVersion = $modelParts[1];
-        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . $digitProject . '/' . $digitVersion . '?api_key=' . ROBOFLOW_API_KEY);
-    } else {
-        // Fallback to direct model_id format (shouldn't happen with correct format)
-        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
-    }
+    // Use model_id format directly (serverless API format)
+    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 } else {
     // Use project/version format (legacy)
-    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
+    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 }
 
 /**
@@ -74,7 +66,7 @@ function detectMeterRegionWithRoboflow($imagePath) {
         error_log("Roboflow: API URL: " . ROBOFLOW_INFERENCE_URL);
         error_log("Roboflow: Workspace: " . ROBOFLOW_WORKSPACE . ", Project: " . ROBOFLOW_PROJECT . ", Version: " . ROBOFLOW_MODEL_VERSION);
         
-        // Prepare multipart form data
+        // Prepare image data and encode to base64 (matching Roboflow's cURL example)
         $imageData = file_get_contents($imagePath);
         if (!$imageData) {
             return [
@@ -84,32 +76,19 @@ function detectMeterRegionWithRoboflow($imagePath) {
             ];
         }
         
-        $boundary = uniqid();
-        $delimiter = '-------------' . $boundary;
-        
-        $postData = '';
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="file"; filename="meter_image.jpg"' . "\r\n";
-        $postData .= 'Content-Type: image/jpeg' . "\r\n\r\n";
-        $postData .= $imageData . "\r\n";
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="confidence"' . "\r\n\r\n";
-        $postData .= '0.3' . "\r\n"; // Lower confidence threshold
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="overlap"' . "\r\n\r\n";
-        $postData .= '0.5' . "\r\n";
-        $postData .= '--' . $delimiter . '--';
+        // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
+        $base64Image = base64_encode($imageData);
         
         // Initialize cURL
-        // Roboflow API requires POST with multipart/form-data
+        // Roboflow serverless API requires POST with base64-encoded image data
         // API key is in URL as query parameter
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, ROBOFLOW_INFERENCE_URL);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send base64 data directly
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: multipart/form-data; boundary=' . $delimiter
+            'Content-Type: application/x-www-form-urlencoded'
         ]);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -394,7 +373,7 @@ function detectDigitsWithRoboflow($imagePath) {
         error_log("Roboflow Digit Detection: Calling API for image: $imagePath");
         error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
         
-        // Prepare multipart form data
+        // Prepare image data and encode to base64 (matching Roboflow's cURL example)
         $imageData = file_get_contents($imagePath);
         if (!$imageData) {
             return [
@@ -404,30 +383,18 @@ function detectDigitsWithRoboflow($imagePath) {
             ];
         }
         
-        $boundary = uniqid();
-        $delimiter = '-------------' . $boundary;
-        
-        $postData = '';
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="file"; filename="meter_image.jpg"' . "\r\n";
-        $postData .= 'Content-Type: image/jpeg' . "\r\n\r\n";
-        $postData .= $imageData . "\r\n";
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="confidence"' . "\r\n\r\n";
-        $postData .= '0.3' . "\r\n"; // Lower confidence threshold for digits
-        $postData .= '--' . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="overlap"' . "\r\n\r\n";
-        $postData .= '0.5' . "\r\n";
-        $postData .= '--' . $delimiter . '--';
+        // Encode image to base64 (matching: base64 YOUR_IMAGE.jpg | curl -d @-)
+        $base64Image = base64_encode($imageData);
         
         // Initialize cURL
+        // Roboflow serverless API requires POST with base64-encoded image data
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send base64 data directly
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: multipart/form-data; boundary=' . $delimiter
+            'Content-Type: application/x-www-form-urlencoded'
         ]);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
