@@ -297,18 +297,24 @@ try {
             
             $client_id = intval($reading_data['client_id']);
             
-            // Validate client exists
+            // Validate client exists (but don't require active status - allow inactive clients)
             $client_stmt = $conn->prepare("
-                SELECT cl.id, cl.meter_code, cl.firstname, cl.lastname
+                SELECT cl.id, cl.meter_code, cl.firstname, cl.lastname, cl.status as client_status
                 FROM client_list cl
-                WHERE cl.id = ? AND cl.status = 1
+                WHERE cl.id = ?
             ");
             $client_stmt->bind_param("i", $client_id);
             $client_stmt->execute();
             $client = $client_stmt->get_result()->fetch_assoc();
             
             if (!$client) {
-                throw new Exception('Invalid or inactive client ID: ' . $client_id);
+                error_log("Batch Upload: Client ID $client_id not found in database");
+                throw new Exception('Invalid client ID: ' . $client_id . '. Client does not exist.');
+            }
+            
+            // Log if client is inactive but still allow upload
+            if (isset($client['client_status']) && $client['client_status'] != 1) {
+                error_log("Batch Upload: Warning - Client ID $client_id is inactive, but allowing upload");
             }
             
             // Check for duplicate reading in current cycle

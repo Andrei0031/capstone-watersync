@@ -474,15 +474,35 @@ $active_cycle_sql = "SELECT * FROM billing_cycles WHERE status = 'active' LIMIT 
 $active_cycle_result = $conn->query($active_cycle_sql);
 $active_cycle = $active_cycle_result ? $active_cycle_result->fetch_assoc() : null;
 
+// Diagnostic: Check all readings in database (for debugging)
+if (isset($_GET['debug']) && $_GET['debug'] === '1') {
+    $debug_sql = "SELECT id, client_id, status, upload_date, image_path, mobile_upload_id 
+                  FROM pending_meter_readings 
+                  ORDER BY upload_date DESC 
+                  LIMIT 20";
+    $debug_result = $conn->query($debug_sql);
+    error_log("DEBUG: Recent readings in database:");
+    if ($debug_result) {
+        while ($debug_row = $debug_result->fetch_assoc()) {
+            error_log("  - ID: {$debug_row['id']}, Client: {$debug_row['client_id']}, Status: {$debug_row['status']}, Upload: {$debug_row['upload_date']}, Image: {$debug_row['image_path']}");
+        }
+    }
+}
+
 // Fetch pending readings with billing cycle info
-$pending_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, 
+// Use LEFT JOIN to show readings even if client is missing/inactive
+$pending_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                 bc.cycle_name, bc.due_date as cycle_due_date
     FROM pending_meter_readings pmr 
-    JOIN client_list cl ON pmr.client_id = cl.id 
+    LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
     WHERE pmr.status = 'pending'
     ORDER BY pmr.upload_date DESC";
 $pending_result = $conn->query($pending_sql);
+if (!$pending_result) {
+    error_log("Error fetching pending readings: " . $conn->error);
+    $pending_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'pending' LIMIT 0");
+}
 
 // Fetch processed readings with billing cycle info
 // Prioritize verified_reading (manually corrected) over ocr_reading
@@ -1516,13 +1536,38 @@ if (!$failed_result) {
                                                 <div class="d-flex align-items-center">
                                                     <div class="avatar-sm">
                                                         <?php 
-                                                            $initials = strtoupper(substr($row['firstname'], 0, 1) . substr($row['lastname'], 0, 1));
-                                                            echo $initials;
+                                                            if (!empty($row['firstname']) && !empty($row['lastname'])) {
+                                                                $initials = strtoupper(substr($row['firstname'], 0, 1) . substr($row['lastname'], 0, 1));
+                                                                echo $initials;
+                                                            } else {
+                                                                echo '?';
+                                                            }
                                                         ?>
                                                     </div>
                                                     <div>
-                                                        <div class="fw-bold"><?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?></div>
-                                                        <div class="text-muted"><?php echo htmlspecialchars($row['meter_code']); ?></div>
+                                                        <div class="fw-bold">
+                                                            <?php 
+                                                                if (!empty($row['firstname']) && !empty($row['lastname'])) {
+                                                                    echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']);
+                                                                } elseif (!empty($row['client_id'])) {
+                                                                    echo 'Client ID: ' . htmlspecialchars($row['client_id']);
+                                                                } else {
+                                                                    echo 'Unknown Client';
+                                                                }
+                                                            ?>
+                                                        </div>
+                                                        <div class="text-muted">
+                                                            <?php 
+                                                                if (!empty($row['meter_code'])) {
+                                                                    echo htmlspecialchars($row['meter_code']);
+                                                                } else {
+                                                                    echo 'No Meter Code';
+                                                                }
+                                                            ?>
+                                                            <?php if (isset($row['client_status']) && $row['client_status'] != 1): ?>
+                                                                <span class="badge bg-warning ms-1">Inactive</span>
+                                                            <?php endif; ?>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
