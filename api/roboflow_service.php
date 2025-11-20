@@ -11,12 +11,12 @@ define('ROBOFLOW_API_KEY', 'plVsmWuM0KjEA8Pz6RqB'); // Private API Key
 define('ROBOFLOW_WORKSPACE', 'watersync');
 
 // Meter Detection Model Configuration
-// Using serverless.roboflow.com API endpoint
+// Using detect.roboflow.com API endpoint (standard Roboflow API)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
 define('ROBOFLOW_MODEL_VERSION', '4'); // Updated to version 4
 define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/4'); // Model ID format: project/version
-// Serverless API endpoint format: https://serverless.roboflow.com/{workspace}/{project}/{version}
-define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
+// Standard Roboflow API endpoint format: https://detect.roboflow.com/{workspace}/{project}/{version}
+define('ROBOFLOW_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
@@ -27,8 +27,8 @@ define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/4'); // Updated to version 4
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
 define('ROBOFLOW_DIGIT_MODEL_VERSION', '4'); // Updated to version 4
 
-// Build inference URL - using serverless.roboflow.com endpoint
-// Serverless API endpoint format: https://serverless.roboflow.com/{workspace}/{project}/{version}
+// Build inference URL - using detect.roboflow.com endpoint (standard Roboflow API)
+// Standard API endpoint format: https://detect.roboflow.com/{workspace}/{project}/{version}
 // If model_id is set, parse it to extract project and version; otherwise use project/version format
 if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
     // Parse model_id format (e.g., "watersync-oekrf/4") to extract project and version
@@ -36,14 +36,14 @@ if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
     if (count($modelParts) === 2) {
         $digitProject = $modelParts[0];
         $digitVersion = $modelParts[1];
-        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . $digitProject . '/' . $digitVersion . '?api_key=' . ROBOFLOW_API_KEY);
+        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . $digitProject . '/' . $digitVersion . '?api_key=' . ROBOFLOW_API_KEY);
     } else {
-        // Fallback to direct model_id format
-        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
+        // Fallback to direct model_id format (shouldn't happen with correct format)
+        define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
     }
 } else {
     // Use project/version format (legacy)
-    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
+    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 }
 
 /**
