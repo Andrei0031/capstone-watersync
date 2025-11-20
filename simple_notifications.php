@@ -301,5 +301,4 @@ function sendTestNotification($client_id) {
     }
     
     return ['success' => true, 'results' => $results];
-}
-?> 
+} 
