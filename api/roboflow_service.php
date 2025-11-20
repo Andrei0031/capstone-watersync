@@ -787,10 +787,25 @@ function detectDigitsWithRoboflow($imagePath) {
             } else {
                 $errorMsg .= '. No detections returned from Roboflow API.';
                 $errorMsg .= ' The model may not be detecting anything, or the image may be too small/cropped.';
-                $errorMsg .= ' Check if model is deployed and API endpoint is correct.';
+                $errorMsg .= ' IMPORTANT: If version 2 works but version 7 does not, version 7 is likely NOT DEPLOYED.';
+                $errorMsg .= ' Go to Roboflow → Your Project → Deploy → "Integrate with my app or website" → Deploy version 7.';
             }
             error_log('✗ Roboflow Digit Detection: ' . $errorMsg);
+            error_log('✗ API URL: ' . ROBOFLOW_DIGIT_INFERENCE_URL);
+            error_log('✗ Model ID: ' . ROBOFLOW_DIGIT_MODEL_ID);
+            error_log('✗ HTTP Code: ' . $httpCode);
             error_log('✗ Roboflow API Response (full): ' . json_encode($data, JSON_PRETTY_PRINT));
+            
+            // If we got a 200 response but no predictions, the model might not be deployed
+            if ($httpCode === 200 && empty($predictions)) {
+                error_log('⚠ WARNING: Got HTTP 200 but no predictions. This usually means:');
+                error_log('   1. Model version 7 is NOT DEPLOYED in Roboflow dashboard');
+                error_log('   2. Model version 7 is deployed but not accessible via API');
+                error_log('   3. The response format is different from version 2');
+                error_log('   4. The model is detecting something but not digits (wrong classes)');
+                error_log('   SOLUTION: Deploy model version 7 in Roboflow dashboard, or use version 2 which is working.');
+                error_log('   To deploy: Go to Roboflow → Project → Deploy → "Integrate with my app or website" → Select version 7 → Deploy');
+            }
             return [
                 'success' => false,
                 'digits' => [],
