@@ -2039,6 +2039,17 @@ $failed_result = $conn->query($failed_sql);
             const pendingCheckboxes = document.querySelectorAll('.pending-checkbox');
             const processSelectedBtn = document.getElementById('processSelectedBtn');
 
+            function updateProcessButton() {
+                const checkedCount = document.querySelectorAll('.pending-checkbox:checked').length;
+                if (processSelectedBtn) {
+                    processSelectedBtn.disabled = checkedCount === 0;
+                }
+                const deleteSelectedPendingBtn = document.getElementById('deleteSelectedPendingBtn');
+                if (deleteSelectedPendingBtn) {
+                    deleteSelectedPendingBtn.disabled = checkedCount === 0;
+                }
+            }
+
             if (selectAllPending && pendingCheckboxes.length > 0) {
                 selectAllPending.addEventListener('change', function() {
                     pendingCheckboxes.forEach(checkbox => {
@@ -2050,17 +2061,6 @@ $failed_result = $conn->query($failed_sql);
                 pendingCheckboxes.forEach(checkbox => {
                     checkbox.addEventListener('change', updateProcessButton);
                 });
-
-                function updateProcessButton() {
-                    const checkedCount = document.querySelectorAll('.pending-checkbox:checked').length;
-                    if (processSelectedBtn) {
-                        processSelectedBtn.disabled = checkedCount === 0;
-                    }
-                    const deleteSelectedPendingBtn = document.getElementById('deleteSelectedPendingBtn');
-                    if (deleteSelectedPendingBtn) {
-                        deleteSelectedPendingBtn.disabled = checkedCount === 0;
-                    }
-                }
             }
 
             // Handle checkboxes for processed readings
@@ -2115,13 +2115,15 @@ $failed_result = $conn->query($failed_sql);
 
             // Select All buttons
             const selectAllPendingBtn = document.getElementById('selectAllPendingBtn');
-            if (selectAllPendingBtn) {
+            if (selectAllPendingBtn && selectAllPending && pendingCheckboxes.length > 0) {
                 selectAllPendingBtn.addEventListener('click', function() {
                     const allChecked = Array.from(pendingCheckboxes).every(cb => cb.checked);
                     pendingCheckboxes.forEach(checkbox => {
                         checkbox.checked = !allChecked;
                     });
-                    selectAllPending.checked = !allChecked;
+                    if (selectAllPending) {
+                        selectAllPending.checked = !allChecked;
+                    }
                     updateProcessButton();
                 });
             }
