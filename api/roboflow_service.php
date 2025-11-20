@@ -857,9 +857,24 @@ function detectDigitsWithRoboflow($imagePath) {
             } elseif (isset($prediction['id'])) {
                 // Some APIs use 'id' for class
                 $className = trim(strval($prediction['id']));
+            } elseif (isset($prediction['label'])) {
+                $className = trim(strval($prediction['label']));
+            } elseif (isset($prediction['id'])) {
+                // Some APIs use 'id' for class
+                $className = trim(strval($prediction['id']));
             }
             
-            $confidence = isset($prediction['confidence']) ? floatval($prediction['confidence']) : 0.0;
+            // Check multiple possible confidence field names
+            $confidence = 0.0;
+            if (isset($prediction['confidence'])) {
+                $confidence = floatval($prediction['confidence']);
+            } elseif (isset($prediction['confidence_score'])) {
+                $confidence = floatval($prediction['confidence_score']);
+            } elseif (isset($prediction['score'])) {
+                $confidence = floatval($prediction['score']);
+            } elseif (isset($prediction['prob'])) {
+                $confidence = floatval($prediction['prob']);
+            }
             
             // Log all predictions for debugging
             error_log("Roboflow prediction #" . (count($digits) + 1) . ": class='$className', class_id=" . ($prediction['class_id'] ?? 'N/A') . ", confidence=$confidence, x=" . ($prediction['x'] ?? 'N/A') . ", y=" . ($prediction['y'] ?? 'N/A'));
