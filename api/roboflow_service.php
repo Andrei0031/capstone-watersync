@@ -13,19 +13,20 @@ define('ROBOFLOW_WORKSPACE', 'watersync');
 // Meter Detection Model Configuration
 // Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
-define('ROBOFLOW_MODEL_VERSION', '7'); // Updated to version 7
-define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/7'); // Model ID format: project/version
+define('ROBOFLOW_MODEL_VERSION', '2'); // Using version 2 (working model)
+define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/2'); // Model ID format: project/version
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
-// Format: "project-name/version" (e.g., "watersync-oekrf/7")
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Updated to version 7
+// Format: "project-name/version" (e.g., "watersync-oekrf/2")
+// Using version 2 which is the working model
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/2'); // Using version 2 (working model)
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
-define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Updated to version 7
+define('ROBOFLOW_DIGIT_MODEL_VERSION', '2'); // Using version 2 (working model)
 
 // Build inference URL - try both serverless and detect endpoints
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
@@ -644,15 +645,43 @@ function detectDigitsWithRoboflow($imagePath) {
         $predictions = [];
         if (isset($data['predictions']) && is_array($data['predictions'])) {
             $predictions = $data['predictions'];
+            error_log("✓ Found predictions array with " . count($predictions) . " items");
         } elseif (isset($data['detections']) && is_array($data['detections'])) {
             $predictions = $data['detections'];
+            error_log("✓ Found detections array with " . count($predictions) . " items");
         } elseif (isset($data['results']) && is_array($data['results'])) {
             $predictions = $data['results'];
+            error_log("✓ Found results array with " . count($predictions) . " items");
+        } else {
+            // Check if response is directly an array
+            if (is_array($data) && isset($data[0])) {
+                $predictions = $data;
+                error_log("✓ Response is directly an array with " . count($predictions) . " items");
+            }
         }
         
         error_log('Roboflow Digit Detection API response keys: ' . implode(', ', array_keys($data)));
-        error_log('Roboflow Digit Detection API full response: ' . json_encode($data));
-        error_log('Number of digit predictions: ' . count($predictions));
+        error_log('Roboflow Digit Detection API full response (first 2000 chars): ' . substr(json_encode($data), 0, 2000));
+        error_log('Number of digit predictions found: ' . count($predictions));
+        
+        // If no predictions found, log the full response structure for debugging
+        if (count($predictions) === 0) {
+            error_log('⚠ Roboflow Digit Detection: No predictions array found. Full response structure:');
+            error_log('   Response type: ' . gettype($data));
+            if (is_array($data)) {
+                error_log('   Top-level keys: ' . implode(', ', array_keys($data)));
+                foreach ($data as $key => $value) {
+                    if (is_array($value)) {
+                        error_log("   Key '$key' is array with " . count($value) . " items");
+                        if (count($value) > 0 && isset($value[0])) {
+                            error_log("   First item keys: " . implode(', ', array_keys($value[0])));
+                        }
+                    } else {
+                        error_log("   Key '$key' = " . (is_string($value) ? substr($value, 0, 100) : gettype($value)));
+                    }
+                }
+            }
+        }
         
         if (count($predictions) === 0 && !empty($data)) {
             error_log('⚠ Roboflow Digit Detection: API returned data but no predictions array found. Response structure: ' . json_encode(array_keys($data)));
@@ -699,9 +728,10 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.5 (50%) to match visualization settings
-            // Your model shows good accuracy (68.1% mAP), so 50% threshold should work well
-            if ($isDigit && $confidence > 0.5) {
+            // Use confidence threshold of 0.2 (20%) - lowered to catch more detections
+            // If model is well-trained, we can increase this later
+            // Lower threshold helps with difficult images
+            if ($isDigit && $confidence > 0.2) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -711,8 +741,14 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.5) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.5)");
+            } elseif ($isDigit && $confidence <= 0.2) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.2)");
+            } elseif ($isDigit) {
+                // Digit found and above threshold
+                error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
+            } else {
+                // Not a digit - log what it is
+                error_log("⚠ Roboflow Digit Detection: Detection found but not a digit - class='$className', class_id=" . ($prediction['class_id'] ?? 'N/A') . ", confidence=$confidence");
             }
         }
         
@@ -727,20 +763,28 @@ function detectDigitsWithRoboflow($imagePath) {
             $errorMsg = 'No digits detected in image';
             if (count($predictions) > 0) {
                 $classNames = [];
-                foreach ($predictions as $pred) {
-                    $class = $pred['class'] ?? 'unknown';
+                $allPredDetails = [];
+                foreach ($predictions as $idx => $pred) {
+                    $class = $pred['class'] ?? $pred['class_name'] ?? $pred['name'] ?? 'unknown';
+                    $classId = $pred['class_id'] ?? 'N/A';
                     $conf = round(($pred['confidence'] ?? 0) * 100, 1);
                     $classNames[] = "$class ($conf%)";
+                    $allPredDetails[] = "Prediction #$idx: class='$class', class_id=$classId, confidence=$conf, keys=" . implode(',', array_keys($pred));
                 }
-                $errorMsg .= '. Found ' . count($predictions) . ' detection(s): ' . implode(', ', $classNames) . ' but none were valid digits (0-9).';
-                $errorMsg .= ' Note: This model may be trained for meter detection, not digit detection.';
-                $errorMsg .= ' You need a separate digit detection model with classes 0-9.';
+                $errorMsg .= '. Found ' . count($predictions) . ' detection(s): ' . implode(', ', $classNames);
+                $errorMsg .= ' but none were recognized as valid digits (0-9).';
+                error_log('✗ Roboflow Digit Detection: All prediction details:');
+                foreach ($allPredDetails as $detail) {
+                    error_log('   ' . $detail);
+                }
+                $errorMsg .= ' Check logs for full prediction details.';
             } else {
                 $errorMsg .= '. No detections returned from Roboflow API.';
                 $errorMsg .= ' The model may not be detecting anything, or the image may be too small/cropped.';
+                $errorMsg .= ' Check if model is deployed and API endpoint is correct.';
             }
             error_log('✗ Roboflow Digit Detection: ' . $errorMsg);
-            error_log('✗ Roboflow API Response: ' . json_encode($data));
+            error_log('✗ Roboflow API Response (full): ' . json_encode($data, JSON_PRETTY_PRINT));
             return [
                 'success' => false,
                 'digits' => [],
