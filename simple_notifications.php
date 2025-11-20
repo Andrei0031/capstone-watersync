@@ -188,15 +188,18 @@ function sendDummyEmail($email, $subject, $message) {
     if ($sent) {
         // Note: mail() returning true doesn't guarantee delivery
         // It only means PHP accepted the request
+        // Log the attempt with full details for debugging
+        error_log("EMAIL QUEUED: To: $email | From: $from_email | Subject: $subject | Status: Accepted by PHP mail()");
+        
         return [
             'success' => true,
             'status' => 'sent',
-            'message' => 'Email sent successfully (Note: Delivery not guaranteed - check spam folder)',
+            'message' => 'Email queued for sending (check inbox and spam folder)',
             'email' => $email,
             'subject' => $subject,
             'from' => $from_email,
             'timestamp' => date('Y-m-d H:i:s'),
-            'warning' => 'PHP mail() function was used. For reliable delivery, configure SMTP or use a mail service provider.'
+            'note' => 'PHP mail() accepted the request. Check spam folder if not received. For reliable delivery, configure SMTP.'
         ];
     } else {
         // Email sending failed
