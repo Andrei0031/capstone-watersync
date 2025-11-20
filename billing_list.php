@@ -1368,8 +1368,10 @@ if ($params) {
                                 </td>
                                 <td>
                                     <div>
-                                        <div class="customer-name" style="cursor: pointer; color: #0d6efd; text-decoration: underline;" 
+                                        <div class="customer-name" style="cursor: pointer; color: inherit;" 
                                              onclick="viewCustomerDetails(<?php echo $row['client_id']; ?>)"
+                                             onmouseover="this.style.color='#0d6efd';" 
+                                             onmouseout="this.style.color='inherit';"
                                              title="Click to view customer details and billing history">
                                             <?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>
                                         </div>
@@ -1961,85 +1963,98 @@ if ($params) {
                     </div>
                     
                     <!-- Statistics Section -->
-                    <div class="row mb-4">
+                    <div class="row mb-4 g-3">
                         <div class="col-md-3">
-                            <div class="card text-center border-primary">
-                                <div class="card-body">
-                                    <h3 class="text-primary mb-0" id="statTotalBills">0</h3>
-                                    <small class="text-muted">Total Bills</small>
+                            <div class="card text-center shadow-sm border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <div class="card-body text-white">
+                                    <i class="fas fa-file-invoice fa-2x mb-2"></i>
+                                    <h3 class="mb-1" id="statTotalBills">0</h3>
+                                    <small>Total Bills</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="card text-center border-success">
-                                <div class="card-body">
-                                    <h3 class="text-success mb-0" id="statPaidBills">0</h3>
-                                    <small class="text-muted">Paid Bills</small>
+                            <div class="card text-center shadow-sm border-0" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                                <div class="card-body text-white">
+                                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                    <h3 class="mb-1" id="statPaidBills">0</h3>
+                                    <small>Paid Bills</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="card text-center border-warning">
-                                <div class="card-body">
-                                    <h3 class="text-warning mb-0" id="statUnpaidBills">0</h3>
-                                    <small class="text-muted">Unpaid Bills</small>
+                            <div class="card text-center shadow-sm border-0" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <div class="card-body text-white">
+                                    <i class="fas fa-clock fa-2x mb-2"></i>
+                                    <h3 class="mb-1" id="statUnpaidBills">0</h3>
+                                    <small>Unpaid Bills</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="card text-center border-danger">
-                                <div class="card-body">
-                                    <h3 class="text-danger mb-0" id="statOverdueBills">0</h3>
-                                    <small class="text-muted">Overdue Bills</small>
+                            <div class="card text-center shadow-sm border-0" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                                <div class="card-body text-white">
+                                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                    <h3 class="mb-1" id="statOverdueBills">0</h3>
+                                    <small>Overdue Bills</small>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="row mb-4">
+                    <div class="row mb-4 g-3">
                         <div class="col-md-6">
-                            <div class="card border-info">
-                                <div class="card-body">
-                                    <h6 class="text-info mb-2">Total Billed</h6>
-                                    <h4 class="mb-0">₱<span id="statTotalBilled">0.00</span></h4>
+                            <div class="card shadow-sm border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <div class="card-body text-white">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="opacity-75">Total Billed</small>
+                                            <h3 class="mb-0 mt-1">₱<span id="statTotalBilled">0.00</span></h3>
+                                        </div>
+                                        <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="card border-success">
-                                <div class="card-body">
-                                    <h6 class="text-success mb-2">Total Outstanding</h6>
-                                    <h4 class="mb-0">₱<span id="statTotalOutstanding">0.00</span></h4>
+                            <div class="card shadow-sm border-0" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <div class="card-body text-white">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="opacity-75">Total Outstanding</small>
+                                            <h3 class="mb-0 mt-1">₱<span id="statTotalOutstanding">0.00</span></h3>
+                                        </div>
+                                        <i class="fas fa-wallet fa-3x opacity-50"></i>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Billing History Table -->
-                    <div class="card">
-                        <div class="card-header bg-light">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-gradient-primary text-white">
                             <h6 class="mb-0"><i class="fas fa-history me-2"></i>Billing History</h6>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0">
+                                <table class="table table-hover mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Bill #</th>
-                                            <th>Billing Month</th>
-                                            <th>Reading Date</th>
-                                            <th>Due Date</th>
-                                            <th>Consumption</th>
-                                            <th>Amount</th>
-                                            <th>Paid</th>
-                                            <th>Balance</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
+                                            <th class="fw-bold">Bill #</th>
+                                            <th class="fw-bold">Billing Month</th>
+                                            <th class="fw-bold">Reading Date</th>
+                                            <th class="fw-bold">Due Date</th>
+                                            <th class="fw-bold">Consumption</th>
+                                            <th class="fw-bold text-end">Amount</th>
+                                            <th class="fw-bold text-end">Paid</th>
+                                            <th class="fw-bold text-end">Balance</th>
+                                            <th class="fw-bold text-center">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="billingHistoryTableBody">
                                         <tr>
-                                            <td colspan="10" class="text-center text-muted">Loading...</td>
+                                            <td colspan="9" class="text-center text-muted py-4">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2564,25 +2579,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             return `
                                 <tr>
-                                    <td>#${bill.id}</td>
+                                    <td><strong>#${bill.id}</strong></td>
                                     <td>${bill.billing_month || 'N/A'}</td>
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
                                     <td>${parseFloat(bill.consumption).toFixed(2)} cu.m</td>
-                                    <td>₱${parseFloat(bill.total).toFixed(2)}</td>
+                                    <td><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
                                     <td>₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
-                                    <td>₱${parseFloat(bill.remaining_balance).toFixed(2)}</td>
+                                    <td><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
                                     <td><span class="status-badge ${statusClass}">${bill.status_text}</span></td>
-                                    <td>
-                                        <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary view-btn" data-id="${bill.id}" title="View">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </td>
                                 </tr>
                             `;
                         }).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No billing history found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No billing history found</td></tr>';
                     }
                     
                     // Hide loading, show content
