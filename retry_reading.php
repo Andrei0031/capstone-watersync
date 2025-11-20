@@ -68,17 +68,47 @@ try {
     $ocrReading = null;
     $extractedText = '';
     $ocrError = null;
+    $originalImagePath = $imagePath;
+
+    // Check if this is a cropped image - if so, try original too
+    if (strpos($imagePath, '_cropped.jpg') !== false) {
+        $originalImagePath = str_replace('_cropped.jpg', '.jpg', $imagePath);
+        // Also try without .jpg extension
+        if (!file_exists($originalImagePath)) {
+            $originalImagePath = str_replace('_cropped.jpg', '', $imagePath);
+        }
+    }
 
     // Try Roboflow digit detection first (preferred method)
     if (function_exists('processImageWithRoboflowDigits')) {
-        $ocrResult = processImageWithRoboflowDigits($imagePath);
-        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-            $ocrReading = $ocrResult['meter_reading'];
-            $extractedText = $ocrResult['extracted_text'] ?? '';
-            $ocrProcessed = true;
-            error_log("✓ Retry OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
-        } else {
-            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+        // Try current image (might be cropped) first
+        if (file_exists($imagePath)) {
+            error_log("Attempting OCR on current image: $imagePath");
+            $ocrResult = processImageWithRoboflowDigits($imagePath);
+            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                $ocrReading = $ocrResult['meter_reading'];
+                $extractedText = $ocrResult['extracted_text'] ?? '';
+                $ocrProcessed = true;
+                error_log("✓ Retry OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
+            } else {
+                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+                error_log("⚠ Retry OCR failed on current image: $ocrError");
+            }
+        }
+        
+        // If failed and we have an original image, try that
+        if (!$ocrProcessed && $originalImagePath !== $imagePath && file_exists($originalImagePath)) {
+            error_log("Attempting OCR on ORIGINAL (uncropped) image: $originalImagePath");
+            $ocrResult = processImageWithRoboflowDigits($originalImagePath);
+            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                $ocrReading = $ocrResult['meter_reading'];
+                $extractedText = $ocrResult['extracted_text'] ?? '';
+                $ocrProcessed = true;
+                error_log("✓ Retry OCR SUCCESS (Roboflow on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
+            } else {
+                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
+                error_log("⚠ Retry OCR failed on original image: $ocrError");
+            }
         }
     }
     
