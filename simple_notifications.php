@@ -78,8 +78,13 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
             $email_result = sendDummyEmail($email_to_use, $email_subject, $email_message);
             $results['email'] = $email_result;
             
-            // Log Email notification
-            logNotification($client_id, $bill_id, 'email', $email_to_use, $email_message, $email_result['status']);
+            // Log detailed email notification result
+            $log_status = $email_result['status'] ?? 'unknown';
+            if (!$email_result['success']) {
+                $log_status .= '_failed';
+                error_log("EMAIL NOTIFICATION FAILED for client $client_id, bill $bill_id: " . ($email_result['error'] ?? 'Unknown error'));
+            }
+            logNotification($client_id, $bill_id, 'email', $email_to_use, $email_message, $log_status);
         }
         
         return ['success' => true, 'results' => $results];
