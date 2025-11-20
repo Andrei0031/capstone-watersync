@@ -461,10 +461,31 @@ function detectDigitsWithRoboflow($imagePath) {
         $method1Success = false;
         if ($httpCode === 200 && !$error && !empty($response)) {
             $testData = json_decode($response, true);
-            if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
-                $method1Success = true;
-                $methodUsed = 'base64-form';
-                error_log("Roboflow Digit Detection: Method 1 (base64-form) succeeded with " . count($testData['predictions']) . " predictions");
+            if ($testData) {
+                // Check multiple possible response formats
+                $hasPredictions = false;
+                $predictionCount = 0;
+                
+                if (isset($testData['predictions']) && is_array($testData['predictions'])) {
+                    $hasPredictions = true;
+                    $predictionCount = count($testData['predictions']);
+                } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
+                    $hasPredictions = true;
+                    $predictionCount = count($testData['detections']);
+                } elseif (isset($testData['results']) && is_array($testData['results'])) {
+                    $hasPredictions = true;
+                    $predictionCount = count($testData['results']);
+                }
+                
+                if ($hasPredictions && $predictionCount > 0) {
+                    $method1Success = true;
+                    $methodUsed = 'base64-form';
+                    error_log("Roboflow Digit Detection: Method 1 (base64-form) succeeded with $predictionCount predictions");
+                } else {
+                    error_log("Roboflow Digit Detection: Method 1 returned HTTP 200 but no predictions found. Response keys: " . implode(', ', array_keys($testData)));
+                }
+            } else {
+                error_log("Roboflow Digit Detection: Method 1 returned HTTP 200 but JSON decode failed. Response: " . substr($response, 0, 500));
             }
         }
         
@@ -534,9 +555,26 @@ function detectDigitsWithRoboflow($imagePath) {
                 $method3Success = false;
                 if ($httpCode === 200 && !$error && !empty($response)) {
                     $testData = json_decode($response, true);
-                    if ($testData && isset($testData['predictions']) && count($testData['predictions']) > 0) {
-                        $method3Success = true;
-                        error_log("Roboflow Digit Detection: Method 3 (base64-text) succeeded with " . count($testData['predictions']) . " predictions");
+                    if ($testData) {
+                        // Check multiple possible response formats
+                        $hasPredictions = false;
+                        $predictionCount = 0;
+                        
+                        if (isset($testData['predictions']) && is_array($testData['predictions'])) {
+                            $hasPredictions = true;
+                            $predictionCount = count($testData['predictions']);
+                        } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
+                            $hasPredictions = true;
+                            $predictionCount = count($testData['detections']);
+                        } elseif (isset($testData['results']) && is_array($testData['results'])) {
+                            $hasPredictions = true;
+                            $predictionCount = count($testData['results']);
+                        }
+                        
+                        if ($hasPredictions && $predictionCount > 0) {
+                            $method3Success = true;
+                            error_log("Roboflow Digit Detection: Method 3 (base64-text) succeeded with $predictionCount predictions");
+                        }
                     }
                 }
                 
