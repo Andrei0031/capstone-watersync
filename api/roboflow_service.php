@@ -790,29 +790,53 @@ function detectDigitsWithRoboflow($imagePath) {
         
         // Parse digit detections - check multiple possible response formats
         $predictions = [];
+        $predictionsFound = false;
+        
         if (isset($data['predictions']) && is_array($data['predictions'])) {
             $predictions = $data['predictions'];
-            error_log("✓ Found predictions array with " . count($predictions) . " items");
+            $predictionsFound = true;
+            error_log("✓ Found 'predictions' array with " . count($predictions) . " items");
         } elseif (isset($data['detections']) && is_array($data['detections'])) {
             $predictions = $data['detections'];
-            error_log("✓ Found detections array with " . count($predictions) . " items");
+            $predictionsFound = true;
+            error_log("✓ Found 'detections' array with " . count($predictions) . " items");
         } elseif (isset($data['results']) && is_array($data['results'])) {
             $predictions = $data['results'];
-            error_log("✓ Found results array with " . count($predictions) . " items");
+            $predictionsFound = true;
+            error_log("✓ Found 'results' array with " . count($predictions) . " items");
         } elseif (isset($data['data']) && is_array($data['data'])) {
             // Some APIs wrap predictions in 'data' key
             $predictions = $data['data'];
-            error_log("✓ Found data array with " . count($predictions) . " items");
+            $predictionsFound = true;
+            error_log("✓ Found 'data' array with " . count($predictions) . " items");
         } elseif (isset($data['objects']) && is_array($data['objects'])) {
             // Some APIs use 'objects' key
             $predictions = $data['objects'];
-            error_log("✓ Found objects array with " . count($predictions) . " items");
+            $predictionsFound = true;
+            error_log("✓ Found 'objects' array with " . count($predictions) . " items");
         } else {
             // Check if response is directly an array
             if (is_array($data) && isset($data[0])) {
                 $predictions = $data;
+                $predictionsFound = true;
                 error_log("✓ Response is directly an array with " . count($predictions) . " items");
             }
+        }
+        
+        // CRITICAL: If predictions array exists but is empty, this means the model ran but detected nothing
+        if ($predictionsFound && count($predictions) === 0) {
+            error_log("⚠⚠⚠ CRITICAL: API returned predictions array but it's EMPTY (no detections) ⚠⚠⚠");
+            error_log("   This means:");
+            error_log("   1. The API call succeeded (HTTP 200)");
+            error_log("   2. The model is deployed and accessible");
+            error_log("   3. BUT the model detected NO digits in the image");
+            error_log("   Possible reasons:");
+            error_log("   - Image quality is too poor");
+            error_log("   - Image is too small or cropped incorrectly");
+            error_log("   - Digits are not visible or too blurry");
+            error_log("   - Model confidence threshold is too high (but we're using 0.05)");
+            error_log("   - Model version 7 might need retraining or different preprocessing");
+            error_log("   Full API response: " . json_encode($data, JSON_PRETTY_PRINT));
         }
         
         error_log('Roboflow Digit Detection API response keys: ' . implode(', ', array_keys($data)));
@@ -1009,10 +1033,17 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
                 $errorMsg .= ' Check logs for full prediction details.';
             } else {
-                $errorMsg .= '. No detections returned from Roboflow API.';
-                $errorMsg .= ' The model may not be detecting anything, or the image may be too small/cropped.';
-                $errorMsg .= ' IMPORTANT: If version 2 works but version 7 does not, version 7 is likely NOT DEPLOYED.';
-                $errorMsg .= ' Go to Roboflow → Your Project → Deploy → "Integrate with my app or website" → Deploy version 7.';
+                // Check if we got a response but predictions array was empty
+                if ($predictionsFound && count($predictions) === 0) {
+                    $errorMsg .= '. The API returned an empty predictions array - model ran but detected NO digits.';
+                    $errorMsg .= ' This means the model is deployed and working, but it cannot see any digits in this image.';
+                    $errorMsg .= ' Possible causes: image too blurry, digits not visible, wrong image region, or model needs retraining.';
+                } else {
+                    $errorMsg .= '. No detections returned from Roboflow API.';
+                    $errorMsg .= ' The model may not be detecting anything, or the image may be too small/cropped.';
+                    $errorMsg .= ' IMPORTANT: If version 2 works but version 7 does not, version 7 is likely NOT DEPLOYED.';
+                    $errorMsg .= ' Go to Roboflow → Your Project → Deploy → "Integrate with my app or website" → Deploy version 7.';
+                }
             }
             error_log('✗ Roboflow Digit Detection: ' . $errorMsg);
             error_log('✗ API URL: ' . ROBOFLOW_DIGIT_INFERENCE_URL);
