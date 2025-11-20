@@ -133,7 +133,7 @@ function sendDummySMS($phone, $message) {
 // Email function - supports both dummy mode and real email sending
 function sendDummyEmail($email, $subject, $message) {
     // Set to true to enable real email sending, false for dummy mode
-    $ENABLE_REAL_EMAIL = false; // CHANGE THIS TO true TO ENABLE REAL EMAIL SENDING
+    $ENABLE_REAL_EMAIL = true; // ENABLED for production deployment
     
     if (!$ENABLE_REAL_EMAIL) {
         // Dummy mode - logs but doesn't send
@@ -152,7 +152,7 @@ function sendDummyEmail($email, $subject, $message) {
     // Note: This requires proper mail server configuration
     // For XAMPP, you may need to configure sendmail or use SMTP
     
-    $from_email = 'noreply@watersync.com'; // Change this to your domain email
+    $from_email = 'noreply@watersync.com'; // Update this to your actual domain email if needed
     $from_name = 'WaterSync';
     
     // Prepare headers
