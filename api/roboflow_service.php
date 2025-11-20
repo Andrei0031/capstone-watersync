@@ -456,20 +456,47 @@ function detectDigitsWithRoboflow($imagePath) {
         // Extract digits with their positions
         $digits = [];
         foreach ($predictions as $prediction) {
-            $className = isset($prediction['class']) ? trim($prediction['class']) : '';
+            // Try multiple possible class name fields
+            $className = '';
+            if (isset($prediction['class'])) {
+                $className = trim($prediction['class']);
+            } elseif (isset($prediction['class_name'])) {
+                $className = trim($prediction['class_name']);
+            } elseif (isset($prediction['name'])) {
+                $className = trim($prediction['name']);
+            }
+            
             $confidence = isset($prediction['confidence']) ? floatval($prediction['confidence']) : 0.0;
             
-            // Validate that it's a digit (0-9) with higher confidence threshold
-            if (preg_match('/^[0-9]$/', $className) && $confidence > 0.35) {
+            // Log all predictions for debugging
+            error_log("Roboflow prediction: class='$className', confidence=$confidence, full_prediction=" . json_encode($prediction));
+            
+            // Validate that it's a digit (0-9) - lower confidence threshold to 0.2 for better detection
+            // Also handle class names that might be strings like "0", "1", etc.
+            $isDigit = false;
+            $digitValue = null;
+            
+            // Check if class name is a single digit (0-9)
+            if (preg_match('/^[0-9]$/', $className)) {
+                $isDigit = true;
+                $digitValue = $className;
+            } elseif (is_numeric($className) && strlen($className) == 1 && $className >= '0' && $className <= '9') {
+                $isDigit = true;
+                $digitValue = $className;
+            }
+            
+            if ($isDigit && $confidence > 0.2) { // Lowered threshold from 0.35 to 0.2
                 $digits[] = [
-                    'digit' => $className,
+                    'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
                     'y' => isset($prediction['y']) ? floatval($prediction['y']) : 0,
                     'width' => isset($prediction['width']) ? floatval($prediction['width']) : 0,
                     'height' => isset($prediction['height']) ? floatval($prediction['height']) : 0,
                     'confidence' => $confidence
                 ];
-                error_log("Roboflow Digit Detection: Found digit '$className' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
+                error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
+            } elseif ($isDigit && $confidence <= 0.2) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.2)");
             }
         }
         
@@ -485,18 +512,25 @@ function detectDigitsWithRoboflow($imagePath) {
             if (count($predictions) > 0) {
                 $classNames = [];
                 foreach ($predictions as $pred) {
-                    $classNames[] = ($pred['class'] ?? 'unknown') . ' (' . ($pred['confidence'] ?? 0) . ')';
+                    $class = $pred['class'] ?? 'unknown';
+                    $conf = round(($pred['confidence'] ?? 0) * 100, 1);
+                    $classNames[] = "$class ($conf%)";
                 }
-                $errorMsg .= '. Found ' . count($predictions) . ' detection(s): ' . implode(', ', $classNames) . ' but none were valid digits (0-9)';
+                $errorMsg .= '. Found ' . count($predictions) . ' detection(s): ' . implode(', ', $classNames) . ' but none were valid digits (0-9).';
+                $errorMsg .= ' Note: This model may be trained for meter detection, not digit detection.';
+                $errorMsg .= ' You need a separate digit detection model with classes 0-9.';
             } else {
-                $errorMsg .= '. No detections returned from Roboflow API';
+                $errorMsg .= '. No detections returned from Roboflow API.';
+                $errorMsg .= ' The model may not be detecting anything, or the image may be too small/cropped.';
             }
             error_log('✗ Roboflow Digit Detection: ' . $errorMsg);
+            error_log('✗ Roboflow API Response: ' . json_encode($data));
             return [
                 'success' => false,
                 'digits' => [],
                 'message' => $errorMsg,
-                'all_predictions' => $predictions
+                'all_predictions' => $predictions,
+                'api_response' => $data
             ];
         }
         

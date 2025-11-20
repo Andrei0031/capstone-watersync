@@ -32,14 +32,37 @@ try {
     }
 
     // Resolve image path (handle both relative and absolute paths)
-    $imagePath = $reading['image_path'];
-    if (!file_exists($imagePath)) {
-        // Try relative path from root
-        $imagePath = __DIR__ . '/' . ltrim($reading['image_path'], '/');
-        if (!file_exists($imagePath)) {
-            throw new Exception('Image file not found: ' . $reading['image_path']);
+    $storedPath = $reading['image_path'];
+    $imagePath = null;
+    
+    // Try multiple path formats
+    $possiblePaths = [
+        $storedPath, // Original path as stored
+        __DIR__ . '/' . ltrim($storedPath, '/'), // Relative from root
+        realpath($storedPath), // Absolute path
+        realpath(__DIR__ . '/' . ltrim($storedPath, '/')) // Absolute from root
+    ];
+    
+    // Also try without _cropped suffix if it exists
+    if (strpos($storedPath, '_cropped.') !== false) {
+        $originalPath = str_replace('_cropped.', '.', $storedPath);
+        $possiblePaths[] = $originalPath;
+        $possiblePaths[] = __DIR__ . '/' . ltrim($originalPath, '/');
+        $possiblePaths[] = realpath($originalPath);
+    }
+    
+    foreach ($possiblePaths as $path) {
+        if ($path && file_exists($path)) {
+            $imagePath = $path;
+            break;
         }
     }
+    
+    if (!$imagePath) {
+        throw new Exception('Image file not found. Tried: ' . implode(', ', array_filter($possiblePaths)) . '. Stored path: ' . $storedPath);
+    }
+    
+    error_log("Retry reading ID $reading_id: Using image path: $imagePath");
 
     $ocrProcessed = false;
     $ocrReading = null;
@@ -73,9 +96,28 @@ try {
     }
     
     if (!$ocrProcessed) {
+        // If Roboflow failed, Tesseract should still work as fallback
+        // But if both failed, provide helpful error message
         $errorMsg = $ocrError ?? 'OCR processing failed. Both Roboflow and Tesseract failed to process the image.';
         error_log("✗ Retry OCR FAILED for reading ID $reading_id: $errorMsg");
-        throw new Exception($errorMsg);
+        
+        // Don't throw exception - instead update status to failed with error message
+        // This allows user to manually enter the reading
+        $update = $conn->prepare("UPDATE pending_meter_readings SET 
+            error_message = ?,
+            processed_at = NOW()
+            WHERE id = ?");
+        $update->bind_param("si", $errorMsg, $reading_id);
+        $update->execute();
+        
+        // Return error but don't throw (allows UI to show error)
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => $errorMsg . ' You can manually enter the reading value.',
+            'can_retry' => true
+        ]);
+        exit();
     }
     
     // Convert reading to float (handle 5-digit reading like "00792")
