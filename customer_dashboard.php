@@ -973,6 +973,121 @@ $disconnection_notices = $stmt->get_result();
                  </form>
              </div>
          </div>
+         
+         <!-- Submitted Outage Reports List - Below the form -->
+         <div id="outage-reports-list" style="display: none; margin: 20px; padding: 0; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
+            <!-- List Header -->
+            <div style="background: linear-gradient(135deg, #2196f3, #1976d2); padding: 20px; border-bottom: 1px solid #e0e0e0;">
+                <h5 style="margin: 0; color: white; font-weight: 600;">
+                    <i class="fas fa-list me-2" style="color: white;"></i>Your Submitted Reports
+                </h5>
+                <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">View all your water outage reports and their status</p>
+            </div>
+            <!-- Reports List Body -->
+            <div style="padding: 25px;">
+                <?php
+                // Fetch all reports for the logged-in client
+                if (isset($_SESSION['client_id'])) {
+                    $client_id = $_SESSION['client_id'];
+                    
+                    // Check if table exists, if not create it
+                    $check_table = $conn->query("SHOW TABLES LIKE 'outage_reports'");
+                    if ($check_table->num_rows == 0) {
+                        $create_table_sql = "CREATE TABLE IF NOT EXISTS outage_reports (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            client_id INT NOT NULL,
+                            location VARCHAR(255) NOT NULL,
+                            description TEXT NOT NULL,
+                            status TINYINT(1) DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            resolved_at TIMESTAMP NULL,
+                            resolution_notes TEXT,
+                            FOREIGN KEY (client_id) REFERENCES client_list(id)
+                        )";
+                        $conn->query($create_table_sql);
+                    }
+                    
+                    // Fetch reports for this client, newest first
+                    $reports_query = "SELECT id, location, description, status, created_at, resolved_at, resolution_notes 
+                                     FROM outage_reports 
+                                     WHERE client_id = ? 
+                                     ORDER BY created_at DESC";
+                    $stmt = $conn->prepare($reports_query);
+                    $stmt->bind_param("i", $client_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $reports = $result->fetch_all(MYSQLI_ASSOC);
+                    $stmt->close();
+                    
+                    if (empty($reports)) {
+                        echo '<div style="text-align: center; padding: 40px; color: #666;">
+                                <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                                <p style="margin: 0; font-size: 1.1rem;">No reports submitted yet</p>
+                                <p style="margin: 10px 0 0 0; color: #999; font-size: 0.9rem;">Submit a report above to get started</p>
+                              </div>';
+                    } else {
+                        echo '<div style="max-height: 600px; overflow-y: auto;">';
+                        foreach ($reports as $report) {
+                            $is_resolved = $report['status'] == 1;
+                            $status_color = $is_resolved ? '#4caf50' : '#ff9800';
+                            $status_text = $is_resolved ? 'Resolved' : 'Pending';
+                            $status_icon = $is_resolved ? 'fa-check-circle' : 'fa-clock';
+                            
+                            $created_date = date('M d, Y g:i A', strtotime($report['created_at']));
+                            $resolved_date = $report['resolved_at'] ? date('M d, Y g:i A', strtotime($report['resolved_at'])) : null;
+                            
+                            echo '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: ' . ($is_resolved ? '#f1f8f4' : '#fff8e1') . '; transition: all 0.3s ease;">';
+                            echo '    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">';
+                            echo '        <div style="flex: 1;">';
+                            echo '            <div style="display: flex; align-items: center; margin-bottom: 10px;">';
+                            echo '                <span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;">';
+                            echo '                    <i class="fas ' . $status_icon . ' me-1"></i>' . $status_text;
+                            echo '                </span>';
+                            echo '                <span style="color: #666; font-size: 0.9rem;">';
+                            echo '                    <i class="fas fa-calendar me-1"></i>' . $created_date;
+                            echo '                </span>';
+                            echo '            </div>';
+                            echo '            <h6 style="margin: 0 0 8px 0; color: #333; font-weight: 600;">';
+                            echo '                <i class="fas fa-map-marker-alt me-2" style="color: #2196f3;"></i>' . htmlspecialchars($report['location']);
+                            echo '            </h6>';
+                            echo '            <p style="margin: 0; color: #555; line-height: 1.6;">' . htmlspecialchars($report['description']) . '</p>';
+                            echo '        </div>';
+                            echo '    </div>';
+                            
+                            if ($is_resolved && $resolved_date) {
+                                echo '    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
+                                echo '        <div style="display: flex; align-items: center; color: #4caf50; font-size: 0.9rem; margin-bottom: 8px;">';
+                                echo '            <i class="fas fa-check-circle me-2"></i>';
+                                echo '            <strong>Resolved on:</strong> ' . $resolved_date;
+                                echo '        </div>';
+                                if (!empty($report['resolution_notes'])) {
+                                    echo '        <div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #4caf50;">';
+                                    echo '            <strong style="color: #333; font-size: 0.9rem;">Resolution Notes:</strong>';
+                                    echo '            <p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">' . htmlspecialchars($report['resolution_notes']) . '</p>';
+                                    echo '        </div>';
+                                }
+                                echo '    </div>';
+                            } else {
+                                echo '    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
+                                echo '        <div style="display: flex; align-items: center; color: #ff9800; font-size: 0.9rem;">';
+                                echo '            <i class="fas fa-hourglass-half me-2"></i>';
+                                echo '            <strong>Status:</strong> Under review - We will update you once resolved';
+                                echo '        </div>';
+                                echo '    </div>';
+                            }
+                            
+                            echo '</div>';
+                        }
+                        echo '</div>';
+                    }
+                } else {
+                    echo '<div style="text-align: center; padding: 40px; color: #666;">
+                            <p style="margin: 0;">Please log in to view your reports</p>
+                          </div>';
+                }
+                ?>
+            </div>
+         </div>
         
         <div class="tab-content" id="nav-tabContent" style="padding: 0 !important; margin: 0 !important; border: none !important;">
                 <!-- Dashboard Overview Tab -->
@@ -2007,13 +2122,20 @@ $disconnection_notices = $stmt->get_result();
                     content.classList.add('show', 'active');
                 }
                 
-                // Show/hide water reports form based on active tab
+                // Show/hide water reports form and reports list based on active tab
                 const waterReportsForm = document.getElementById('water-reports-form');
+                const outageReportsList = document.getElementById('outage-reports-list');
                 if (waterReportsForm) {
                     if (target === '#nav-reports') {
                         waterReportsForm.style.display = 'block';
+                        if (outageReportsList) {
+                            outageReportsList.style.display = 'block';
+                        }
                     } else {
                         waterReportsForm.style.display = 'none';
+                        if (outageReportsList) {
+                            outageReportsList.style.display = 'none';
+                        }
                     }
                 }
             });
@@ -2027,13 +2149,20 @@ $disconnection_notices = $stmt->get_result();
     document.addEventListener('shown.bs.tab', function (e) {
         const target = e.target.getAttribute('data-bs-target');
         
-        // Show/hide water reports form based on active tab
+        // Show/hide water reports form and reports list based on active tab
         const waterReportsForm = document.getElementById('water-reports-form');
+        const outageReportsList = document.getElementById('outage-reports-list');
         if (waterReportsForm) {
             if (target === '#nav-reports') {
                 waterReportsForm.style.display = 'block';
+                if (outageReportsList) {
+                    outageReportsList.style.display = 'block';
+                }
             } else {
                 waterReportsForm.style.display = 'none';
+                if (outageReportsList) {
+                    outageReportsList.style.display = 'none';
+                }
             }
         }
     });
