@@ -783,6 +783,14 @@ function detectDigitsWithRoboflow($imagePath) {
         } elseif (isset($data['results']) && is_array($data['results'])) {
             $predictions = $data['results'];
             error_log("✓ Found results array with " . count($predictions) . " items");
+        } elseif (isset($data['data']) && is_array($data['data'])) {
+            // Some APIs wrap predictions in 'data' key
+            $predictions = $data['data'];
+            error_log("✓ Found data array with " . count($predictions) . " items");
+        } elseif (isset($data['objects']) && is_array($data['objects'])) {
+            // Some APIs use 'objects' key
+            $predictions = $data['objects'];
+            error_log("✓ Found objects array with " . count($predictions) . " items");
         } else {
             // Check if response is directly an array
             if (is_array($data) && isset($data[0])) {
@@ -860,10 +868,10 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.2 (20%) - lowered to catch more detections
-            // If model is well-trained, we can increase this later
-            // Lower threshold helps with difficult images
-            if ($isDigit && $confidence > 0.2) {
+            // Use confidence threshold of 0.1 (10%) - very low to catch all detections
+            // Version 7 might have different confidence distribution
+            // Lower threshold ensures we catch all valid digits
+            if ($isDigit && $confidence > 0.1) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -873,8 +881,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.2) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.2)");
+            } elseif ($isDigit && $confidence <= 0.1) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.1)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
