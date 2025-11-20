@@ -346,67 +346,28 @@ try {
                 throw new Exception('Failed to save meter image');
             }
             
-            // AUTO-PROCESS OCR IMMEDIATELY
+            // BATCH UPLOAD: Save as 'pending' status - OCR will be processed manually from web interface
+            // This allows admin to review and process OCR from the pending tab
             $ocrReading = null;
             $extractedText = '';
             $ocrProcessed = false;
             $ocrError = null;
-            $status = 'pending'; // Default to pending - will change to processed if OCR succeeds
+            $status = 'pending'; // Always 'pending' for batch uploads - manual OCR processing from web
             
-            try {
-                // Try Roboflow digit detection first
-                if (function_exists('processImageWithRoboflowDigits')) {
-                    $ocrResult = processImageWithRoboflowDigits($filepath);
-                    if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                        $ocrReading = $ocrResult['meter_reading'];
-                        $extractedText = $ocrResult['extracted_text'] ?? '';
-                        $ocrProcessed = true;
-                        $status = 'processed';
-                        error_log("Batch Upload: OCR SUCCESS (Roboflow) for client $client_id: $ocrReading");
-                    } else {
-                        $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
-                        error_log("Batch Upload: OCR FAILED (Roboflow) for client $client_id: $ocrError");
-                    }
+            // If manual reading is provided from mobile app, use it but still keep status as 'pending'
+            // Admin can verify and process from web interface
+            if (isset($reading_data['meter_reading'])) {
+                $meter_reading = floatval($reading_data['meter_reading']);
+                if ($meter_reading > 0) {
+                    $ocrReading = $meter_reading;
+                    $extractedText = 'Manual reading from mobile app - pending verification';
+                    error_log("Batch Upload: Manual reading provided for client $client_id: $meter_reading (status: pending for verification)");
                 }
-                
-                // If Roboflow failed, try Tesseract as fallback
-                if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
-                    $tesseractResult = processImageWithTesseract($filepath);
-                    if ($tesseractResult['success'] && !empty($tesseractResult['meter_reading'])) {
-                        $ocrReading = $tesseractResult['meter_reading'];
-                        $extractedText = $tesseractResult['extracted_text'] ?? '';
-                        $ocrProcessed = true;
-                        $status = 'processed';
-                        error_log("Batch Upload: OCR SUCCESS (Tesseract) for client $client_id: $ocrReading");
-                    } else {
-                        $ocrError = $tesseractResult['error'] ?? 'Tesseract OCR failed';
-                        error_log("Batch Upload: OCR FAILED (Tesseract) for client $client_id: $ocrError");
-                    }
-                }
-                
-                // If both OCR methods failed, use manual reading if provided
-                if (!$ocrProcessed && isset($reading_data['meter_reading'])) {
-                    $meter_reading = floatval($reading_data['meter_reading']);
-                    if ($meter_reading > 0) {
-                        $ocrReading = $meter_reading;
-                        $extractedText = 'Manual reading from mobile app';
-                        $ocrProcessed = true;
-                        $status = 'processed';
-                        error_log("Batch Upload: Using manual reading for client $client_id: $meter_reading");
-                    }
-                }
-                
-                if (!$ocrProcessed) {
-                    $ocrError = $ocrError ?? 'OCR processing failed and no manual reading provided';
-                    error_log("Batch Upload: OCR FAILED for client $client_id - setting status to 'pending' for manual processing");
-                    // Status remains 'pending' - will be shown in pending tab for manual processing
-                }
-                
-            } catch (Exception $e) {
-                $ocrError = 'OCR processing exception: ' . $e->getMessage();
-                error_log("Batch Upload: OCR EXCEPTION for client $client_id: " . $e->getMessage());
-                // Status remains 'pending' - will be shown in pending tab for manual processing
             }
+            
+            // NOTE: OCR processing is skipped for batch uploads
+            // All readings go to 'pending' status and will be processed manually from web interface
+            // This ensures quality control and allows admin to verify readings before processing
             
             // Get mobile device info if provided
             $device_info = $reading_data['device_info'] ?? null;
