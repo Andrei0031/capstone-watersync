@@ -458,36 +458,47 @@ function detectDigitsWithRoboflow($imagePath) {
         // Extract digits with their positions
         $digits = [];
         foreach ($predictions as $prediction) {
-            // Try multiple possible class name fields
+            // Try multiple possible class name fields (class, class_name, name, or class_id)
             $className = '';
+            $digitValue = null;
+            
             if (isset($prediction['class'])) {
-                $className = trim($prediction['class']);
+                $className = trim(strval($prediction['class']));
             } elseif (isset($prediction['class_name'])) {
-                $className = trim($prediction['class_name']);
+                $className = trim(strval($prediction['class_name']));
             } elseif (isset($prediction['name'])) {
-                $className = trim($prediction['name']);
+                $className = trim(strval($prediction['name']));
+            } elseif (isset($prediction['class_id'])) {
+                // class_id is numeric (0-9), convert to string
+                $className = strval($prediction['class_id']);
             }
             
             $confidence = isset($prediction['confidence']) ? floatval($prediction['confidence']) : 0.0;
             
             // Log all predictions for debugging
-            error_log("Roboflow prediction: class='$className', confidence=$confidence, full_prediction=" . json_encode($prediction));
+            error_log("Roboflow prediction: class='$className', class_id=" . ($prediction['class_id'] ?? 'N/A') . ", confidence=$confidence");
             
-            // Validate that it's a digit (0-9) - lower confidence threshold to 0.2 for better detection
-            // Also handle class names that might be strings like "0", "1", etc.
+            // Validate that it's a digit (0-9)
+            // Handle both string class names ("6") and numeric class_id (6)
             $isDigit = false;
-            $digitValue = null;
             
-            // Check if class name is a single digit (0-9)
+            // Check if class name is a single digit (0-9) as string
             if (preg_match('/^[0-9]$/', $className)) {
                 $isDigit = true;
                 $digitValue = $className;
-            } elseif (is_numeric($className) && strlen($className) == 1 && $className >= '0' && $className <= '9') {
-                $isDigit = true;
-                $digitValue = $className;
+            } 
+            // Check if class_id is a digit (0-9)
+            elseif (isset($prediction['class_id']) && is_numeric($prediction['class_id'])) {
+                $classId = intval($prediction['class_id']);
+                if ($classId >= 0 && $classId <= 9) {
+                    $isDigit = true;
+                    $digitValue = strval($classId);
+                }
             }
             
-            if ($isDigit && $confidence > 0.2) { // Lowered threshold from 0.35 to 0.2
+            // Use confidence threshold of 0.5 (50%) to match visualization settings
+            // Your model shows good accuracy (68.1% mAP), so 50% threshold should work well
+            if ($isDigit && $confidence > 0.5) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -497,8 +508,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.2) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.2)");
+            } elseif ($isDigit && $confidence <= 0.5) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.5)");
             }
         }
         
