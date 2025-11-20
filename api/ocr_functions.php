@@ -430,10 +430,28 @@ function processImageWithRoboflowDigits($imagePath) {
     }
     
     try {
-        error_log("Roboflow OCR: Processing image with digit detection: $imagePath");
+        error_log("=== ROBOFLOW OCR PROCESSING START ===");
+        error_log("Image path: $imagePath");
+        error_log("Image exists: " . (file_exists($imagePath) ? 'Yes' : 'No'));
+        if (file_exists($imagePath)) {
+            error_log("Image size: " . filesize($imagePath) . " bytes");
+            $imgInfo = @getimagesize($imagePath);
+            if ($imgInfo) {
+                error_log("Image dimensions: " . $imgInfo[0] . "x" . $imgInfo[1]);
+            }
+        }
         
         // Step 1: Detect digits using Roboflow API
+        error_log("Calling detectDigitsWithRoboflow()...");
         $digitResult = detectDigitsWithRoboflow($imagePath);
+        
+        error_log("detectDigitsWithRoboflow() returned:");
+        error_log("  success: " . ($digitResult['success'] ? 'true' : 'false'));
+        error_log("  digits count: " . count($digitResult['digits'] ?? []));
+        error_log("  message: " . ($digitResult['message'] ?? 'N/A'));
+        if (isset($digitResult['api_response'])) {
+            error_log("  api_response keys: " . implode(', ', array_keys($digitResult['api_response'])));
+        }
         
         if (!$digitResult['success']) {
             $errorMsg = 'Roboflow digit detection failed';
@@ -441,6 +459,7 @@ function processImageWithRoboflowDigits($imagePath) {
                 $errorMsg .= ': ' . $digitResult['message'];
             }
             error_log('✗ Roboflow OCR: ' . $errorMsg);
+            error_log("=== ROBOFLOW OCR PROCESSING END (FAILED) ===");
             return [
                 'success' => false,
                 'extracted_text' => '',
@@ -450,13 +469,21 @@ function processImageWithRoboflowDigits($imagePath) {
         }
         
         $digits = $digitResult['digits'] ?? [];
+        error_log("Digits array count: " . count($digits));
         
         if (empty($digits)) {
             $errorMsg = 'No digits detected in image';
             if (isset($digitResult['message']) && !empty($digitResult['message'])) {
                 $errorMsg .= ': ' . $digitResult['message'];
             }
+            if (isset($digitResult['all_predictions']) && !empty($digitResult['all_predictions'])) {
+                error_log("⚠ Found " . count($digitResult['all_predictions']) . " predictions but none were valid digits");
+                foreach ($digitResult['all_predictions'] as $idx => $pred) {
+                    error_log("  Prediction #$idx: " . json_encode($pred));
+                }
+            }
             error_log('✗ Roboflow OCR: ' . $errorMsg);
+            error_log("=== ROBOFLOW OCR PROCESSING END (NO DIGITS) ===");
             return [
                 'success' => false,
                 'extracted_text' => '',

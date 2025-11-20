@@ -13,20 +13,19 @@ define('ROBOFLOW_WORKSPACE', 'watersync');
 // Meter Detection Model Configuration
 // Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
-define('ROBOFLOW_MODEL_VERSION', '2'); // Temporarily using version 2 (working model)
-define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/2'); // Model ID format: project/version
+define('ROBOFLOW_MODEL_VERSION', '7'); // Using version 7
+define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/7'); // Model ID format: project/version
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
-// Format: "project-name/version" (e.g., "watersync-oekrf/2")
-// Temporarily using version 2 (working model) to test
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/2'); // Temporarily using version 2 (working model)
+// Format: "project-name/version" (e.g., "watersync-oekrf/7")
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Using version 7
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
-define('ROBOFLOW_DIGIT_MODEL_VERSION', '2'); // Temporarily using version 2 (working model)
+define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Using version 7
 
 // Build inference URL - try both serverless and detect endpoints
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
@@ -460,8 +459,14 @@ function detectDigitsWithRoboflow($imagePath) {
         // Check if Method 1 returned valid predictions
         $method1Success = false;
         if ($httpCode === 200 && !$error && !empty($response)) {
+            error_log("Roboflow Digit Detection: Method 1 - HTTP 200, response length: " . strlen($response));
             $testData = json_decode($response, true);
+            
             if ($testData) {
+                error_log("Roboflow Digit Detection: Method 1 - JSON decoded successfully");
+                error_log("Roboflow Digit Detection: Method 1 - Response keys: " . implode(', ', array_keys($testData)));
+                error_log("Roboflow Digit Detection: Method 1 - Full response: " . json_encode($testData, JSON_PRETTY_PRINT));
+                
                 // Check multiple possible response formats
                 $hasPredictions = false;
                 $predictionCount = 0;
@@ -469,24 +474,34 @@ function detectDigitsWithRoboflow($imagePath) {
                 if (isset($testData['predictions']) && is_array($testData['predictions'])) {
                     $hasPredictions = true;
                     $predictionCount = count($testData['predictions']);
+                    error_log("Roboflow Digit Detection: Method 1 - Found 'predictions' array with $predictionCount items");
                 } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
                     $hasPredictions = true;
                     $predictionCount = count($testData['detections']);
+                    error_log("Roboflow Digit Detection: Method 1 - Found 'detections' array with $predictionCount items");
                 } elseif (isset($testData['results']) && is_array($testData['results'])) {
                     $hasPredictions = true;
                     $predictionCount = count($testData['results']);
+                    error_log("Roboflow Digit Detection: Method 1 - Found 'results' array with $predictionCount items");
+                } else {
+                    error_log("Roboflow Digit Detection: Method 1 - No predictions/detections/results found. Full response structure:");
+                    error_log(json_encode($testData, JSON_PRETTY_PRINT));
                 }
                 
                 if ($hasPredictions && $predictionCount > 0) {
                     $method1Success = true;
                     $methodUsed = 'base64-form';
-                    error_log("Roboflow Digit Detection: Method 1 (base64-form) succeeded with $predictionCount predictions");
+                    error_log("✓ Roboflow Digit Detection: Method 1 (base64-form) succeeded with $predictionCount predictions");
                 } else {
-                    error_log("Roboflow Digit Detection: Method 1 returned HTTP 200 but no predictions found. Response keys: " . implode(', ', array_keys($testData)));
+                    error_log("✗ Roboflow Digit Detection: Method 1 returned HTTP 200 but no predictions found. Response keys: " . implode(', ', array_keys($testData)));
                 }
             } else {
-                error_log("Roboflow Digit Detection: Method 1 returned HTTP 200 but JSON decode failed. Response: " . substr($response, 0, 500));
+                $jsonError = json_last_error_msg();
+                error_log("✗ Roboflow Digit Detection: Method 1 returned HTTP 200 but JSON decode failed: $jsonError");
+                error_log("✗ Roboflow Digit Detection: Method 1 - Raw response: " . substr($response, 0, 1000));
             }
+        } else {
+            error_log("✗ Roboflow Digit Detection: Method 1 failed - HTTP Code: $httpCode, Error: $error, Response length: " . strlen($response ?? ''));
         }
         
         // If Method 1 failed or returned empty predictions, try Method 2: Multipart form-data
@@ -643,12 +658,15 @@ function detectDigitsWithRoboflow($imagePath) {
             }
         }
         
-        error_log("Roboflow Digit Detection: Final method used: $methodUsed, HTTP Code: $httpCode");
-        error_log("Roboflow Digit Detection: API URL used: " . ROBOFLOW_DIGIT_INFERENCE_URL);
-        error_log("Roboflow Digit Detection: Model ID: " . ROBOFLOW_DIGIT_MODEL_ID);
-        error_log("Roboflow Digit Detection: HTTP Response Code: $httpCode");
-        error_log("Roboflow Digit Detection: Response length: " . strlen($response) . " bytes");
-        error_log("Roboflow Digit Detection: Raw response (first 1000 chars): " . substr($response, 0, 1000));
+        error_log("=== ROBOFLOW DIGIT DETECTION SUMMARY ===");
+        error_log("Final method used: $methodUsed");
+        error_log("HTTP Code: $httpCode");
+        error_log("API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        error_log("Model ID: " . ROBOFLOW_DIGIT_MODEL_ID);
+        error_log("Response length: " . strlen($response ?? '') . " bytes");
+        error_log("Has cURL error: " . ($error ? 'Yes - ' . $error : 'No'));
+        error_log("Response preview: " . substr($response ?? '', 0, 1000));
+        error_log("==========================================");
         
         if ($error) {
             error_log("Roboflow Digit Detection: cURL Error: $error");
@@ -710,11 +728,17 @@ function detectDigitsWithRoboflow($imagePath) {
         }
         
         // Log full API response structure
-        error_log("Roboflow Digit Detection: API Response structure: " . json_encode($data, JSON_PRETTY_PRINT));
+        error_log("=== ROBOFLOW API RESPONSE STRUCTURE ===");
+        error_log(json_encode($data, JSON_PRETTY_PRINT));
+        error_log("========================================");
         
         // Check if response is empty object/array
         if (empty($data) || (is_array($data) && count($data) === 0)) {
-            error_log('⚠ WARNING: API returned empty data structure. This usually means:');
+            error_log('⚠ WARNING: API returned empty data structure');
+            error_log('   Response type: ' . gettype($data));
+            error_log('   Is array: ' . (is_array($data) ? 'Yes' : 'No'));
+            error_log('   Array count: ' . (is_array($data) ? count($data) : 'N/A'));
+            error_log('   This usually means:');
             error_log('   1. Version 7 is NOT deployed for "Hosted Image Inference"');
             error_log('   2. You need to go to Roboflow → Deploy → "Hosted Image Inference" → Click "View Code"');
             error_log('   3. The model may only be deployed for "Embedded Device" (not for API calls)');
@@ -788,7 +812,8 @@ function detectDigitsWithRoboflow($imagePath) {
             $confidence = isset($prediction['confidence']) ? floatval($prediction['confidence']) : 0.0;
             
             // Log all predictions for debugging
-            error_log("Roboflow prediction: class='$className', class_id=" . ($prediction['class_id'] ?? 'N/A') . ", confidence=$confidence");
+            error_log("Roboflow prediction #" . (count($digits) + 1) . ": class='$className', class_id=" . ($prediction['class_id'] ?? 'N/A') . ", confidence=$confidence, x=" . ($prediction['x'] ?? 'N/A') . ", y=" . ($prediction['y'] ?? 'N/A'));
+            error_log("   Full prediction data: " . json_encode($prediction));
             
             // Validate that it's a digit (0-9)
             // Handle both string class names ("6") and numeric class_id (6)
