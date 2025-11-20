@@ -2149,48 +2149,6 @@ $failed_result = $conn->query($failed_sql);
             }
 
             // Handle file upload
-            const uploadInput = document.getElementById('uploadInput');
-            uploadInput.addEventListener('change', function() {
-                const files = Array.from(this.files);
-                if (files.length === 0) return;
-
-                const formData = new FormData();
-                files.forEach(file => {
-                    formData.append('meter_images[]', file);
-                });
-
-                // Show upload progress
-                const progressHtml = `
-                    <div class="alert alert-info alert-dismissible fade show" role="alert">
-                        <div class="d-flex align-items-center">
-                            <div class="spinner-border spinner-border-sm me-2" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div>Uploading ${files.length} image${files.length > 1 ? 's' : ''}...</div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                `;
-                document.querySelector('.main-content').insertAdjacentHTML('afterbegin', progressHtml);
-
-                // Upload files
-                fetch('upload_readings.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error uploading files: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error uploading files');
-                });
-            });
         });
 
         function viewImage(imagePath) {
