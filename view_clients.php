@@ -1860,12 +1860,6 @@ $result = $conn->query($sql);
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Apply Fees">
-                                        <i class="fas fa-dollar-sign"></i>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                    </ul>
-                                </div>
                                 <a href="#" class="btn btn-sm btn-outline-warning historical-reading-btn" 
                                    data-client-id="<?php echo $row['id']; ?>" 
                                    data-client-name="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>"
