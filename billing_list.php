@@ -1480,9 +1480,6 @@ if ($params) {
                                     <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary view-btn" data-id="<?php echo $row['id']; ?>" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="javascript:void(0)" class="btn btn-sm btn-outline-success edit-btn" data-id="<?php echo $row['id']; ?>" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
                                     <a href="javascript:void(0)" 
                                        class="btn btn-sm btn-outline-danger delete-btn" 
                                        data-id="<?php echo $row['id']; ?>" 
