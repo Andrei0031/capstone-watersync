@@ -569,6 +569,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
+    // Handle overdue email test
+    if (isset($_POST['test_overdue_email'])) {
+        $test_email = $_POST['test_overdue_email'] ?? '';
+        $test_name = $_POST['test_overdue_name'] ?? 'Test User';
+        $test_amount = $_POST['test_overdue_amount'] ?? '1,500.00';
+        $test_days_overdue = intval($_POST['test_overdue_days'] ?? 5);
+        
+        if (!empty($test_email)) {
+            include 'simple_notifications.php';
+            
+            $due_date = date('M d, Y', strtotime("-{$test_days_overdue} days"));
+            $email_subject = "URGENT: Overdue Water Bill - $test_days_overdue Day(s) Late";
+            $email_message = "Dear $test_name,\n\n" .
+                           "URGENT: Your water bill payment is OVERDUE!\n\n" .
+                           "Amount Due: ₱$test_amount\n" .
+                           "Due Date: $due_date\n" .
+                           "Days Overdue: $test_days_overdue day(s)\n\n" .
+                           "Please pay immediately to avoid late fees and potential service disconnection.\n\n" .
+                           "Thank you,\nWaterSync Team";
+            
+            $email_result = sendDummyEmail($test_email, $email_subject, $email_message);
+            
+            if (isset($email_result['success']) && $email_result['success']) {
+                $message = "✅ Overdue email test sent successfully! Check your inbox.";
+                $messageClass = "alert-success";
+            } else {
+                $error_msg = $email_result['error'] ?? $email_result['message'] ?? 'Unknown error';
+                $message = "❌ Overdue email test failed: " . $error_msg;
+                $messageClass = "alert-danger";
+            }
+        } else {
+            $message = "Please provide an email address for testing.";
+            $messageClass = "alert-warning";
+        }
+    }
+    
     // Handle SMS settings form submission
     if (isset($_POST['save_sms_settings'])) {
         $sms_enabled = isset($_POST['sms_enabled']) ? 1 : 0;
@@ -3478,6 +3514,50 @@ function updateSMSFields() {
                             </div>
                             <button type="submit" name="test_email" class="btn btn-success">
                                 <i class="fas fa-paper-plane me-2"></i>Send Test Email
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-3">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Test Overdue Email</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Test the overdue bill email notification format</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_name" class="form-label">Customer Name</label>
+                                        <input type="text" class="form-control" id="test_overdue_name" name="test_overdue_name" 
+                                               placeholder="John Doe" value="Test User">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_email" class="form-label">Test Email</label>
+                                        <input type="email" class="form-control" id="test_overdue_email" name="test_overdue_email" 
+                                               placeholder="test@example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_amount" class="form-label">Amount Due</label>
+                                        <input type="text" class="form-control" id="test_overdue_amount" name="test_overdue_amount" 
+                                               placeholder="1,500.00" value="1,500.00">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_days" class="form-label">Days Overdue</label>
+                                        <input type="number" class="form-control" id="test_overdue_days" name="test_overdue_days" 
+                                               placeholder="5" value="5" min="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" name="test_overdue_email" class="btn btn-danger">
+                                <i class="fas fa-paper-plane me-2"></i>Send Overdue Email Test
                             </button>
                         </div>
                     </div>
