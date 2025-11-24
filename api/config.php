@@ -1,4 +1,7 @@
 <?php
+// Set timezone to Philippine Time (Asia/Manila, UTC+8)
+date_default_timezone_set('Asia/Manila');
+
 // API Configuration
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

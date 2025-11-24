@@ -1,4 +1,7 @@
 <?php
+// Set timezone to Philippine Time (Asia/Manila, UTC+8)
+date_default_timezone_set('Asia/Manila');
+
 // Enable error display for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
