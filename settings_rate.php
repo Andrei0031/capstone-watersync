@@ -515,6 +515,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $from_email = $_POST['from_email'] ?? '';
         $from_name = $_POST['from_name'] ?? 'WaterSync';
         $email_test_mode = isset($_POST['email_test_mode']) ? 1 : 0;
+        $email_bill_schedule_mode = $_POST['email_bill_schedule_mode'] ?? 'immediate';
+        $email_bill_schedule_time = $_POST['email_bill_schedule_time'] ?? '08:00';
+        $email_overdue_schedule_mode = $_POST['email_overdue_schedule_mode'] ?? 'scheduled';
+        $email_overdue_schedule_time = $_POST['email_overdue_schedule_time'] ?? '09:00';
         
         // Ensure notification_settings table exists
         $createSettingsTable = "
@@ -536,6 +540,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         updateEmailSetting($conn, 'from_email', $from_email);
         updateEmailSetting($conn, 'from_name', $from_name);
         updateEmailSetting($conn, 'email_test_mode', $email_test_mode);
+        updateEmailSetting($conn, 'email_bill_schedule_mode', $email_bill_schedule_mode);
+        updateEmailSetting($conn, 'email_bill_schedule_time', $email_bill_schedule_time);
+        updateEmailSetting($conn, 'email_overdue_schedule_mode', $email_overdue_schedule_mode);
+        updateEmailSetting($conn, 'email_overdue_schedule_time', $email_overdue_schedule_time);
         
         $message = "Email settings saved successfully!";
         $messageClass = "alert-success";
@@ -616,6 +624,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $sms_account_sid = $_POST['sms_account_sid'] ?? '';
         $sms_auth_token = $_POST['sms_auth_token'] ?? '';
         $sms_test_mode = isset($_POST['sms_test_mode']) ? 1 : 0;
+        $sms_bill_schedule_mode = $_POST['sms_bill_schedule_mode'] ?? 'immediate';
+        $sms_bill_schedule_time = $_POST['sms_bill_schedule_time'] ?? '08:00';
+        $sms_overdue_schedule_mode = $_POST['sms_overdue_schedule_mode'] ?? 'scheduled';
+        $sms_overdue_schedule_time = $_POST['sms_overdue_schedule_time'] ?? '09:00';
         
         // Ensure notification_settings table exists
         $createSettingsTable = "
@@ -638,6 +650,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         updateEmailSetting($conn, 'sms_account_sid', $sms_account_sid);
         updateEmailSetting($conn, 'sms_auth_token', $sms_auth_token);
         updateEmailSetting($conn, 'sms_test_mode', $sms_test_mode);
+        updateEmailSetting($conn, 'sms_bill_schedule_mode', $sms_bill_schedule_mode);
+        updateEmailSetting($conn, 'sms_bill_schedule_time', $sms_bill_schedule_time);
+        updateEmailSetting($conn, 'sms_overdue_schedule_mode', $sms_overdue_schedule_mode);
+        updateEmailSetting($conn, 'sms_overdue_schedule_time', $sms_overdue_schedule_time);
         
         $message = "SMS settings saved successfully!";
         $messageClass = "alert-success";
@@ -705,6 +721,10 @@ $sms_from_number = getEmailSetting($conn, 'sms_from_number', '');
 $sms_account_sid = getEmailSetting($conn, 'sms_account_sid', '');
 $sms_auth_token = getEmailSetting($conn, 'sms_auth_token', '');
 $sms_test_mode = getEmailSetting($conn, 'sms_test_mode', '0');
+$sms_bill_schedule_mode = getEmailSetting($conn, 'sms_bill_schedule_mode', 'immediate');
+$sms_bill_schedule_time = getEmailSetting($conn, 'sms_bill_schedule_time', '08:00');
+$sms_overdue_schedule_mode = getEmailSetting($conn, 'sms_overdue_schedule_mode', 'scheduled');
+$sms_overdue_schedule_time = getEmailSetting($conn, 'sms_overdue_schedule_time', '09:00');
 
 // Get current email settings
 $email_enabled = getEmailSetting($conn, 'email_enabled', '1');
@@ -715,6 +735,10 @@ $smtp_password = getEmailSetting($conn, 'smtp_password', '');
 $from_email = getEmailSetting($conn, 'from_email', '');
 $from_name = getEmailSetting($conn, 'from_name', 'WaterSync');
 $email_test_mode = getEmailSetting($conn, 'email_test_mode', '0');
+$email_bill_schedule_mode = getEmailSetting($conn, 'email_bill_schedule_mode', 'immediate');
+$email_bill_schedule_time = getEmailSetting($conn, 'email_bill_schedule_time', '08:00');
+$email_overdue_schedule_mode = getEmailSetting($conn, 'email_overdue_schedule_mode', 'scheduled');
+$email_overdue_schedule_time = getEmailSetting($conn, 'email_overdue_schedule_time', '09:00');
 
 // Fetch current rates
 $rates = [];
@@ -2983,6 +3007,38 @@ function updateSMSFields() {
     }
 }
 
+function toggleScheduleTime(selectEl, wrapper) {
+    if (!selectEl || !wrapper) {
+        return;
+    }
+    if (selectEl.value === 'scheduled') {
+        wrapper.classList.remove('d-none');
+    } else {
+        wrapper.classList.add('d-none');
+    }
+}
+
+function initNotificationSchedulerFields() {
+    const schedulePairs = [
+        { selectId: 'sms_bill_schedule_mode', wrapperId: 'sms_bill_schedule_time_wrapper' },
+        { selectId: 'sms_overdue_schedule_mode', wrapperId: 'sms_overdue_schedule_time_wrapper' },
+        { selectId: 'email_bill_schedule_mode', wrapperId: 'email_bill_schedule_time_wrapper' },
+        { selectId: 'email_overdue_schedule_mode', wrapperId: 'email_overdue_schedule_time_wrapper' }
+    ];
+
+    schedulePairs.forEach(pair => {
+        const selectEl = document.getElementById(pair.selectId);
+        const wrapper = document.getElementById(pair.wrapperId);
+        if (!selectEl || !wrapper) {
+            return;
+        }
+        toggleScheduleTime(selectEl, wrapper);
+        selectEl.addEventListener('change', () => toggleScheduleTime(selectEl, wrapper));
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
+
 </script>
 
 <!-- Water Rates Modal -->
@@ -3340,6 +3396,40 @@ function updateSMSFields() {
                                 4. Enter your credentials in the fields above<br>
                                 5. Test your configuration using the test button below
                             </div>
+
+                            <div class="card mt-3">
+                                <div class="card-header bg-dark text-white">
+                                    <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Notification Scheduler</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Bill Creation SMS</label>
+                                            <select class="form-select" id="sms_bill_schedule_mode" name="sms_bill_schedule_mode">
+                                                <option value="immediate" <?php echo $sms_bill_schedule_mode === 'immediate' ? 'selected' : ''; ?>>Send immediately</option>
+                                                <option value="scheduled" <?php echo $sms_bill_schedule_mode === 'scheduled' ? 'selected' : ''; ?>>Send at a specific time</option>
+                                            </select>
+                                            <div class="mt-2 schedule-time-wrapper <?php echo $sms_bill_schedule_mode === 'scheduled' ? '' : 'd-none'; ?>" id="sms_bill_schedule_time_wrapper">
+                                                <label for="sms_bill_schedule_time" class="form-label small text-muted mb-1">Scheduled Time</label>
+                                                <input type="time" class="form-control" id="sms_bill_schedule_time" name="sms_bill_schedule_time" value="<?php echo htmlspecialchars($sms_bill_schedule_time); ?>">
+                                                <small class="text-muted">The reminder cron can run hourly; SMS will only send when it matches this time.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Overdue SMS Reminders</label>
+                                            <select class="form-select" id="sms_overdue_schedule_mode" name="sms_overdue_schedule_mode">
+                                                <option value="immediate" <?php echo $sms_overdue_schedule_mode === 'immediate' ? 'selected' : ''; ?>>Send whenever script runs</option>
+                                                <option value="scheduled" <?php echo $sms_overdue_schedule_mode === 'scheduled' ? 'selected' : ''; ?>>Send at a specific time</option>
+                                            </select>
+                                            <div class="mt-2 schedule-time-wrapper <?php echo $sms_overdue_schedule_mode === 'scheduled' ? '' : 'd-none'; ?>" id="sms_overdue_schedule_time_wrapper">
+                                                <label for="sms_overdue_schedule_time" class="form-label small text-muted mb-1">Scheduled Time</label>
+                                                <input type="time" class="form-control" id="sms_overdue_schedule_time" name="sms_overdue_schedule_time" value="<?php echo htmlspecialchars($sms_overdue_schedule_time); ?>">
+                                                <small class="text-muted">Use this to batch all overdue SMS into a single daily send.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -3487,6 +3577,40 @@ function updateSMSFields() {
                                 2. Use SMTP Host: <code>mail.yourdomain.com</code> or <code>localhost</code><br>
                                 3. Port: <code>587</code> (TLS) or <code>465</code> (SSL)<br>
                                 4. Use the email address and password you created
+                            </div>
+
+                            <div class="card mt-3">
+                                <div class="card-header bg-dark text-white">
+                                    <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Email Scheduler</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Bill Creation Emails</label>
+                                            <select class="form-select" id="email_bill_schedule_mode" name="email_bill_schedule_mode">
+                                                <option value="immediate" <?php echo $email_bill_schedule_mode === 'immediate' ? 'selected' : ''; ?>>Send immediately</option>
+                                                <option value="scheduled" <?php echo $email_bill_schedule_mode === 'scheduled' ? 'selected' : ''; ?>>Send at a specific time</option>
+                                            </select>
+                                            <div class="mt-2 schedule-time-wrapper <?php echo $email_bill_schedule_mode === 'scheduled' ? '' : 'd-none'; ?>" id="email_bill_schedule_time_wrapper">
+                                                <label for="email_bill_schedule_time" class="form-label small text-muted mb-1">Scheduled Time</label>
+                                                <input type="time" class="form-control" id="email_bill_schedule_time" name="email_bill_schedule_time" value="<?php echo htmlspecialchars($email_bill_schedule_time); ?>">
+                                                <small class="text-muted">Pair with an hourly cron to delay sending new-bill emails.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Overdue Email Reminders</label>
+                                            <select class="form-select" id="email_overdue_schedule_mode" name="email_overdue_schedule_mode">
+                                                <option value="immediate" <?php echo $email_overdue_schedule_mode === 'immediate' ? 'selected' : ''; ?>>Send whenever script runs</option>
+                                                <option value="scheduled" <?php echo $email_overdue_schedule_mode === 'scheduled' ? 'selected' : ''; ?>>Send at a specific time</option>
+                                            </select>
+                                            <div class="mt-2 schedule-time-wrapper <?php echo $email_overdue_schedule_mode === 'scheduled' ? '' : 'd-none'; ?>" id="email_overdue_schedule_time_wrapper">
+                                                <label for="email_overdue_schedule_time" class="form-label small text-muted mb-1">Scheduled Time</label>
+                                                <input type="time" class="form-control" id="email_overdue_schedule_time" name="email_overdue_schedule_time" value="<?php echo htmlspecialchars($email_overdue_schedule_time); ?>">
+                                                <small class="text-muted">Daily batch time for overdue notices.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
