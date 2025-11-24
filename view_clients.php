@@ -2842,13 +2842,63 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Show/hide submit buttons based on active tab in Add Customer Modal
+    // Show/hide submit buttons & auto meter code generation in Add Customer Modal
     const addClientModal = document.getElementById('addClientModal');
+    const meterCodeInput = document.getElementById('add_meter_code');
+    const meterCodeHint = document.getElementById('lastMeterCodeDisplay');
+    const meterCodeError = document.getElementById('meterCodeError');
+    const autoGenerateMeterCodeBtn = document.getElementById('autoGenerateMeterCode');
+
+    function fetchNextMeterCode(focusInput = false) {
+        if (!meterCodeInput) {
+            return;
+        }
+        fetch('get_last_meter_code.php')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (meterCodeHint) {
+                        meterCodeHint.textContent = data.last_meter_code ?? 'None';
+                    }
+                    if (data.next_meter_code) {
+                        meterCodeInput.value = data.next_meter_code;
+                        if (focusInput) {
+                            meterCodeInput.focus();
+                            meterCodeInput.select();
+                        }
+                    }
+                    if (meterCodeError) {
+                        meterCodeError.textContent = '';
+                        meterCodeError.style.display = 'none';
+                    }
+                } else if (meterCodeError) {
+                    meterCodeError.textContent = data.message || 'Unable to fetch meter code.';
+                    meterCodeError.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                if (meterCodeError) {
+                    meterCodeError.textContent = 'Unable to fetch meter code.';
+                    meterCodeError.style.display = 'block';
+                }
+            });
+    }
+
+    if (autoGenerateMeterCodeBtn) {
+        autoGenerateMeterCodeBtn.addEventListener('click', function () {
+            fetchNextMeterCode(true);
+        });
+    }
+
     if (addClientModal) {
         const addClientSubmitBtn = document.getElementById('addClientSubmitBtn');
         const bulkImportSubmitBtn = document.getElementById('bulkImportSubmitBtn');
         const singleTab = document.getElementById('single-tab');
         const bulkTab = document.getElementById('bulk-tab');
+
+        addClientModal.addEventListener('shown.bs.modal', function () {
+            fetchNextMeterCode(false);
+        });
         
         // Show correct button when modal opens (default to Single Customer)
         if (addClientSubmitBtn) {
