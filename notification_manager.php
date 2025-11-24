@@ -21,7 +21,14 @@ class NotificationManager {
             'sms' => [
                 'provider' => $this->getSetting('sms_provider', 'semaphore'),
                 'api_key' => $this->getSetting('sms_api_key', ''),
+                'api_secret' => $this->getSetting('sms_api_secret', ''),
                 'sender_name' => $this->getSetting('sms_sender_name', 'WaterSync'),
+                'account_sid' => $this->getSetting('sms_account_sid', ''),
+                'auth_token' => $this->getSetting('sms_auth_token', ''),
+                'from_number' => $this->getSetting('sms_from_number', ''),
+                'philsms_api_token' => $this->getSetting('sms_philsms_api_token', ''),
+                'philsms_group_id' => $this->getSetting('sms_philsms_group_id', ''),
+                'philsms_sync_contacts' => $this->getSetting('sms_philsms_sync_contacts', '0') == '1',
                 'enabled' => $this->getSetting('sms_enabled', '1') == '1',
                 'test_mode' => $this->getSetting('sms_test_mode', '0') == '1'
             ],
@@ -69,7 +76,10 @@ class NotificationManager {
             // Send SMS notification (if enabled and requested)
             if ($send_sms && !empty($client['phone']) && $this->settings['sms']['enabled']) {
                 $sms_message = $this->generateBillingSMS($client, $bill, $event_type);
-                $sms_result = $this->sendSMS($client['phone'], $sms_message);
+                $sms_result = $this->sendSMS($client['phone'], $sms_message, [
+                    'first_name' => $client['firstname'] ?? '',
+                    'last_name' => $client['lastname'] ?? ''
+                ]);
                 $results['sms'] = $sms_result;
                 $this->logNotification($client_id, $bill_id, 'sms', $client['phone'], $sms_message, $sms_result['status']);
             }
@@ -104,7 +114,10 @@ class NotificationManager {
                 // Send SMS
                 if (!empty($customer['phone']) && $this->settings['sms']['enabled']) {
                     $sms_message = $this->generateInterruptionSMS($customer, $message, $estimated_restoration);
-                    $sms_result = $this->sendSMS($customer['phone'], $sms_message);
+                    $sms_result = $this->sendSMS($customer['phone'], $sms_message, [
+                        'first_name' => $customer['firstname'] ?? '',
+                        'last_name' => $customer['lastname'] ?? ''
+                    ]);
                     $results['sms'][] = ['customer' => $customer['name'], 'result' => $sms_result];
                     $this->logNotification($customer['id'], null, 'sms', $customer['phone'], $sms_message, $sms_result['status']);
                 }
@@ -143,7 +156,10 @@ class NotificationManager {
             // Send SMS reminder
             if (!empty($client['phone']) && $this->settings['sms']['enabled']) {
                 $sms_message = $this->generatePaymentReminderSMS($client, $bill, $days_overdue);
-                $sms_result = $this->sendSMS($client['phone'], $sms_message);
+                $sms_result = $this->sendSMS($client['phone'], $sms_message, [
+                    'first_name' => $client['firstname'] ?? '',
+                    'last_name' => $client['lastname'] ?? ''
+                ]);
                 $results['sms'] = $sms_result;
                 $this->logNotification($client_id, $bill_id, 'sms', $client['phone'], $sms_message, $sms_result['status']);
             }
@@ -167,7 +183,7 @@ class NotificationManager {
     /**
      * Send SMS using configured provider
      */
-    public function sendSMS($phone, $message) {
+    public function sendSMS($phone, $message, $contactMetadata = []) {
         // Check if SMS is enabled
         if (!$this->settings['sms']['enabled']) {
             return ['status' => 'disabled', 'message' => 'SMS notifications are disabled'];
@@ -188,6 +204,8 @@ class NotificationManager {
                 return $this->sendSMSViaTwilio($phone, $message);
             case 'nexmo':
                 return $this->sendSMSViaNexmo($phone, $message);
+            case 'philsms':
+                return $this->sendSMSViaPhilSMS($phone, $message, $contactMetadata);
             default:
                 return ['status' => 'failed', 'error' => 'SMS provider not configured'];
         }
@@ -329,6 +347,117 @@ class NotificationManager {
         } else {
             return ['status' => 'failed', 'error' => 'HTTP ' . $http_code];
         }
+    }
+
+    /**
+     * PhilSMS API
+     */
+    private function sendSMSViaPhilSMS($phone, $message, $metadata = []) {
+        $apiToken = $this->settings['sms']['philsms_api_token'] ?? '';
+        if (empty($apiToken)) {
+            return ['status' => 'failed', 'error' => 'PhilSMS API token missing'];
+        }
+
+        $recipient = $this->normalizePhilSMSNumber($phone);
+        if (empty($recipient)) {
+            return ['status' => 'failed', 'error' => 'Invalid phone number'];
+        }
+
+        if (!empty($this->settings['sms']['philsms_group_id']) && $this->settings['sms']['philsms_sync_contacts']) {
+            $this->syncPhilSMSContact($recipient, $metadata);
+        }
+
+        $payload = [
+            'recipient' => $recipient,
+            'message' => $message
+        ];
+        if (!empty($this->settings['sms']['sender_name'])) {
+            $payload['sender_id'] = $this->settings['sms']['sender_name'];
+        }
+
+        $headers = [
+            'Authorization: Bearer ' . $apiToken,
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ];
+
+        $ch = curl_init('https://app.philsms.com/api/v3/sms/send');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            return ['status' => 'failed', 'error' => 'cURL error: ' . $curl_error];
+        }
+
+        $decoded = json_decode($response, true);
+        if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && $decoded['status'] === 'success') {
+            return ['status' => 'sent', 'provider_response' => $decoded];
+        }
+
+        $error_message = $decoded['message'] ?? ('HTTP ' . $http_code);
+        return ['status' => 'failed', 'error' => $error_message, 'provider_response' => $decoded];
+    }
+
+    private function syncPhilSMSContact($phone, $metadata = []) {
+        $apiToken = $this->settings['sms']['philsms_api_token'] ?? '';
+        $groupId = $this->settings['sms']['philsms_group_id'] ?? '';
+        if (empty($apiToken) || empty($groupId)) {
+            return;
+        }
+
+        $payload = [
+            'phone' => $phone
+        ];
+        if (!empty($metadata['first_name'])) {
+            $payload['first_name'] = $metadata['first_name'];
+        }
+        if (!empty($metadata['last_name'])) {
+            $payload['last_name'] = $metadata['last_name'];
+        }
+
+        $headers = [
+            'Authorization: Bearer ' . $apiToken,
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ];
+
+        $url = "https://dashboard.philsms.com/api/v3/contacts/{$groupId}/store";
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        if ($response === false) {
+            error_log('PhilSMS contact sync error: ' . curl_error($ch));
+        }
+        curl_close($ch);
+    }
+
+    private function normalizePhilSMSNumber($phone) {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (empty($digits)) {
+            return '';
+        }
+        if (strpos($digits, '63') === 0) {
+            return $digits;
+        }
+        if ($digits[0] === '0') {
+            return '63' . substr($digits, 1);
+        }
+        if ($digits[0] === '9' && strlen($digits) === 10) {
+            return '63' . $digits;
+        }
+        return $digits;
     }
     
     /**

@@ -4,6 +4,167 @@
  * Currently in DUMMY mode - can be upgraded to real APIs later
  */
 
+function getNotificationSettingValue($key, $default = '') {
+    global $conn;
+    $stmt = $conn->prepare("SELECT setting_value FROM notification_settings WHERE setting_key = ? LIMIT 1");
+    if (!$stmt) {
+        return $default;
+    }
+    $stmt->bind_param("s", $key);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return $default;
+    }
+    $result = $stmt->get_result();
+    $value = $result && $result->num_rows > 0 ? $result->fetch_assoc()['setting_value'] : $default;
+    $stmt->close();
+    return $value;
+}
+
+function getSMSProviderSettingsCache() {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [
+        'provider' => getNotificationSettingValue('sms_provider', 'dummy'),
+        'sender_name' => getNotificationSettingValue('sms_sender_name', 'WaterSync'),
+        'philsms_api_token' => getNotificationSettingValue('sms_philsms_api_token', ''),
+        'philsms_group_id' => getNotificationSettingValue('sms_philsms_group_id', ''),
+        'philsms_sync_contacts' => getNotificationSettingValue('sms_philsms_sync_contacts', '0')
+    ];
+    return $cache;
+}
+
+function normalizePhilSMSNumber($phone) {
+    $digits = preg_replace('/\D+/', '', $phone);
+    if (empty($digits)) {
+        return '';
+    }
+    if (strpos($digits, '63') === 0) {
+        return $digits;
+    }
+    if ($digits[0] === '0') {
+        return '63' . substr($digits, 1);
+    }
+    if ($digits[0] === '9' && strlen($digits) === 10) {
+        return '63' . $digits;
+    }
+    return $digits;
+}
+
+function maybeSyncPhilSMSContact($phone, $settings, $contactDetails = []) {
+    if (($settings['philsms_sync_contacts'] ?? '0') !== '1') {
+        return;
+    }
+    $groupId = $settings['philsms_group_id'] ?? '';
+    $apiToken = $settings['philsms_api_token'] ?? '';
+    if (empty($groupId) || empty($apiToken)) {
+        return;
+    }
+    $url = "https://dashboard.philsms.com/api/v3/contacts/{$groupId}/store";
+    $payload = [
+        'phone' => $phone
+    ];
+    if (!empty($contactDetails['first_name'])) {
+        $payload['first_name'] = $contactDetails['first_name'];
+    }
+    if (!empty($contactDetails['last_name'])) {
+        $payload['last_name'] = $contactDetails['last_name'];
+    }
+    $headers = [
+        'Authorization: Bearer ' . $apiToken,
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $response = curl_exec($ch);
+    if ($response === false) {
+        error_log('PhilSMS contact sync failed: ' . curl_error($ch));
+    }
+    curl_close($ch);
+}
+
+function sendSMSViaPhilSMS($phone, $message, $contactDetails = []) {
+    $settings = getSMSProviderSettingsCache();
+    $apiToken = $settings['philsms_api_token'] ?? '';
+    if (empty($apiToken)) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'PhilSMS API token is missing'
+        ];
+    }
+    $recipient = normalizePhilSMSNumber($phone);
+    if (empty($recipient)) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'Invalid phone number'
+        ];
+    }
+
+    if (!empty($settings['philsms_group_id'])) {
+        maybeSyncPhilSMSContact($recipient, $settings, $contactDetails);
+    }
+
+    $payload = [
+        'recipient' => $recipient,
+        'message' => $message
+    ];
+    if (!empty($settings['sender_name'])) {
+        $payload['sender_id'] = $settings['sender_name'];
+    }
+
+    $headers = [
+        'Authorization: Bearer ' . $apiToken,
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ];
+
+    $ch = curl_init('https://app.philsms.com/api/v3/sms/send');
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'cURL error: ' . $curl_error
+        ];
+    }
+
+    $decoded = json_decode($response, true);
+    if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && $decoded['status'] === 'success') {
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'provider_response' => $decoded
+        ];
+    }
+
+    $error_message = $decoded['message'] ?? ('HTTP ' . $http_code);
+    return [
+        'success' => false,
+        'status' => 'failed',
+        'error' => $error_message,
+        'provider_response' => $decoded
+    ];
+}
+
 // Simple notification function
 function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_approved') {
     global $conn;
@@ -73,7 +234,10 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         if (!empty($client['phone'])) {
             $sms_overdue = $is_overdue ? " OVERDUE by {$days_overdue} day(s)!" : "";
             $sms_message = "Hi $customer_name! Your water bill for $billing_month has been created. Amount: PHP $amount. Due: $due_date.$sms_overdue Consumption: {$consumption} cubic meters. - WaterSync";
-            $sms_result = sendDummySMS($client['phone'], $sms_message);
+            $sms_result = sendDummySMS($client['phone'], $sms_message, [
+                'first_name' => $client['firstname'],
+                'last_name' => $client['lastname']
+            ]);
             $results['sms'] = $sms_result;
             
             // Log SMS notification
@@ -116,9 +280,13 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
     }
 }
 
-// Dummy SMS function (replace with real API later)
-function sendDummySMS($phone, $message) {
-    // This is dummy mode - no actual SMS sent
+// SMS helper that automatically routes to the configured provider
+function sendDummySMS($phone, $message, $contactDetails = []) {
+    $settings = getSMSProviderSettingsCache();
+    if (($settings['provider'] ?? '') === 'philsms') {
+        return sendSMSViaPhilSMS($phone, $message, $contactDetails);
+    }
+
     return [
         'success' => true,
         'status' => 'dummy_sent',
@@ -126,34 +294,6 @@ function sendDummySMS($phone, $message) {
         'phone' => $phone,
         'timestamp' => date('Y-m-d H:i:s')
     ];
-    
-    // When ready for real SMS API, replace above with:
-    /*
-    // Example for real SMS API:
-    $api_key = 'your_sms_api_key';
-    $sender = 'WaterSync';
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, 'https://api.semaphore.co/api/v4/messages'); // Example API
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-        'apikey' => $api_key,
-        'number' => $phone,
-        'message' => $message,
-        'sendername' => $sender
-    ]));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    return [
-        'success' => $http_code == 200,
-        'status' => $http_code == 200 ? 'sent' : 'failed',
-        'response' => $response
-    ];
-    */
 }
 
 // Email function - supports both dummy mode and real email sending
@@ -342,7 +482,10 @@ function sendTestNotification($client_id) {
     // Send test SMS
     if (!empty($client['phone'])) {
         $sms_message = "TEST: Hi $customer_name! This is a test notification from WaterSync. Your system is working properly!";
-        $sms_result = sendDummySMS($client['phone'], $sms_message);
+        $sms_result = sendDummySMS($client['phone'], $sms_message, [
+            'first_name' => $client['firstname'] ?? '',
+            'last_name' => $client['lastname'] ?? ''
+        ]);
         $results['sms'] = $sms_result;
         logNotification($client_id, null, 'sms', $client['phone'], $sms_message, $sms_result['status']);
     }

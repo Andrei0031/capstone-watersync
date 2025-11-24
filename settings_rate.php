@@ -624,6 +624,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $sms_account_sid = $_POST['sms_account_sid'] ?? '';
         $sms_auth_token = $_POST['sms_auth_token'] ?? '';
         $sms_test_mode = isset($_POST['sms_test_mode']) ? 1 : 0;
+        $sms_philsms_api_token = $_POST['sms_philsms_api_token'] ?? '';
+        $sms_philsms_group_id = $_POST['sms_philsms_group_id'] ?? '';
+        $sms_philsms_sync_contacts = isset($_POST['sms_philsms_sync_contacts']) ? 1 : 0;
         $sms_bill_schedule_mode = $_POST['sms_bill_schedule_mode'] ?? 'immediate';
         $sms_bill_schedule_time = $_POST['sms_bill_schedule_time'] ?? '08:00';
         $sms_overdue_schedule_mode = $_POST['sms_overdue_schedule_mode'] ?? 'scheduled';
@@ -650,6 +653,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         updateEmailSetting($conn, 'sms_account_sid', $sms_account_sid);
         updateEmailSetting($conn, 'sms_auth_token', $sms_auth_token);
         updateEmailSetting($conn, 'sms_test_mode', $sms_test_mode);
+        updateEmailSetting($conn, 'sms_philsms_api_token', $sms_philsms_api_token);
+        updateEmailSetting($conn, 'sms_philsms_group_id', $sms_philsms_group_id);
+        updateEmailSetting($conn, 'sms_philsms_sync_contacts', $sms_philsms_sync_contacts);
         updateEmailSetting($conn, 'sms_bill_schedule_mode', $sms_bill_schedule_mode);
         updateEmailSetting($conn, 'sms_bill_schedule_time', $sms_bill_schedule_time);
         updateEmailSetting($conn, 'sms_overdue_schedule_mode', $sms_overdue_schedule_mode);
@@ -721,6 +727,9 @@ $sms_from_number = getEmailSetting($conn, 'sms_from_number', '');
 $sms_account_sid = getEmailSetting($conn, 'sms_account_sid', '');
 $sms_auth_token = getEmailSetting($conn, 'sms_auth_token', '');
 $sms_test_mode = getEmailSetting($conn, 'sms_test_mode', '0');
+$sms_philsms_api_token = getEmailSetting($conn, 'sms_philsms_api_token', '');
+$sms_philsms_group_id = getEmailSetting($conn, 'sms_philsms_group_id', '');
+$sms_philsms_sync_contacts = getEmailSetting($conn, 'sms_philsms_sync_contacts', '0');
 $sms_bill_schedule_mode = getEmailSetting($conn, 'sms_bill_schedule_mode', 'immediate');
 $sms_bill_schedule_time = getEmailSetting($conn, 'sms_bill_schedule_time', '08:00');
 $sms_overdue_schedule_mode = getEmailSetting($conn, 'sms_overdue_schedule_mode', 'scheduled');
@@ -3001,6 +3010,9 @@ function updateSMSFields() {
         case 'nexmo':
             document.getElementById('nexmo_fields').style.display = 'block';
             break;
+        case 'philsms':
+            document.getElementById('philsms_fields').style.display = 'block';
+            break;
         case 'custom':
             document.getElementById('custom_fields').style.display = 'block';
             break;
@@ -3277,6 +3289,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <option value="semaphore" <?php echo $sms_provider == 'semaphore' ? 'selected' : ''; ?>>Semaphore (Philippines)</option>
                                     <option value="twilio" <?php echo $sms_provider == 'twilio' ? 'selected' : ''; ?>>Twilio (Global)</option>
                                     <option value="nexmo" <?php echo $sms_provider == 'nexmo' ? 'selected' : ''; ?>>Nexmo/Vonage (Global)</option>
+                                    <option value="philsms" <?php echo $sms_provider == 'philsms' ? 'selected' : ''; ?>>PhilSMS (Philippines)</option>
                                     <option value="custom" <?php echo $sms_provider == 'custom' ? 'selected' : ''; ?>>Custom API</option>
                                 </select>
                                 <small class="form-text text-muted">Choose your SMS service provider</small>
@@ -3374,6 +3387,42 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <input type="text" class="form-control" id="sms_sender_name_custom" name="sms_sender_name" 
                                            value="<?php echo htmlspecialchars($sms_sender_name); ?>" 
                                            placeholder="WaterSync">
+                                </div>
+                            </div>
+
+                            <!-- PhilSMS Fields -->
+                            <div id="philsms_fields" class="provider-fields" style="display: <?php echo $sms_provider == 'philsms' ? 'block' : 'none'; ?>;">
+                                <div class="mb-3">
+                                    <label for="sms_philsms_api_token" class="form-label">PhilSMS API Token</label>
+                                    <input type="text" class="form-control" id="sms_philsms_api_token" name="sms_philsms_api_token"
+                                           value="<?php echo htmlspecialchars($sms_philsms_api_token); ?>"
+                                           placeholder="Paste your PhilSMS API token" autocomplete="off">
+                                    <small class="form-text text-muted">
+                                        Get this from your PhilSMS dashboard under Developers &gt; API Token. This token is used as the Bearer authorization header.
+                                    </small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="sms_philsms_group_id" class="form-label">Contact Group UID (optional)</label>
+                                    <input type="text" class="form-control" id="sms_philsms_group_id" name="sms_philsms_group_id"
+                                           value="<?php echo htmlspecialchars($sms_philsms_group_id); ?>"
+                                           placeholder="e.g., 6065ecdc9184a">
+                                    <small class="form-text text-muted">
+                                        Provide a PhilSMS contact group UID if you want WaterSync to auto-create contacts whenever it sends a message.
+                                    </small>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sms_philsms_sync_contacts" name="sms_philsms_sync_contacts"
+                                           <?php echo $sms_philsms_sync_contacts == '1' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="sms_philsms_sync_contacts">
+                                        Auto-create contacts via PhilSMS Contacts API
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        When enabled, every SMS will also POST to <code>/api/v3/contacts/{group}/store</code> using the phone number so your PhilSMS address book stays updated.
+                                    </small>
+                                </div>
+                                <div class="alert alert-secondary">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    WaterSync sends SMS through <code>https://app.philsms.com/api/v3/sms/send</code> with your API token as the Bearer authorization header. Update the global “Sender Name” field above if you need a custom PhilSMS sender ID.
                                 </div>
                             </div>
                             

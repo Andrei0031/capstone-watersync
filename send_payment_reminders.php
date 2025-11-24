@@ -109,7 +109,10 @@ while ($bill = $result->fetch_assoc()) {
         // SMS
         if ($sms_enabled && $sms_bill_schedule_ok && !empty($bill['phone'])) {
             $sms_message = "Hi $customer_name! Reminder: Your water bill of ₱$amount is due in 3 days ($due_date). Please pay on time! - WaterSync";
-            sendDummySMS($bill['phone'], $sms_message);
+            sendDummySMS($bill['phone'], $sms_message, [
+                'first_name' => $bill['firstname'],
+                'last_name' => $bill['lastname']
+            ]);
             logNotification($bill['client_id'], $bill['bill_id'], 'sms', $bill['phone'], $sms_message, 'sent');
             $sent_any = true;
         }
@@ -137,7 +140,10 @@ while ($bill = $result->fetch_assoc()) {
         // SMS
         if ($sms_enabled && $sms_overdue_schedule_ok && !empty($bill['phone'])) {
             $sms_message = "Hi $customer_name! Your water bill of ₱$amount is OVERDUE by $days_overdue day(s). Due: $due_date. Please pay immediately to avoid disconnection! - WaterSync";
-            sendDummySMS($bill['phone'], $sms_message);
+            sendDummySMS($bill['phone'], $sms_message, [
+                'first_name' => $bill['firstname'],
+                'last_name' => $bill['lastname']
+            ]);
             logNotification($bill['client_id'], $bill['bill_id'], 'sms', $bill['phone'], $sms_message, 'sent');
             $sent_any_overdue = true;
         }
