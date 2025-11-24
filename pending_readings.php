@@ -376,9 +376,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
     $selected_ids = $_POST['selected_processed'] ?? [];
     
     foreach ($selected_ids as $reading_id) {
-        $stmt = $conn->prepare("SELECT pmr.*, cl.category_id 
+        $stmt = $conn->prepare("SELECT pmr.*, cl.category_id, bc.due_date AS cycle_due_date 
             FROM pending_meter_readings pmr 
             JOIN client_list cl ON pmr.client_id = cl.id 
+            LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
             WHERE pmr.id = ? AND pmr.status = 'processed'");
         $stmt->bind_param("i", $reading_id);
         $stmt->execute();
@@ -410,8 +411,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
             $prev_result = $prev_stmt->get_result();
             $previous = $prev_result->fetch_assoc()['reading'] ?? 0;
             
-            // Calculate due date (30 days from now)
-            $due_date = date('Y-m-d', strtotime('+30 days'));
+            // Determine due date from billing cycle, fallback to +30 days if missing
+            if (!empty($reading['cycle_due_date'])) {
+                $due_date = $reading['cycle_due_date'];
+            } else {
+                $due_date = date('Y-m-d', strtotime('+30 days'));
+            }
             
             // Get rates for the client's category
             $rate_stmt = $conn->prepare("SELECT rate, excess_rate FROM category_rates WHERE category_id = ?");
