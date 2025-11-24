@@ -18,6 +18,9 @@ function getNotificationSettingValue($key, $default = '') {
     $result = $stmt->get_result();
     $value = $result && $result->num_rows > 0 ? $result->fetch_assoc()['setting_value'] : $default;
     $stmt->close();
+    if (is_string($value)) {
+        $value = trim($value);
+    }
     return $value;
 }
 

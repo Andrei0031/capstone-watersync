@@ -53,7 +53,8 @@ class NotificationManager {
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
-            return $result->fetch_assoc()['setting_value'];
+            $value = $result->fetch_assoc()['setting_value'];
+            return is_string($value) ? trim($value) : $value;
         }
         return $default;
     }
