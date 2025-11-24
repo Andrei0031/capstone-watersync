@@ -2838,11 +2838,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show/hide submit buttons & auto meter code generation in Add Customer Modal
     const addClientModal = document.getElementById('addClientModal');
-    const meterCodeInput = document.getElementById('add_meter_code');
+    const meterCodeInputAuto = document.getElementById('add_meter_code');
     const meterCodeError = document.getElementById('meterCodeError');
 
     function fetchNextMeterCode(focusInput = false) {
-        if (!meterCodeInput) {
+        if (!meterCodeInputAuto) {
             return;
         }
         fetch('get_last_meter_code.php')
@@ -2850,10 +2850,10 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     if (data.next_meter_code) {
-                        meterCodeInput.value = data.next_meter_code;
+                        meterCodeInputAuto.value = data.next_meter_code;
                         if (focusInput) {
-                            meterCodeInput.focus();
-                            meterCodeInput.select();
+                            meterCodeInputAuto.focus();
+                            meterCodeInputAuto.select();
                         }
                     }
                     if (meterCodeError) {
