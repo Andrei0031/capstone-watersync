@@ -1928,15 +1928,9 @@ $result = $conn->query($sql);
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="add_meter_code" class="form-label">Meter Code <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                      <input type="text" id="add_meter_code" name="meter_code" class="form-control" placeholder="Enter meter code (numbers only)" pattern="[0-9]+" required />
-                      <button type="button" class="btn btn-outline-secondary" id="autoGenerateMeterCode" title="Auto-generate next meter code">
-                          <i class="fas fa-magic"></i> Auto-Generate
-                      </button>
-                  </div>
-                  <small class="text-muted" id="meterCodeHint">Last meter code: <span id="lastMeterCodeDisplay">-</span></small>
+                  <input type="text" id="add_meter_code" name="meter_code" class="form-control" placeholder="Enter meter code (numbers only)" pattern="[0-9]+" required />
                   <div class="invalid-feedback" id="meterCodeError"></div>
-                  <small class="form-text text-muted">Only numbers are allowed</small>
+                  <small class="form-text text-muted">Only numbers are allowed. Automatically filled with the next available code, but you can adjust if needed.</small>
                 </div>
               </div>
               <div class="row">
@@ -2845,9 +2839,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show/hide submit buttons & auto meter code generation in Add Customer Modal
     const addClientModal = document.getElementById('addClientModal');
     const meterCodeInput = document.getElementById('add_meter_code');
-    const meterCodeHint = document.getElementById('lastMeterCodeDisplay');
     const meterCodeError = document.getElementById('meterCodeError');
-    const autoGenerateMeterCodeBtn = document.getElementById('autoGenerateMeterCode');
 
     function fetchNextMeterCode(focusInput = false) {
         if (!meterCodeInput) {
@@ -2857,9 +2849,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    if (meterCodeHint) {
-                        meterCodeHint.textContent = data.last_meter_code ?? 'None';
-                    }
                     if (data.next_meter_code) {
                         meterCodeInput.value = data.next_meter_code;
                         if (focusInput) {
@@ -2882,12 +2871,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     meterCodeError.style.display = 'block';
                 }
             });
-    }
-
-    if (autoGenerateMeterCodeBtn) {
-        autoGenerateMeterCodeBtn.addEventListener('click', function () {
-            fetchNextMeterCode(true);
-        });
     }
 
     if (addClientModal) {
