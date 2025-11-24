@@ -320,20 +320,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 $bills_count = $bills_data['count'] ?? 0;
                 
-                // Delete the cycle (readings and bills will remain but lose cycle association)
-                // Note: We're not deleting readings/bills, just removing the cycle reference
-                $stmt = $conn->prepare("DELETE FROM billing_cycles WHERE id = ?");
-                $stmt->bind_param("i", $cycle_id);
+                // Start transaction for safe deletion
+                $conn->begin_transaction();
                 
-                if ($stmt->execute()) {
-                    // Optionally: Set billing_cycle_id to NULL for associated readings and bills
+                try {
+                    // Set billing_cycle_id to NULL for associated readings and bills
                     // This keeps the data but removes the cycle association
                     if ($readings_count > 0) {
-                        $conn->query("UPDATE pending_meter_readings SET billing_cycle_id = NULL WHERE billing_cycle_id = $cycle_id");
+                        $update_readings = $conn->prepare("UPDATE pending_meter_readings SET billing_cycle_id = NULL WHERE billing_cycle_id = ?");
+                        $update_readings->bind_param("i", $cycle_id);
+                        if (!$update_readings->execute()) {
+                            throw new Exception("Failed to update readings: " . $update_readings->error);
+                        }
+                        $update_readings->close();
                     }
+                    
                     if ($bills_count > 0) {
-                        $conn->query("UPDATE billing_list SET billing_cycle_id = NULL WHERE billing_cycle_id = $cycle_id");
+                        $update_bills = $conn->prepare("UPDATE billing_list SET billing_cycle_id = NULL WHERE billing_cycle_id = ?");
+                        $update_bills->bind_param("i", $cycle_id);
+                        if (!$update_bills->execute()) {
+                            throw new Exception("Failed to update bills: " . $update_bills->error);
+                        }
+                        $update_bills->close();
                     }
+                    
+                    // Delete the cycle (readings and bills will remain but lose cycle association)
+                    $stmt = $conn->prepare("DELETE FROM billing_cycles WHERE id = ?");
+                    $stmt->bind_param("i", $cycle_id);
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to delete billing cycle: " . $stmt->error);
+                    }
+                    $stmt->close();
+                    
+                    // Commit transaction
+                    $conn->commit();
                     
                     $message = "Billing cycle deleted successfully!";
                     if ($readings_count > 0 || $bills_count > 0) {
@@ -343,12 +364,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Redirect to prevent form resubmission on refresh
                     header("Location: settings_rate.php?cycle_status=deleted&message=" . urlencode($message) . "#billing-cycles");
                     exit();
-                } else {
-                    // Redirect with error message
-                    header("Location: settings_rate.php?cycle_status=error&message=" . urlencode("Error deleting billing cycle: " . $conn->error) . "#billing-cycles");
+                    
+                } catch (Exception $e) {
+                    // Rollback transaction on error
+                    $conn->rollback();
+                    error_log("Error deleting billing cycle: " . $e->getMessage());
+                    header("Location: settings_rate.php?cycle_status=error&message=" . urlencode("Error deleting billing cycle: " . $e->getMessage()) . "#billing-cycles");
                     exit();
                 }
-                $stmt->close();
             }
         }
     }
