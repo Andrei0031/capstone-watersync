@@ -1930,7 +1930,8 @@ $result = $conn->query($sql);
                   <label for="add_meter_code" class="form-label">Meter Code <span class="text-danger">*</span></label>
                   <input type="text" id="add_meter_code" name="meter_code" class="form-control" placeholder="Enter meter code (numbers only)" pattern="[0-9]+" required />
                   <div class="invalid-feedback" id="meterCodeError"></div>
-                  <small class="form-text text-muted">Only numbers are allowed. Automatically filled with the next available code, but you can adjust if needed.</small>
+                  <small class="text-muted d-block">Last meter code used: <span id="lastMeterCodeDisplay">Loading…</span></small>
+                  <small class="form-text text-muted">Automatically filled with the next available number, but you can adjust if needed.</small>
                 </div>
               </div>
               <div class="row">
