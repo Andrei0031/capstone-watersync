@@ -694,6 +694,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $messageClass = "alert-warning";
         }
     }
+
+    // Handle overdue SMS test
+    if (isset($_POST['test_overdue_sms'])) {
+        $test_phone = trim($_POST['test_overdue_sms_phone'] ?? '');
+        $test_name = $_POST['test_overdue_sms_name'] ?? 'Test User';
+        $test_amount = $_POST['test_overdue_sms_amount'] ?? '1,500.00';
+        $test_days_overdue = max(1, intval($_POST['test_overdue_sms_days'] ?? 5));
+
+        if (!empty($test_phone)) {
+            include 'simple_notifications.php';
+            $due_date = date('M d, Y', strtotime("-{$test_days_overdue} days"));
+            $sms_message = "Hi $test_name! Your water bill of ₱$test_amount is OVERDUE by $test_days_overdue day(s). Due: $due_date. Please pay immediately to avoid disconnection! - WaterSync";
+            $sms_result = sendDummySMS($test_phone, $sms_message, [
+                'first_name' => $test_name,
+                'last_name' => ''
+            ]);
+
+            if (!empty($sms_result['success'])) {
+                $message = "✅ Overdue SMS test sent successfully! Check your phone.";
+                $messageClass = "alert-success";
+            } else {
+                $error_msg = $sms_result['error'] ?? $sms_result['message'] ?? 'Unknown error';
+                $message = "❌ Overdue SMS test failed: " . $error_msg;
+                $messageClass = "alert-danger";
+            }
+        } else {
+            $message = "Please provide a phone number for the overdue SMS test.";
+            $messageClass = "alert-warning";
+        }
+    }
 }
 
 // Function to update email setting
@@ -3529,13 +3559,58 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <div class="mb-3">
                                         <label for="test_phone" class="form-label">Test Phone Number</label>
                                         <input type="tel" class="form-control" id="test_phone" name="test_phone" 
-                                               placeholder="+639123456789" required>
-                                        <small class="form-text text-muted">Include country code (e.g., +63 for Philippines)</small>
+                                               placeholder="+639123456789">
+                                        <small class="form-text text-muted">Include country code (e.g., +63 for Philippines). Required only when sending a test.</small>
                                     </div>
                                 </div>
                             </div>
                             <button type="submit" name="test_sms" class="btn btn-success">
                                 <i class="fas fa-paper-plane me-2"></i>Send Test SMS
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Test Overdue SMS</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Preview the overdue bill SMS notification format.</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_sms_name" class="form-label">Customer Name</label>
+                                        <input type="text" class="form-control" id="test_overdue_sms_name" name="test_overdue_sms_name"
+                                               placeholder="John Doe" value="Test User">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_sms_phone" class="form-label">Test Phone Number</label>
+                                        <input type="tel" class="form-control" id="test_overdue_sms_phone" name="test_overdue_sms_phone"
+                                               placeholder="+639123456789">
+                                        <small class="form-text text-muted">Include country code (e.g., +63). Required only when sending this test.</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_sms_amount" class="form-label">Amount Due (₱)</label>
+                                        <input type="text" class="form-control" id="test_overdue_sms_amount" name="test_overdue_sms_amount"
+                                               placeholder="1,500.00" value="1,500.00">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="test_overdue_sms_days" class="form-label">Days Overdue</label>
+                                        <input type="number" class="form-control" id="test_overdue_sms_days" name="test_overdue_sms_days"
+                                               placeholder="5" value="5" min="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" name="test_overdue_sms" class="btn btn-danger">
+                                <i class="fas fa-paper-plane me-2"></i>Send Overdue SMS Test
                             </button>
                         </div>
                     </div>
