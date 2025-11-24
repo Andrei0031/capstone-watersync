@@ -3282,7 +3282,17 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     </label>
                                 </div>
                             </div>
-                            
+
+                            <div class="mb-3">
+                                <label for="sms_sender_name" class="form-label">Default Sender ID / Name</label>
+                                <input type="text" class="form-control" id="sms_sender_name" name="sms_sender_name" 
+                                       value="<?php echo htmlspecialchars($sms_sender_name); ?>" 
+                                       placeholder="WaterSync" maxlength="11">
+                                <small class="form-text text-muted">
+                                    Used for all providers (PhilSMS, Semaphore, Twilio, etc.). PhilSMS allows up to 11 alphanumeric characters.
+                                </small>
+                            </div>
+
                             <div class="mb-3">
                                 <label for="sms_provider" class="form-label">SMS Provider</label>
                                 <select class="form-select" id="sms_provider" name="sms_provider" onchange="updateSMSFields()">
@@ -3303,14 +3313,6 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                            value="<?php echo htmlspecialchars($sms_api_key); ?>" 
                                            placeholder="Your Semaphore API key">
                                     <small class="form-text text-muted">Get this from <a href="https://semaphore.co" target="_blank">semaphore.co</a></small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="sms_sender_name" class="form-label">Sender Name</label>
-                                    <input type="text" class="form-control" id="sms_sender_name" name="sms_sender_name" 
-                                           value="<?php echo htmlspecialchars($sms_sender_name); ?>" 
-                                           placeholder="WaterSync" maxlength="11">
-                                    <small class="form-text text-muted">Max 11 characters (alphanumeric)</small>
                                 </div>
                             </div>
                             
@@ -3380,13 +3382,6 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <input type="password" class="form-control" id="sms_api_secret_custom" name="sms_api_secret" 
                                            value="<?php echo htmlspecialchars($sms_api_secret); ?>" 
                                            placeholder="Your custom API secret">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="sms_sender_name" class="form-label">Sender Name/ID</label>
-                                    <input type="text" class="form-control" id="sms_sender_name_custom" name="sms_sender_name" 
-                                           value="<?php echo htmlspecialchars($sms_sender_name); ?>" 
-                                           placeholder="WaterSync">
                                 </div>
                             </div>
 
