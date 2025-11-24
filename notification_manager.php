@@ -382,7 +382,7 @@ class NotificationManager {
             'Accept: application/json'
         ];
 
-        $ch = curl_init('https://app.philsms.com/api/v3/sms/send');
+        $ch = curl_init('https://dashboard.philsms.com/api/v3/sms/send');
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

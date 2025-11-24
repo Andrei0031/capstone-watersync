@@ -3420,9 +3420,9 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                         When enabled, every SMS will also POST to <code>/api/v3/contacts/{group}/store</code> using the phone number so your PhilSMS address book stays updated.
                                     </small>
                                 </div>
-                                <div class="alert alert-secondary">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    WaterSync sends SMS through <code>https://app.philsms.com/api/v3/sms/send</code> with your API token as the Bearer authorization header. Update the global “Sender Name” field above if you need a custom PhilSMS sender ID.
+                                    <div class="alert alert-secondary">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        WaterSync sends SMS through <code>https://dashboard.philsms.com/api/v3/sms/send</code> with your API token as the Bearer authorization header. Update the global “Sender Name” field above if you need a custom PhilSMS sender ID.
                                 </div>
                             </div>
                             
