@@ -12,6 +12,15 @@ include 'simple_notifications.php';
 $showNotificationModal = false; // Initialize to avoid undefined variable warning
 $message = ''; // Initialize message variable
 
+// Get current active billing cycle (used for default due dates)
+$active_cycle = null;
+$active_cycle_due_date = null;
+$active_cycle_stmt = $conn->query("SELECT * FROM billing_cycles WHERE status = 'active' LIMIT 1");
+if ($active_cycle_stmt && $active_cycle_stmt->num_rows > 0) {
+    $active_cycle = $active_cycle_stmt->fetch_assoc();
+    $active_cycle_due_date = $active_cycle['due_date'] ?? null;
+}
+
 // Calculate total revenue for current month
 $total_revenue = 0;
 $revenue_query = "SELECT SUM(total) as total FROM billing_list 
@@ -65,7 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Validate and sanitize inputs
         $client_id = intval($_POST['client_id']);
         $reading_date = $_POST['reading_date'];
-        $due_date = $_POST['due_date'];
+        $due_date = $_POST['due_date'] ?? '';
+        if (empty($due_date) && !empty($active_cycle_due_date)) {
+            $due_date = $active_cycle_due_date;
+        }
         $reading = floatval($_POST['reading']);
         $status = intval($_POST['status']);
 
@@ -1689,7 +1701,8 @@ if ($params) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Due Date</label>
-                            <input type="date" class="form-control" name="due_date" required>
+                            <input type="date" class="form-control" name="due_date" value="<?php echo htmlspecialchars($active_cycle_due_date ?? ''); ?>" required>
+                            <small class="text-muted">Defaults to the active billing cycle due date.</small>
                         </div>
                     </div>
                     <div class="row g-3 mb-3">

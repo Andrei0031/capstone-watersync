@@ -414,6 +414,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
             // Determine due date from billing cycle, fallback to +30 days if missing
             if (!empty($reading['cycle_due_date'])) {
                 $due_date = $reading['cycle_due_date'];
+            } elseif (!empty($active_cycle['due_date'])) {
+                $due_date = $active_cycle['due_date'];
             } else {
                 $due_date = date('Y-m-d', strtotime('+30 days'));
             }
