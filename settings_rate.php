@@ -2994,6 +2994,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Edit Cycle Modal Handler
+document.addEventListener('DOMContentLoaded', function() {
+    const editCycleModal = document.getElementById('editCycleModal');
+    if (editCycleModal) {
+        editCycleModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            if (!button) {
+                return;
+            }
+
+            document.getElementById('edit_cycle_id').value = button.getAttribute('data-cycle-id') || '';
+            document.getElementById('edit_cycle_name').value = button.getAttribute('data-cycle-name') || '';
+            document.getElementById('edit_start_date').value = button.getAttribute('data-start-date') || '';
+            document.getElementById('edit_end_date').value = button.getAttribute('data-end-date') || '';
+            document.getElementById('edit_due_date').value = button.getAttribute('data-due-date') || '';
+            document.getElementById('edit_description').value = button.getAttribute('data-description') || '';
+        });
+    }
+});
+
 // Billing Cycle Management JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     const formatDateForInput = (date) => {
