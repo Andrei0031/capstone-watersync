@@ -196,6 +196,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         
+        if ($action === 'edit_cycle') {
+            $cycle_id = $_POST['cycle_id'];
+            $cycle_name = $_POST['cycle_name'];
+            $start_date = $_POST['start_date'];
+            $end_date = $_POST['end_date'];
+            $due_date = $_POST['due_date'];
+            $description = $_POST['description'] ?? '';
+            
+            // Check if cycle exists
+            $check_stmt = $conn->prepare("SELECT status FROM billing_cycles WHERE id = ?");
+            $check_stmt->bind_param("i", $cycle_id);
+            $check_stmt->execute();
+            $cycle_result = $check_stmt->get_result();
+            $cycle_data = $cycle_result->fetch_assoc();
+            $check_stmt->close();
+            
+            if (!$cycle_data) {
+                header("Location: settings_rate.php?cycle_status=error&message=" . urlencode("Billing cycle not found!") . "#billing-cycles");
+                exit();
+            }
+            
+            // Update the cycle
+            $stmt = $conn->prepare("UPDATE billing_cycles SET cycle_name = ?, start_date = ?, end_date = ?, due_date = ?, description = ? WHERE id = ?");
+            $stmt->bind_param("sssssi", $cycle_name, $start_date, $end_date, $due_date, $description, $cycle_id);
+            
+            if ($stmt->execute()) {
+                header("Location: settings_rate.php?cycle_status=updated&message=" . urlencode("Billing cycle updated successfully!") . "#billing-cycles");
+                exit();
+            } else {
+                header("Location: settings_rate.php?cycle_status=error&message=" . urlencode("Error updating billing cycle: " . $conn->error) . "#billing-cycles");
+                exit();
+            }
+        }
+        
         if ($action === 'delete_cycle') {
             $cycle_id = $_POST['cycle_id'];
             $admin_password = isset($_POST['admin_password']) ? $_POST['admin_password'] : '';
@@ -1692,6 +1726,18 @@ if ($mobile_users_result) {
                                                 </form>
                                             <?php endif; ?>
                                             
+                                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editCycleModal"
+                                                    data-cycle-id="<?php echo $cycle['id']; ?>"
+                                                    data-cycle-name="<?php echo htmlspecialchars($cycle['cycle_name'], ENT_QUOTES); ?>"
+                                                    data-start-date="<?php echo htmlspecialchars($cycle['start_date']); ?>"
+                                                    data-end-date="<?php echo htmlspecialchars($cycle['end_date']); ?>"
+                                                    data-due-date="<?php echo htmlspecialchars($cycle['due_date']); ?>"
+                                                    data-description="<?php echo htmlspecialchars($cycle['description'] ?? '', ENT_QUOTES); ?>">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            
                                             <a href="pending_readings.php?cycle_id=<?php echo $cycle['id']; ?>" 
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> View
@@ -1970,6 +2016,71 @@ if ($mobile_users_result) {
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Create Billing Cycle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Cycle Modal -->
+    <div class="modal fade" id="editCycleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Billing Cycle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit_cycle">
+                        <input type="hidden" name="cycle_id" id="edit_cycle_id">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_cycle_name" class="form-label">Cycle Name *</label>
+                                    <input type="text" class="form-control" id="edit_cycle_name" name="cycle_name" 
+                                           placeholder="e.g., January 2024 Billing" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_due_date" class="form-label">Bill Due Date *</label>
+                                    <input type="date" class="form-control" id="edit_due_date" name="due_date" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_start_date" class="form-label">Reading Period Start *</label>
+                                    <input type="date" class="form-control" id="edit_start_date" name="start_date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_end_date" class="form-label">Reading Period End *</label>
+                                    <input type="date" class="form-control" id="edit_end_date" name="end_date" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="edit_description" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="edit_description" name="description" rows="2" 
+                                      placeholder="Additional notes about this billing cycle..."></textarea>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Note:</strong> Updating the due date will affect all bills created from this cycle. 
+                            Existing bills will keep their current due dates, but new bills will use the updated due date.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Billing Cycle</button>
                     </div>
                 </form>
             </div>
@@ -2885,6 +2996,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Billing Cycle Management JavaScript
 document.addEventListener('DOMContentLoaded', function() {
+    const formatDateForInput = (date) => {
+        if (!(date instanceof Date) || isNaN(date)) return '';
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - tzOffset).toISOString().split('T')[0];
+    };
+
     // Auto-fill dates when start date is selected
     const startDateInput = document.getElementById('start_date');
     const endDateInput = document.getElementById('end_date');
@@ -2901,8 +3018,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const dueDate = new Date(endDate);
                 dueDate.setDate(dueDate.getDate() + 15);
                 
-                endDateInput.value = endDate.toISOString().split('T')[0];
-                dueDateInput.value = dueDate.toISOString().split('T')[0];
+                endDateInput.value = formatDateForInput(endDate);
+                dueDateInput.value = formatDateForInput(dueDate);
             }
         });
     }
