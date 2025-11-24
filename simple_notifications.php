@@ -120,9 +120,6 @@ function sendSMSViaPhilSMS($phone, $message, $contactDetails = []) {
         'recipient' => $recipient,
         'message' => $message
     ];
-    if (!empty($settings['sender_name'])) {
-        $payload['sender_id'] = $settings['sender_name'];
-    }
 
     $headers = [
         'Authorization: Bearer ' . $apiToken,

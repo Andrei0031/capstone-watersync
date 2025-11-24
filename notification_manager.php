@@ -372,9 +372,6 @@ class NotificationManager {
             'recipient' => $recipient,
             'message' => $message
         ];
-        if (!empty($this->settings['sms']['sender_name'])) {
-            $payload['sender_id'] = $this->settings['sms']['sender_name'];
-        }
 
         $headers = [
             'Authorization: Bearer ' . $apiToken,
