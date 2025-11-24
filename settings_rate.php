@@ -627,6 +627,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $sms_philsms_api_token = $_POST['sms_philsms_api_token'] ?? '';
         $sms_philsms_group_id = $_POST['sms_philsms_group_id'] ?? '';
         $sms_philsms_sync_contacts = isset($_POST['sms_philsms_sync_contacts']) ? 1 : 0;
+        $sms_iprogsms_api_token = $_POST['sms_iprogsms_api_token'] ?? '';
+        $sms_iprogsms_provider = isset($_POST['sms_iprogsms_provider']) ? intval($_POST['sms_iprogsms_provider']) : '';
         $sms_bill_schedule_mode = $_POST['sms_bill_schedule_mode'] ?? 'immediate';
         $sms_bill_schedule_time = $_POST['sms_bill_schedule_time'] ?? '08:00';
         $sms_overdue_schedule_mode = $_POST['sms_overdue_schedule_mode'] ?? 'scheduled';
@@ -656,6 +658,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         updateEmailSetting($conn, 'sms_philsms_api_token', $sms_philsms_api_token);
         updateEmailSetting($conn, 'sms_philsms_group_id', $sms_philsms_group_id);
         updateEmailSetting($conn, 'sms_philsms_sync_contacts', $sms_philsms_sync_contacts);
+        updateEmailSetting($conn, 'sms_iprogsms_api_token', $sms_iprogsms_api_token);
+        updateEmailSetting($conn, 'sms_iprogsms_provider', $sms_iprogsms_provider);
         updateEmailSetting($conn, 'sms_bill_schedule_mode', $sms_bill_schedule_mode);
         updateEmailSetting($conn, 'sms_bill_schedule_time', $sms_bill_schedule_time);
         updateEmailSetting($conn, 'sms_overdue_schedule_mode', $sms_overdue_schedule_mode);
@@ -730,6 +734,8 @@ $sms_test_mode = getEmailSetting($conn, 'sms_test_mode', '0');
 $sms_philsms_api_token = getEmailSetting($conn, 'sms_philsms_api_token', '');
 $sms_philsms_group_id = getEmailSetting($conn, 'sms_philsms_group_id', '');
 $sms_philsms_sync_contacts = getEmailSetting($conn, 'sms_philsms_sync_contacts', '0');
+$sms_iprogsms_api_token = getEmailSetting($conn, 'sms_iprogsms_api_token', '');
+$sms_iprogsms_provider = getEmailSetting($conn, 'sms_iprogsms_provider', '');
 $sms_bill_schedule_mode = getEmailSetting($conn, 'sms_bill_schedule_mode', 'immediate');
 $sms_bill_schedule_time = getEmailSetting($conn, 'sms_bill_schedule_time', '08:00');
 $sms_overdue_schedule_mode = getEmailSetting($conn, 'sms_overdue_schedule_mode', 'scheduled');
@@ -3013,6 +3019,9 @@ function updateSMSFields() {
         case 'philsms':
             document.getElementById('philsms_fields').style.display = 'block';
             break;
+        case 'iprogsms':
+            document.getElementById('iprogsms_fields').style.display = 'block';
+            break;
         case 'custom':
             document.getElementById('custom_fields').style.display = 'block';
             break;
@@ -3300,6 +3309,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <option value="twilio" <?php echo $sms_provider == 'twilio' ? 'selected' : ''; ?>>Twilio (Global)</option>
                                     <option value="nexmo" <?php echo $sms_provider == 'nexmo' ? 'selected' : ''; ?>>Nexmo/Vonage (Global)</option>
                                     <option value="philsms" <?php echo $sms_provider == 'philsms' ? 'selected' : ''; ?>>PhilSMS (Philippines)</option>
+                                    <option value="iprogsms" <?php echo $sms_provider == 'iprogsms' ? 'selected' : ''; ?>>IPROGSMS (Philippines)</option>
                                     <option value="custom" <?php echo $sms_provider == 'custom' ? 'selected' : ''; ?>>Custom API</option>
                                 </select>
                                 <small class="form-text text-muted">Choose your SMS service provider</small>
@@ -3428,6 +3438,31 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     <label class="form-check-label" for="sms_test_mode">
                                         Test Mode (Log only, don't send real SMS)
                                     </label>
+                                </div>
+                            </div>
+
+                            <!-- IPROGSMS Fields -->
+                            <div id="iprogsms_fields" class="provider-fields" style="display: <?php echo $sms_provider == 'iprogsms' ? 'block' : 'none'; ?>;">
+                                <div class="mb-3">
+                                    <label for="sms_iprogsms_api_token" class="form-label">IPROGSMS API Token</label>
+                                    <input type="text" class="form-control" id="sms_iprogsms_api_token" name="sms_iprogsms_api_token"
+                                           value="<?php echo htmlspecialchars($sms_iprogsms_api_token); ?>"
+                                           placeholder="Enter your IPROGSMS API token">
+                                    <small class="form-text text-muted">Paste the token from your iprogsms.com dashboard.</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="sms_iprogsms_provider" class="form-label">SMS Provider Route (optional)</label>
+                                    <select class="form-select" id="sms_iprogsms_provider" name="sms_iprogsms_provider">
+                                        <option value="" <?php echo $sms_iprogsms_provider === '' ? 'selected' : ''; ?>>Default (auto)</option>
+                                        <option value="0" <?php echo $sms_iprogsms_provider === '0' ? 'selected' : ''; ?>>Provider 0</option>
+                                        <option value="1" <?php echo $sms_iprogsms_provider === '1' ? 'selected' : ''; ?>>Provider 1</option>
+                                        <option value="2" <?php echo $sms_iprogsms_provider === '2' ? 'selected' : ''; ?>>Provider 2</option>
+                                    </select>
+                                    <small class="form-text text-muted">Leave default to let IPROGSMS decide (fallback uses sender “iprogtech”).</small>
+                                </div>
+                                <div class="alert alert-secondary">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    IPROGSMS automatically switches to their fallback route when limits are reached. During fallback the sender name is “iprogtech” and works on all networks.
                                 </div>
                             </div>
                             

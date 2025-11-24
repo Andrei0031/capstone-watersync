@@ -29,6 +29,8 @@ class NotificationManager {
                 'philsms_api_token' => $this->getSetting('sms_philsms_api_token', ''),
                 'philsms_group_id' => $this->getSetting('sms_philsms_group_id', ''),
                 'philsms_sync_contacts' => $this->getSetting('sms_philsms_sync_contacts', '0') == '1',
+                'iprogsms_api_token' => $this->getSetting('sms_iprogsms_api_token', ''),
+                'iprogsms_provider' => $this->getSetting('sms_iprogsms_provider', ''),
                 'enabled' => $this->getSetting('sms_enabled', '1') == '1',
                 'test_mode' => $this->getSetting('sms_test_mode', '0') == '1'
             ],
@@ -207,6 +209,8 @@ class NotificationManager {
                 return $this->sendSMSViaNexmo($phone, $message);
             case 'philsms':
                 return $this->sendSMSViaPhilSMS($phone, $message, $contactMetadata);
+            case 'iprogsms':
+                return $this->sendSMSViaIprogSMS($phone, $message);
             default:
                 return ['status' => 'failed', 'error' => 'SMS provider not configured'];
         }
@@ -397,6 +401,57 @@ class NotificationManager {
 
         $decoded = json_decode($response, true);
         if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && $decoded['status'] === 'success') {
+            return ['status' => 'sent', 'provider_response' => $decoded];
+        }
+
+        $error_message = $decoded['message'] ?? ('HTTP ' . $http_code);
+        return ['status' => 'failed', 'error' => $error_message, 'provider_response' => $decoded];
+    }
+
+    /**
+     * IPROGSMS API
+     */
+    private function sendSMSViaIprogSMS($phone, $message) {
+        $apiToken = $this->settings['sms']['iprogsms_api_token'] ?? '';
+        if (empty($apiToken)) {
+            return ['status' => 'failed', 'error' => 'IPROGSMS API token missing'];
+        }
+
+        $recipient = $this->normalizePhilSMSNumber($phone);
+        if (empty($recipient)) {
+            return ['status' => 'failed', 'error' => 'Invalid phone number'];
+        }
+
+        $payload = [
+            'api_token' => $apiToken,
+            'phone_number' => $recipient,
+            'message' => $message
+        ];
+        if ($this->settings['sms']['iprogsms_provider'] !== '' && $this->settings['sms']['iprogsms_provider'] !== null) {
+            $payload['sms_provider'] = intval($this->settings['sms']['iprogsms_provider']);
+        }
+
+        $ch = curl_init('https://www.iprogsms.com/api/v1/sms_messages');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            return ['status' => 'failed', 'error' => 'cURL error: ' . $curl_error];
+        }
+
+        $decoded = json_decode($response, true);
+        if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && (int)$decoded['status'] === 200) {
             return ['status' => 'sent', 'provider_response' => $decoded];
         }
 

@@ -34,7 +34,9 @@ function getSMSProviderSettingsCache() {
         'sender_name' => getNotificationSettingValue('sms_sender_name', 'WaterSync'),
         'philsms_api_token' => getNotificationSettingValue('sms_philsms_api_token', ''),
         'philsms_group_id' => getNotificationSettingValue('sms_philsms_group_id', ''),
-        'philsms_sync_contacts' => getNotificationSettingValue('sms_philsms_sync_contacts', '0')
+        'philsms_sync_contacts' => getNotificationSettingValue('sms_philsms_sync_contacts', '0'),
+        'iprogsms_api_token' => getNotificationSettingValue('sms_iprogsms_api_token', ''),
+        'iprogsms_provider' => getNotificationSettingValue('sms_iprogsms_provider', '')
     ];
     return $cache;
 }
@@ -149,6 +151,76 @@ function sendSMSViaPhilSMS($phone, $message, $contactDetails = []) {
 
     $decoded = json_decode($response, true);
     if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && $decoded['status'] === 'success') {
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'provider_response' => $decoded
+        ];
+    }
+
+    $error_message = $decoded['message'] ?? ('HTTP ' . $http_code);
+    return [
+        'success' => false,
+        'status' => 'failed',
+        'error' => $error_message,
+        'provider_response' => $decoded
+    ];
+}
+
+function sendSMSViaIprogSMS($phone, $message) {
+    $settings = getSMSProviderSettingsCache();
+    $apiToken = $settings['iprogsms_api_token'] ?? '';
+    if (empty($apiToken)) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'IPROGSMS API token is missing'
+        ];
+    }
+
+    $recipient = normalizePhilSMSNumber($phone);
+    if (empty($recipient)) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'Invalid phone number'
+        ];
+    }
+
+    $payload = [
+        'api_token' => $apiToken,
+        'phone_number' => $recipient,
+        'message' => $message
+    ];
+    if ($settings['iprogsms_provider'] !== '' && $settings['iprogsms_provider'] !== null) {
+        $payload['sms_provider'] = intval($settings['iprogsms_provider']);
+    }
+
+    $ch = curl_init('https://www.iprogsms.com/api/v1/sms_messages');
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'error' => 'cURL error: ' . $curl_error
+        ];
+    }
+
+    $decoded = json_decode($response, true);
+    if ($http_code >= 200 && $http_code < 300 && isset($decoded['status']) && (int)$decoded['status'] === 200) {
         return [
             'success' => true,
             'status' => 'sent',
@@ -285,6 +357,9 @@ function sendDummySMS($phone, $message, $contactDetails = []) {
     $settings = getSMSProviderSettingsCache();
     if (($settings['provider'] ?? '') === 'philsms') {
         return sendSMSViaPhilSMS($phone, $message, $contactDetails);
+    }
+    if (($settings['provider'] ?? '') === 'iprogsms') {
+        return sendSMSViaIprogSMS($phone, $message);
     }
 
     return [
