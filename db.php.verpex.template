@@ -8,6 +8,9 @@
  * 3. You can find these in your Verpex cPanel → Databases section
  */
 
+require_once __DIR__ . '/timezone_helper.php';
+watersync_force_timezone();
+
 // Database Configuration
 $host = 'localhost'; // Usually 'localhost' for Verpex shared hosting
 $user = 'your_verpex_db_username'; // Replace with your Verpex database username
@@ -26,6 +29,8 @@ try {
     if (!$conn->set_charset("utf8mb4")) {
         error_log("Error setting charset: " . $conn->error);
     }
+
+    watersync_force_timezone($conn);
 
 } catch (Exception $e) {
     error_log("Database connection error: " . $e->getMessage());

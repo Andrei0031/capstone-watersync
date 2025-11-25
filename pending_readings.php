@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/timezone_helper.php';
+watersync_force_timezone();
+
 session_start();
 if (!isset($_SESSION['admin_id'])) {
     header("Location: adminlogin.php");
@@ -33,6 +36,9 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 define('TESSERACT_AVAILABLE', $tesseract_available);
 
 include 'db.php';
+if (isset($conn)) {
+    watersync_force_timezone($conn);
+}
 include 'simple_notifications.php';
 include 'automated_bill_creation.php';
 
