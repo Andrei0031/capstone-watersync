@@ -319,14 +319,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     // unlink($croppedImagePath); // Uncomment to delete cropped images
                 }
                 
-                // Update reading status
+                // Update reading status (force Asia/Manila timestamp via PHP)
+                $processedAt = date('Y-m-d H:i:s');
                 $update = $conn->prepare("UPDATE pending_meter_readings SET 
                     status = 'processed',
                     ocr_reading = ?,
                     extracted_text = ?,
-                    processed_at = CURRENT_TIMESTAMP
+                    processed_at = ?
                     WHERE id = ?");
-                $update->bind_param("dsi", $ocrReading, $extractedText, $reading_id);
+                $update->bind_param("dssi", $ocrReading, $extractedText, $processedAt, $reading_id);
                 
                 if (!$update->execute()) {
                     throw new Exception('Failed to update database: ' . $conn->error);
@@ -337,12 +338,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
             } catch (Exception $e) {
                 // Update with error
                 $error_msg = $e->getMessage();
+                $failedProcessedAt = date('Y-m-d H:i:s');
                 $update = $conn->prepare("UPDATE pending_meter_readings SET 
                     status = 'failed',
                     admin_notes = ?,
-                    processed_at = CURRENT_TIMESTAMP
+                    processed_at = ?
                     WHERE id = ?");
-                $update->bind_param("si", $error_msg, $reading_id);
+                $update->bind_param("ssi", $error_msg, $failedProcessedAt, $reading_id);
                 $update->execute();
                 
                 $failed_count++;
