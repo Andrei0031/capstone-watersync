@@ -463,23 +463,40 @@ elseif ($report_type === 'fees') {
     }
 
     .report-card {
-        transition: transform 0.2s;
+        transition: all 0.3s ease;
         border: none;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         background-color: var(--card-bg);
         color: var(--card-text);
-        border-radius: 15px;
+        border-radius: 16px;
+        overflow: hidden;
     }
 
     .report-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .report-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 20px;
+        font-weight: 600;
     }
 
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        border-radius: 15px;
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
     }
 
     .chart-container {
@@ -585,6 +602,9 @@ elseif ($report_type === 'fees') {
         background-color: var(--sidebar-bg);
         border-color: var(--border-color);
         color: var(--text-color);
+        border-radius: 10px;
+        padding: 12px 15px;
+        transition: all 0.3s ease;
     }
 
     .form-control:focus, .form-select:focus {
@@ -592,27 +612,121 @@ elseif ($report_type === 'fees') {
         border-color: var(--hover-text);
         color: var(--text-color);
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        transform: translateY(-1px);
     }
 
-    .reports-sidebar {
-        background-color: var(--card-bg);
-        border-radius: 15px;
-        padding: 20px;
-        margin-bottom: 20px;
+    .form-control-lg {
+        padding: 15px 20px;
+        font-size: 1rem;
+        border-radius: 12px;
     }
 
-    .reports-sidebar .nav-link {
-        color: var(--text-color);
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin: 0.2rem 0;
+    .btn {
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-weight: 600;
         transition: all 0.3s ease;
     }
 
-    .reports-sidebar .nav-link:hover, 
-    .reports-sidebar .nav-link.active {
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-lg {
+        padding: 15px 30px;
+        font-size: 1rem;
+        border-radius: 12px;
+    }
+
+    .page-header {
+        padding: 20px 0;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 30px;
+    }
+
+    .page-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-color);
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .report-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 15px;
+    }
+
+    .report-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        background-color: var(--card-bg);
+    }
+
+    .report-nav-item:hover {
         background-color: var(--hover-bg);
+        transform: translateX(5px);
+        border-color: var(--hover-text);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .report-nav-item.active {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border-color: var(--hover-text);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    .report-nav-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .report-nav-content {
+        flex: 1;
+    }
+
+    .report-nav-content h6 {
+        font-weight: 600;
+        color: var(--text-color);
+        margin-bottom: 4px;
+    }
+
+    .report-nav-content small {
+        color: var(--muted-text);
+        font-size: 0.85rem;
+    }
+
+    .report-nav-item.active .report-nav-content h6 {
         color: var(--hover-text);
+        font-weight: 700;
+    }
+
+    .sticky-top {
+        position: sticky;
+        top: 20px;
+        z-index: 10;
     }
 
     /* Responsive */
@@ -757,75 +871,200 @@ elseif ($report_type === 'fees') {
 
 <!-- Main Content -->
 <div class="main-content">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+                <h2 class="page-title mb-2">
+                    <i class="fas fa-chart-line me-2 text-primary"></i>
+                    Reports & Analytics
+                </h2>
+                <p class="text-muted mb-0">Comprehensive insights and data analysis for your water billing system</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" onclick="window.print()" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+                <button type="button" onclick="exportReport('csv')" class="btn btn-success me-2">
+                    <i class="fas fa-download me-1"></i> Export CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Range Filter Card -->
+    <div class="card report-card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <input type="hidden" name="type" value="<?php echo $report_type; ?>">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-calendar-alt me-2 text-primary"></i>From Date
+                    </label>
+                    <input type="date" name="date_from" value="<?php echo $date_from; ?>" class="form-control form-control-lg">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-calendar-check me-2 text-primary"></i>To Date
+                    </label>
+                    <input type="date" name="date_to" value="<?php echo $date_to; ?>" class="form-control form-control-lg">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-info-circle me-2 text-primary"></i>Period
+                    </label>
+                    <div class="form-control form-control-lg bg-light border-0">
+                        <?php echo date('M d, Y', strtotime($date_from)); ?> - <?php echo date('M d, Y', strtotime($date_to)); ?>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-filter me-2"></i>Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="row">
-        <!-- Reports Navigation -->
-        <div class="col-md-3">
-            <div class="reports-sidebar">
-                <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Report Types</h5>
-                <nav class="nav flex-column">
-                    <a class="nav-link <?php echo $report_type === 'dashboard' ? 'active' : ''; ?>" href="?type=dashboard">
-                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard Overview
-                    </a>
-                    <a class="nav-link <?php echo $report_type === 'collections' ? 'active' : ''; ?>" href="?type=collections">
-                        <i class="fas fa-money-bill-wave me-2"></i>Collections Report
-                    </a>
-                    <a class="nav-link <?php echo $report_type === 'clients' ? 'active' : ''; ?>" href="?type=clients">
-                        <i class="fas fa-users me-2"></i>Clients Report
-                    </a>
-                    <a class="nav-link <?php echo $report_type === 'overdue' ? 'active' : ''; ?>" href="?type=overdue">
-                        <i class="fas fa-exclamation-triangle me-2"></i>Overdue Accounts
-                    </a>
-                    <a class="nav-link <?php echo $report_type === 'billing' ? 'active' : ''; ?>" href="?type=billing">
-                        <i class="fas fa-file-invoice me-2"></i>Billing Summary
-                    </a>
-                    <a class="nav-link <?php echo $report_type === 'fees' ? 'active' : ''; ?>" href="?type=fees">
-                        <i class="fas fa-tags me-2"></i>Additional Fees
-                    </a>
-                </nav>
+        <!-- Reports Navigation - Redesigned as Cards -->
+        <div class="col-lg-3 col-md-4 mb-4">
+            <div class="card report-card sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Report Types
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="report-nav-list">
+                        <a href="?type=dashboard&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'dashboard' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Dashboard Overview</h6>
+                                <small>Key metrics & insights</small>
+                            </div>
+                            <?php if ($report_type === 'dashboard'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                        
+                        <a href="?type=collections&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'collections' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Collections Report</h6>
+                                <small>Payment & revenue data</small>
+                            </div>
+                            <?php if ($report_type === 'collections'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                        
+                        <a href="?type=clients&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'clients' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Clients Report</h6>
+                                <small>Customer statistics</small>
+                            </div>
+                            <?php if ($report_type === 'clients'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                        
+                        <a href="?type=overdue&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'overdue' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Overdue Accounts</h6>
+                                <small>Unpaid bills & aging</small>
+                            </div>
+                            <?php if ($report_type === 'overdue'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                        
+                        <a href="?type=billing&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'billing' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <i class="fas fa-file-invoice"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Billing Summary</h6>
+                                <small>Bills & consumption</small>
+                            </div>
+                            <?php if ($report_type === 'billing'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                        
+                        <a href="?type=fees&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'fees' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Additional Fees</h6>
+                                <small>Fee breakdown & analysis</small>
+                            </div>
+                            <?php if ($report_type === 'fees'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Report Content -->
-        <div class="col-md-9">
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3>
-                        <?php
-                        $titles = [
-                            'dashboard' => 'Dashboard Overview',
-                            'collections' => 'Collections Report',
-                            'clients' => 'Clients Report',
-                            'overdue' => 'Overdue Accounts Report',
-                            'billing' => 'Billing Summary Report',
-                            'fees' => 'Additional Fees Report'
-                        ];
-                        echo $titles[$report_type] ?? 'Reports';
-                        ?>
-                    </h3>
-                    <p class="text-muted">Period: <?php echo date('M d, Y', strtotime($date_from)); ?> to <?php echo date('M d, Y', strtotime($date_to)); ?></p>
-                </div>
-                <div>
-                    <!-- Date Filter -->
-                    <form method="GET" class="d-flex gap-2">
-                        <input type="hidden" name="type" value="<?php echo $report_type; ?>">
-                        <input type="date" name="date_from" value="<?php echo $date_from; ?>" class="form-control">
-                        <input type="date" name="date_to" value="<?php echo $date_to; ?>" class="form-control">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter"></i> Filter
-                        </button>
-                        <div class="btn-group" role="group">
-                            <button type="button" onclick="window.print()" class="btn btn-outline-secondary">
-                                <i class="fas fa-print"></i> Print
-                            </button>
+        <div class="col-lg-9 col-md-8">
+            <!-- Report Header -->
+            <div class="card report-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div>
+                            <h3 class="mb-1">
+                                <?php
+                                $titles = [
+                                    'dashboard' => 'Dashboard Overview',
+                                    'collections' => 'Collections Report',
+                                    'clients' => 'Clients Report',
+                                    'overdue' => 'Overdue Accounts Report',
+                                    'billing' => 'Billing Summary Report',
+                                    'fees' => 'Additional Fees Report'
+                                ];
+                                $icons = [
+                                    'dashboard' => 'fa-tachometer-alt',
+                                    'collections' => 'fa-money-bill-wave',
+                                    'clients' => 'fa-users',
+                                    'overdue' => 'fa-exclamation-triangle',
+                                    'billing' => 'fa-file-invoice',
+                                    'fees' => 'fa-tags'
+                                ];
+                                ?>
+                                <i class="fas <?php echo $icons[$report_type] ?? 'fa-chart-line'; ?> me-2 text-primary"></i>
+                                <?php echo $titles[$report_type] ?? 'Reports'; ?>
+                            </h3>
+                            <p class="text-muted mb-0">
+                                <i class="fas fa-calendar me-1"></i>
+                                Period: <?php echo date('M d, Y', strtotime($date_from)); ?> to <?php echo date('M d, Y', strtotime($date_to)); ?>
+                            </p>
+                        </div>
+                        <div class="mt-2 mt-md-0">
                             <button type="button" onclick="exportReport('csv')" class="btn btn-success">
-                                <i class="fas fa-download"></i> Export CSV
-                            </button>
-                            <button type="button" onclick="exportReport('pdf')" class="btn btn-outline-danger" disabled title="PDF export coming soon">
-                                <i class="fas fa-file-pdf"></i> Export PDF
+                                <i class="fas fa-download me-1"></i> Export CSV
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
 
