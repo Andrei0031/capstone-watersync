@@ -710,9 +710,78 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
             <div class="card card-soft">
                 <div class="card-body">
                     <h5 class="card-title">Payment Status</h5>
-                    <div class="chart-container">
-                        <canvas id="paymentStatusChart"></canvas>
+                    <?php 
+                    $total_bills = $payment_status['total_bills'];
+                    if ($total_bills > 0):
+                        $paid_percentage = $payment_status['paid_percentage'];
+                        $pending_percentage = $payment_status['pending_percentage'];
+                        $overdue_percentage = $payment_status['overdue_percentage'];
+                    ?>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <span style="font-weight: 600; color: var(--text-color);">Payment Status Overview</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--muted-text);">
+                                Total: <?php echo $total_bills; ?> bills
+                            </div>
+                        </div>
+                        
+                        <!-- Bar Graph -->
+                        <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; height: 50px; position: relative; margin-bottom: 15px;">
+                            <?php if ($payment_status['paid'] > 0): ?>
+                            <div style="background: linear-gradient(90deg, #1cc88a, #13855c); height: 100%; width: <?php echo $paid_percentage; ?>%; display: inline-block; position: absolute; left: 0; top: 0; transition: width 0.3s ease;">
+                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-weight: 600; font-size: 0.85rem;">
+                                    <?php if ($paid_percentage >= 10): ?>
+                                        Paid (<?php echo $payment_status['paid']; ?>)
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <?php if ($payment_status['pending'] > 0): ?>
+                            <div style="background: linear-gradient(90deg, #f6c23e, #dda20a); height: 100%; width: <?php echo $pending_percentage; ?>%; display: inline-block; position: absolute; left: <?php echo $paid_percentage; ?>%; top: 0; transition: width 0.3s ease;">
+                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-weight: 600; font-size: 0.85rem;">
+                                    <?php if ($pending_percentage >= 10): ?>
+                                        Pending (<?php echo $payment_status['pending']; ?>)
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <?php if ($payment_status['overdue'] > 0): ?>
+                            <div style="background: linear-gradient(90deg, #e74a3b, #c0392b); height: 100%; width: <?php echo $overdue_percentage; ?>%; display: inline-block; position: absolute; left: <?php echo ($paid_percentage + $pending_percentage); ?>%; top: 0; transition: width 0.3s ease;">
+                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-weight: 600; font-size: 0.85rem;">
+                                    <?php if ($overdue_percentage >= 10): ?>
+                                        Overdue (<?php echo $payment_status['overdue']; ?>)
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Legend -->
+                        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 16px; height: 16px; background: linear-gradient(90deg, #1cc88a, #13855c); border-radius: 3px;"></div>
+                                <span style="color: var(--text-color);">Paid: <?php echo $payment_status['paid']; ?> (<?php echo $paid_percentage; ?>%)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 16px; height: 16px; background: linear-gradient(90deg, #f6c23e, #dda20a); border-radius: 3px;"></div>
+                                <span style="color: var(--text-color);">Pending: <?php echo $payment_status['pending']; ?> (<?php echo $pending_percentage; ?>%)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 16px; height: 16px; background: linear-gradient(90deg, #e74a3b, #c0392b); border-radius: 3px;"></div>
+                                <span style="color: var(--text-color);">Overdue: <?php echo $payment_status['overdue']; ?> (<?php echo $overdue_percentage; ?>%)</span>
+                            </div>
+                        </div>
                     </div>
+                    <?php else: ?>
+                    <div style="text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-info-circle" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                        <p style="margin: 0;">No payment data available</p>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -1153,47 +1222,7 @@ $(document).ready(function() {
         updateRevenueChart('monthly');
     }
     
-    // Initialize Payment Status Chart
-    const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
-    paymentStatusChart = new Chart(paymentStatusCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Paid', 'Pending', 'Overdue'],
-            datasets: [{
-                data: [
-                    <?php echo $payment_status['paid_percentage']; ?>,
-                    <?php echo $payment_status['pending_percentage']; ?>,
-                    <?php echo $payment_status['overdue_percentage']; ?>
-                ],
-                backgroundColor: ['#1cc88a', '#f6c23e', '#e74a3b']
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            return `${label}: ${value}%`;
-                        }
-                    }
-                }
-            },
-            cutout: '70%'
-        }
-    });
+    // Payment Status Chart removed - replaced with bar graph in HTML
 
 
     
@@ -1659,19 +1688,8 @@ function refreshDashboardData() {
         $('.pending-payments h3').text(data.pending_payments);
         $('.average-bill h3').text('₱' + parseFloat(data.average_bill).toLocaleString(2));
         
-        // Update payment status chart
-        paymentStatusChart.data.datasets[0].data = [
-            data.payment_status.paid_percentage,
-            data.payment_status.pending_percentage,
-            data.payment_status.overdue_percentage
-        ];
-        paymentStatusChart.update();
-        
-        // Update status summary badges
-        const badges = document.querySelectorAll('.badge');
-        badges[0].textContent = data.payment_status.paid;
-        badges[1].textContent = data.payment_status.pending;
-        badges[2].textContent = data.payment_status.overdue;
+        // Payment status bar graph is static HTML - no update needed
+        // Status data is already displayed in the bar graph
     });
 }
 

@@ -1939,116 +1939,49 @@ $disconnection_notices = $stmt->get_result();
                                             Payment History
                                         </h5>
                                     </div>
-                                    <div style="padding: 20px;">
-                                        <?php 
-                                        // Reset payments result
-                                        $stmt->execute();
-                                        $payments_for_graph = $stmt->get_result();
-                                        
-                                        $count = 0;
-                                        $paid_count = 0;
-                                        $pending_count = 0;
-                                        $total_amount = 0;
-                                        
-                                        while (($payment = $payments_for_graph->fetch_assoc()) && $count < 5): 
-                                            $count++;
-                                            if ($payment['status'] == 1) {
-                                                $paid_count++;
-                                            } else {
-                                                $pending_count++;
-                                            }
-                                            $total_amount += $payment['amount'];
-                                        endwhile;
-                                        
-                                        if ($count > 0):
-                                            $paid_percentage = ($paid_count / $count) * 100;
-                                            $pending_percentage = ($pending_count / $count) * 100;
-                                        ?>
-                                        <div style="margin-bottom: 20px;">
-                                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                                                <div>
-                                                    <span style="font-weight: 600; color: #333;">Payment Status Overview</span>
-                                                </div>
-                                                <div style="font-size: 0.9rem; color: #666;">
-                                                    Total: <?php echo $count; ?> payments
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Bar Graph -->
-                                            <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; height: 40px; position: relative; margin-bottom: 15px;">
-                                                <?php if ($paid_count > 0): ?>
-                                                <div style="background: linear-gradient(90deg, #4caf50, #388e3c); height: 100%; width: <?php echo $paid_percentage; ?>%; display: inline-block; position: absolute; left: 0; top: 0; transition: width 0.3s ease;">
-                                                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-weight: 600; font-size: 0.85rem;">
-                                                        <?php if ($paid_percentage >= 15): ?>
-                                                            Paid (<?php echo $paid_count; ?>)
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                                <?php endif; ?>
-                                                
-                                                <?php if ($pending_count > 0): ?>
-                                                <div style="background: linear-gradient(90deg, #ff9800, #f57c00); height: 100%; width: <?php echo $pending_percentage; ?>%; display: inline-block; position: absolute; left: <?php echo $paid_percentage; ?>%; top: 0; transition: width 0.3s ease;">
-                                                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-weight: 600; font-size: 0.85rem;">
-                                                        <?php if ($pending_percentage >= 15): ?>
-                                                            Pending (<?php echo $pending_count; ?>)
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                                <?php endif; ?>
-                                            </div>
-                                            
-                                            <!-- Legend -->
-                                            <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem;">
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <div style="width: 16px; height: 16px; background: linear-gradient(90deg, #4caf50, #388e3c); border-radius: 3px;"></div>
-                                                    <span style="color: #333;">Paid: <?php echo $paid_count; ?> (<?php echo number_format($paid_percentage, 1); ?>%)</span>
-                                                </div>
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <div style="width: 16px; height: 16px; background: linear-gradient(90deg, #ff9800, #f57c00); border-radius: 3px;"></div>
-                                                    <span style="color: #333;">Pending: <?php echo $pending_count; ?> (<?php echo number_format($pending_percentage, 1); ?>%)</span>
-                                                </div>
-                                            </div>
+                                    <div style="padding: 0;">
+                                        <div class="table-responsive">
+                                            <table class="table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Date</th>
+                                                        <th class="d-none d-md-table-cell">Reference</th>
+                                                        <th>Amount</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php 
+                                                    $count = 0;
+                                                    while (($payment = $payments->fetch_assoc()) && $count < 5): 
+                                                        $count++;
+                                                    ?>
+                                                    <tr>
+                                                        <td>
+                                                            <small class="d-block"><?php echo date('M d, Y h:i A', strtotime($payment['payment_date'])); ?></small>
+                                                            <small class="d-md-none text-muted"><?php echo htmlspecialchars($payment['reference_number']); ?></small>
+                                                        </td>
+                                                        <td class="d-none d-md-table-cell">
+                                                            <?php echo htmlspecialchars($payment['reference_number']); ?>
+                                                        </td>
+                                                        <td>₱<?php echo number_format($payment['amount'], 2); ?></td>
+                                                        <td>
+                                                            <span class="badge <?php echo $payment['status'] ? 'bg-success' : 'bg-warning'; ?>">
+                                                                <?php echo $payment['status_text']; ?>
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <?php endwhile; ?>
+                                                    <?php if ($count === 0): ?>
+                                                    <tr>
+                                                        <td colspan="4" class="text-center text-muted">
+                                                            <i class="fas fa-info-circle me-2"></i>No payment records found
+                                                        </td>
+                                                    </tr>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        
-                                        <!-- Payment Details List -->
-                                        <div style="border-top: 1px solid #e0e0e0; padding-top: 15px;">
-                                            <h6 style="margin-bottom: 15px; color: #333; font-weight: 600;">Recent Payments</h6>
-                                            <div style="max-height: 300px; overflow-y: auto;">
-                                                <?php 
-                                                // Reset again for display
-                                                $stmt->execute();
-                                                $payments_display = $stmt->get_result();
-                                                $display_count = 0;
-                                                while (($payment = $payments_display->fetch_assoc()) && $display_count < 5): 
-                                                    $display_count++;
-                                                ?>
-                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 8px;">
-                                                    <div style="flex: 1;">
-                                                        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">
-                                                            <?php echo date('M d, Y h:i A', strtotime($payment['payment_date'])); ?>
-                                                        </div>
-                                                        <div style="font-size: 0.85rem; color: #666;">
-                                                            Ref: <?php echo htmlspecialchars($payment['reference_number']); ?>
-                                                        </div>
-                                                    </div>
-                                                    <div style="text-align: right;">
-                                                        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">
-                                                            ₱<?php echo number_format($payment['amount'], 2); ?>
-                                                        </div>
-                                                        <span class="badge <?php echo $payment['status'] ? 'bg-success' : 'bg-warning'; ?>" style="font-size: 0.75rem;">
-                                                            <?php echo $payment['status_text']; ?>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <?php endwhile; ?>
-                                            </div>
-                                        </div>
-                                        <?php else: ?>
-                                        <div style="text-align: center; padding: 40px; color: #666;">
-                                            <i class="fas fa-info-circle" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
-                                            <p style="margin: 0;">No payment records found</p>
-                                        </div>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
