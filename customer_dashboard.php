@@ -26,6 +26,7 @@ $customer = $stmt->get_result()->fetch_assoc();
 $total_amount_due = 0;
 $overdue_balance = 0;
 $current_balance = 0;
+$previous_balance = 0; // Sum of all paid bills
 
 // Get all bills with payment information
 $balance_sql = "WITH PaymentTotals AS (
@@ -56,10 +57,14 @@ $stmt->bind_param("ii", $_SESSION['client_id'], $_SESSION['client_id']);
 $stmt->execute();
 $bills = $stmt->get_result();
 
-// Calculate balances from unpaid bills
+// Calculate balances from unpaid bills and previous balance (paid bills)
 while ($bill = $bills->fetch_assoc()) {
     $remaining = $bill['remaining_balance'];
-    if ($bill['status'] == 0 && $remaining > 0) {
+    if ($bill['status'] == 1) {
+        // Paid bills - add to previous balance
+        $previous_balance += $bill['total'];
+    } elseif ($bill['status'] == 0 && $remaining > 0) {
+        // Unpaid bills
         $total_amount_due += $remaining;
         if (strtotime($bill['due_date']) < time()) {
             $overdue_balance += $remaining;
@@ -68,6 +73,19 @@ while ($bill = $bills->fetch_assoc()) {
         }
     }
 }
+
+// Get total previous balance (all paid bills)
+$previous_balance_sql = "SELECT COALESCE(SUM(total), 0) as total_paid 
+                         FROM billing_list 
+                         WHERE client_id = ? AND status = 1";
+$stmt_prev = $conn->prepare($previous_balance_sql);
+$stmt_prev->bind_param("i", $_SESSION['client_id']);
+$stmt_prev->execute();
+$prev_result = $stmt_prev->get_result()->fetch_assoc();
+$previous_balance = $prev_result['total_paid'] ?? 0;
+
+// Calculate total amount (current + previous)
+$total_amount = $current_balance + $previous_balance;
 
 // Reset the result for later use
 $stmt->execute();
@@ -83,7 +101,7 @@ $total_bills_count = $total_bills_result['total_bills'];
 
 // Get payment history
 $stmt = $conn->prepare("SELECT p.*, 
-                              CASE WHEN p.status = 1 THEN 'Verified' ELSE 'Pending' END as status_text
+                              CASE WHEN p.status = 1 THEN 'Paid' ELSE 'Pending' END as status_text
                        FROM payment_list p
                        WHERE p.client_id = ?
                        ORDER BY p.payment_date DESC");
@@ -994,27 +1012,27 @@ $disconnection_notices = $stmt->get_result();
                             <label for="outageDescription" class="form-label">Type of Water Issue <span class="text-danger">*</span></label>
                             <select class="form-select" id="outageDescription" name="description" required>
                                 <option value="">Select the type of water issue</option>
-                                <optgroup label="Water Supply Issues">
-                                    <option value="No water supply for more than 2 hours">No water supply for more than 2 hours</option>
-                                    <option value="Complete water outage - no water at all">Complete water outage - no water at all</option>
-                                    <option value="Intermittent water supply - on and off">Intermittent water supply - on and off</option>
+                                <optgroup label="Water Supply Issues / Mga Isyu sa Supply sa Tubig">
+                                    <option value="No water supply for more than 2 hours">No water supply for more than 2 hours / Wala'y tubig sulod sa 2 ka oras</option>
+                                    <option value="Complete water outage - no water at all">Complete water outage - no water at all / Wala gyud tubig</option>
+                                    <option value="Intermittent water supply - on and off">Intermittent water supply - on and off / Nag-on ug off ang tubig</option>
                                 </optgroup>
-                                <optgroup label="Water Pressure Issues">
-                                    <option value="Very low water pressure">Very low water pressure</option>
-                                    <option value="No water pressure at all">No water pressure at all</option>
-                                    <option value="Water pressure only during certain times">Water pressure only during certain times</option>
+                                <optgroup label="Water Pressure Issues / Mga Isyu sa Pressure sa Tubig">
+                                    <option value="Very low water pressure">Very low water pressure / Ubos kaayo ang pressure sa tubig</option>
+                                    <option value="No water pressure at all">No water pressure at all / Wala'y pressure ang tubig</option>
+                                    <option value="Water pressure only during certain times">Water pressure only during certain times / Naay pressure sa tubig sa pipila lang ka oras</option>
                                 </optgroup>
-                                <optgroup label="Water Quality Issues">
-                                    <option value="Water quality issues - unusual color">Water quality issues - unusual color</option>
-                                    <option value="Water quality issues - bad taste">Water quality issues - bad taste</option>
-                                    <option value="Water quality issues - unusual odor">Water quality issues - unusual odor</option>
-                                    <option value="Cloudy or murky water">Cloudy or murky water</option>
+                                <optgroup label="Water Quality Issues / Mga Isyu sa Kalidad sa Tubig">
+                                    <option value="Water quality issues - unusual color">Water quality issues - unusual color / Kakaibang kolor ang tubig</option>
+                                    <option value="Water quality issues - bad taste">Water quality issues - bad taste / Lami ang tubig</option>
+                                    <option value="Water quality issues - unusual odor">Water quality issues - unusual odor / Kakaibang baho ang tubig</option>
+                                    <option value="Cloudy or murky water">Cloudy or murky water / Malaag ang tubig</option>
                                 </optgroup>
-                                <optgroup label="Infrastructure Issues">
-                                    <option value="Visible pipe leaks in the area">Visible pipe leaks in the area</option>
-                                    <option value="Burst pipes causing water loss">Burst pipes causing water loss</option>
-                                    <option value="Water meter issues or damage">Water meter issues or damage</option>
-                                    <option value="Suspected main line break">Suspected main line break</option>
+                                <optgroup label="Infrastructure Issues / Mga Isyu sa Infrastruktura">
+                                    <option value="Visible pipe leaks in the area">Visible pipe leaks in the area / Naay nag-leak nga tubo sa lugar</option>
+                                    <option value="Burst pipes causing water loss">Burst pipes causing water loss / Nabuak ang tubo ug nag-leak</option>
+                                    <option value="Water meter issues or damage">Water meter issues or damage / Naay problema o nasamad ang metro sa tubig</option>
+                                    <option value="Suspected main line break">Suspected main line break / Gisuspetsa nga nabuak ang main line</option>
                                 </optgroup>
                             </select>
                             <small class="text-muted">Choose the option that best describes your water issue</small>
@@ -1174,25 +1192,11 @@ $disconnection_notices = $stmt->get_result();
                                     <div style="padding: 25px;">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
-                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Total Amount Due</h6>
-                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($total_amount_due, 2); ?></h3>
-                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Total unpaid bills</small>
+                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Current Balance</h6>
+                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($current_balance, 2); ?></h3>
+                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Current billing period</small>
                                             </div>
-                                            <i class="fas fa-file-invoice-dollar fa-2x" style="color: rgba(255,255,255,0.6);"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-12 col-sm-6 col-md-4 mb-3 mb-md-0">
-                                <div style="background: linear-gradient(135deg, #f44336, #d32f2f); border-radius: 12px; box-shadow: 0 4px 15px rgba(244,67,54,0.2); overflow: hidden; margin-bottom: 20px;">
-                                    <div style="padding: 25px;">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Overdue Balance</h6>
-                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($overdue_balance, 2); ?></h3>
-                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Past due bills</small>
-                                            </div>
-                                            <i class="fas fa-exclamation-circle fa-2x" style="color: rgba(255,255,255,0.6);"></i>
+                                            <i class="fas fa-calendar-alt fa-2x" style="color: rgba(255,255,255,0.6);"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -1202,11 +1206,25 @@ $disconnection_notices = $stmt->get_result();
                                     <div style="padding: 25px;">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
-                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Current Balance</h6>
-                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($current_balance, 2); ?></h3>
-                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Current billing period</small>
+                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Previous Balance</h6>
+                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($previous_balance, 2); ?></h3>
+                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Total paid bills</small>
                                             </div>
-                                            <i class="fas fa-calendar-alt fa-2x" style="color: rgba(255,255,255,0.6);"></i>
+                                            <i class="fas fa-check-circle fa-2x" style="color: rgba(255,255,255,0.6);"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6 col-md-4 mb-3 mb-md-0">
+                                <div style="background: linear-gradient(135deg, #ff9800, #f57c00); border-radius: 12px; box-shadow: 0 4px 15px rgba(255,152,0,0.2); overflow: hidden; margin-bottom: 20px;">
+                                    <div style="padding: 25px;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 500;">Total Amount</h6>
+                                                <h3 style="color: white; margin-bottom: 5px; font-weight: 600;">₱<?php echo number_format($total_amount, 2); ?></h3>
+                                                <small style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Current + Previous</small>
+                                            </div>
+                                            <i class="fas fa-file-invoice-dollar fa-2x" style="color: rgba(255,255,255,0.6);"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -1956,8 +1974,9 @@ $disconnection_notices = $stmt->get_result();
                                                     ?>
                                                     <tr>
                                                         <td>
-                                                            <small class="d-block"><?php echo date('M d, Y', strtotime($payment['payment_date'])); ?></small>
-                                                            <small class="d-md-none text-muted"><?php echo htmlspecialchars($payment['reference_number']); ?></small>
+                                                            <small class="d-block"><strong><?php echo date('M d, Y', strtotime($payment['payment_date'])); ?></strong></small>
+                                                            <small class="d-block text-muted"><?php echo date('h:i A', strtotime($payment['payment_date'])); ?></small>
+                                                            <small class="d-md-none text-muted mt-1 d-block">Ref: <?php echo htmlspecialchars($payment['reference_number']); ?></small>
                                                         </td>
                                                         <td class="d-none d-md-table-cell">
                                                             <?php echo htmlspecialchars($payment['reference_number']); ?>
