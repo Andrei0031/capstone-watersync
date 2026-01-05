@@ -1016,7 +1016,7 @@ $payments_result = $conn->query($payments_sql);
                                     <label class="form-label">Amount to Pay</label>
                                     <div class="input-group">
                                         <span class="input-group-text">₱</span>
-                                        <input type="number" class="form-control" name="amount" id="amountToPay" step="0.01" required>
+                                        <input type="number" class="form-control" name="amount" id="amountToPay" step="0.01" min="0.01" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -1365,7 +1365,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>`;
         }).join('') + 
         `<div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
-            <strong>Total Selected:</strong>
+            <strong>Total Selected (Amount to Pay):</strong>
             <strong class="text-success">₱${totalSelected.toFixed(2)}</strong>
         </div>`;
         
@@ -1387,6 +1387,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const remainingBalance = Math.max(0, totalDue - totalSelected);
         remainingBalanceInput.value = remainingBalance.toFixed(2);
     }
+
+    // Prevent negative and invalid characters in amount to pay
+    amountToPayInput.addEventListener('keydown', function(e) {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+        }
+    });
 
     // Handle amount to pay changes
     amountToPayInput.addEventListener('input', function() {
