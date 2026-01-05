@@ -98,8 +98,26 @@ $conn->query($create_settings_table);
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_delete_password') {
     $delete_password = $_POST['delete_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
+    $current_password = $_POST['current_password'] ?? '';
+
+    // Check if a password already exists
+    $existing_hash = null;
+    $has_existing_password = false;
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password' LIMIT 1");
+    if ($stmt && $stmt->execute()) {
+        $result = $stmt->get_result();
+        if ($result && $row = $result->fetch_assoc()) {
+            $existing_hash = $row['setting_value'] ?? null;
+            if (!empty($existing_hash)) {
+                $has_existing_password = true;
+            }
+        }
+    }
     
-    if (empty($delete_password)) {
+    // If there is already a password, require the current password to change it
+    if ($has_existing_password && (empty($current_password) || !password_verify($current_password, $existing_hash))) {
+        $error_message = "Current password is incorrect. Please enter the correct current password to change it.";
+    } elseif (empty($delete_password)) {
         $error_message = "Password cannot be empty!";
     } elseif ($delete_password !== $confirm_password) {
         $error_message = "Passwords do not match!";
@@ -287,12 +305,15 @@ $fees_result = $conn->query($fees_query);
                             <li>Fixed fees are added as a flat amount to each bill</li>
                             <li>Percentage fees are calculated as a percentage of the base water consumption charge</li>
                             <li>Only active fees are applied during automated bill creation</li>
-                            <li>Fees can be applied to All customers, only Residential, or only Commercial</li>
+                            <li>
+                                Fees can be applied to All customers, only Residential, or only 
+                                <span id="showDeleteProtection" class="text-decoration-underline" style="cursor: pointer;">Commercial</span>
+                            </li>
                         </ul>
                     </div>
 
                     <!-- Delete Password Security Settings -->
-                    <div class="card border-warning mt-4">
+                    <div id="deleteProtectionCard" class="card border-warning mt-4" style="display: none;">
                         <div class="card-header bg-warning text-dark">
                             <h5 class="mb-0">
                                 <i class="fas fa-lock me-2"></i>Delete Password Protection
@@ -480,11 +501,22 @@ $fees_result = $conn->query($fees_query);
                             <i class="fas fa-info-circle me-2"></i>
                             This password will be required to delete readings or bills. Keep it secure!
                         </div>
+
+                        <?php if ($password_set): ?>
+                            <div class="mb-3">
+                                <label for="current_password" class="form-label">Current Password</label>
+                                <input type="password" class="form-control" id="current_password" name="current_password"
+                                       placeholder="Enter current delete password" minlength="4" required>
+                                <small class="text-muted">You must confirm the current delete password before changing it.</small>
+                            </div>
+                        <?php endif; ?>
                         
                         <div class="mb-3">
-                            <label for="delete_password" class="form-label">Delete Password</label>
+                            <label for="delete_password" class="form-label">
+                                <?php echo $password_set ? 'New Delete Password' : 'Delete Password'; ?>
+                            </label>
                             <input type="password" class="form-control" id="delete_password" name="delete_password" required 
-                                   placeholder="Enter password" minlength="4">
+                                   placeholder="<?php echo $password_set ? 'Enter new password' : 'Enter password'; ?>" minlength="4">
                             <small class="text-muted">Minimum 4 characters</small>
                         </div>
                         
@@ -507,6 +539,19 @@ $fees_result = $conn->query($fees_query);
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Reveal Delete Password Protection when clicking "Commercial" text
+        document.addEventListener('DOMContentLoaded', function () {
+            const trigger = document.getElementById('showDeleteProtection');
+            const card = document.getElementById('deleteProtectionCard');
+            if (trigger && card) {
+                trigger.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    card.style.display = 'block';
+                    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
+        });
+
         function updateFeePrefix(type) {
             const prefix = document.getElementById('fee_prefix');
             if (type === 'percentage') {
