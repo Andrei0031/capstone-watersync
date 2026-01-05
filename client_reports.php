@@ -98,12 +98,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resolve_report'])) {
     $stmt->close();
 }
 
-// Get reports with client information
+// Get filter parameter
+$status_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : 'all';
+
+// Build reports query with filter
 $reports_query = "
     SELECT o.*, cl.firstname, cl.lastname
     FROM outage_reports o
-    JOIN client_list cl ON o.client_id = cl.id
-    ORDER BY o.created_at DESC";
+    JOIN client_list cl ON o.client_id = cl.id";
+    
+if ($status_filter === 'pending') {
+    $reports_query .= " WHERE o.status = 0";
+} elseif ($status_filter === 'resolved') {
+    $reports_query .= " WHERE o.status = 1";
+}
+
+$reports_query .= " ORDER BY o.created_at DESC";
 $reports = $conn->query($reports_query);
 
 // Get statistics
@@ -706,10 +716,21 @@ $notices = $conn->query($notices_query);
             <!-- Reports Section (Left) -->
             <div class="col-md-7">
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="fas fa-chart-bar me-2"></i>Client Reports
                         </h5>
+                        <div class="btn-group" role="group">
+                            <a href="?status_filter=all" class="btn btn-sm <?php echo $status_filter === 'all' ? 'btn-primary' : 'btn-outline-primary'; ?>">
+                                All
+                            </a>
+                            <a href="?status_filter=pending" class="btn btn-sm <?php echo $status_filter === 'pending' ? 'btn-warning' : 'btn-outline-warning'; ?>">
+                                Pending
+                            </a>
+                            <a href="?status_filter=resolved" class="btn btn-sm <?php echo $status_filter === 'resolved' ? 'btn-success' : 'btn-outline-success'; ?>">
+                                Resolved
+                            </a>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -858,6 +879,57 @@ $notices = $conn->query($notices_query);
                         </div>
                         <?php endif; ?>
 
+                        <!-- Notice Filter -->
+                        <?php
+                        $notice_status_filter = isset($_GET['notice_status_filter']) ? $_GET['notice_status_filter'] : 'all';
+                        $notices_query_filtered = "
+                            SELECT n.*, a.username as admin_name
+                            FROM notices n
+                            JOIN admin a ON n.created_by = a.id";
+                        
+                        if ($notice_status_filter === 'ongoing') {
+                            $notices_query_filtered .= " WHERE n.status = 'ongoing'";
+                        } elseif ($notice_status_filter === 'scheduled') {
+                            $notices_query_filtered .= " WHERE n.status = 'scheduled'";
+                        } elseif ($notice_status_filter === 'completed') {
+                            $notices_query_filtered .= " WHERE n.status = 'completed'";
+                        } else {
+                            $notices_query_filtered .= " WHERE (n.status = 'ongoing' OR 
+                                  (n.status = 'scheduled' AND n.start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) OR
+                                  (n.status = 'completed' AND n.end_date >= DATE_SUB(NOW(), INTERVAL 24 HOUR)))";
+                        }
+                        
+                        $notices_query_filtered .= " ORDER BY 
+                            CASE n.status
+                                WHEN 'ongoing' THEN 1
+                                WHEN 'scheduled' THEN 2
+                                WHEN 'completed' THEN 3
+                            END,
+                            n.start_date DESC";
+                        $notices_filtered = $conn->query($notices_query_filtered);
+                        ?>
+
+                        <div class="mb-3">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="?notice_status_filter=all<?php echo $status_filter !== 'all' ? '&status_filter=' . $status_filter : ''; ?>" 
+                                   class="btn <?php echo $notice_status_filter === 'all' ? 'btn-primary' : 'btn-outline-primary'; ?>">
+                                    All
+                                </a>
+                                <a href="?notice_status_filter=ongoing<?php echo $status_filter !== 'all' ? '&status_filter=' . $status_filter : ''; ?>" 
+                                   class="btn <?php echo $notice_status_filter === 'ongoing' ? 'btn-warning' : 'btn-outline-warning'; ?>">
+                                    Ongoing
+                                </a>
+                                <a href="?notice_status_filter=scheduled<?php echo $status_filter !== 'all' ? '&status_filter=' . $status_filter : ''; ?>" 
+                                   class="btn <?php echo $notice_status_filter === 'scheduled' ? 'btn-info' : 'btn-outline-info'; ?>">
+                                    Scheduled
+                                </a>
+                                <a href="?notice_status_filter=completed<?php echo $status_filter !== 'all' ? '&status_filter=' . $status_filter : ''; ?>" 
+                                   class="btn <?php echo $notice_status_filter === 'completed' ? 'btn-success' : 'btn-outline-success'; ?>">
+                                    Completed
+                                </a>
+                            </div>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table">
                                 <thead>
@@ -869,7 +941,7 @@ $notices = $conn->query($notices_query);
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php while ($notice = $notices->fetch_assoc()): ?>
+                                    <?php while ($notice = $notices_filtered->fetch_assoc()): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($notice['title']); ?></td>
                                         <td>
