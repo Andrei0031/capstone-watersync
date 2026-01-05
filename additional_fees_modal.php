@@ -546,15 +546,18 @@ $fees_result = $conn->query($fees_query);
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Reveal Delete Password Protection when clicking "Commercial" text
+        // Toggle Delete Password Protection when clicking "Commercial" text
         document.addEventListener('DOMContentLoaded', function () {
             const trigger = document.getElementById('showDeleteProtection');
             const card = document.getElementById('deleteProtectionCard');
             if (trigger && card) {
                 trigger.addEventListener('click', function (e) {
                     e.preventDefault();
-                    card.style.display = 'block';
-                    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    const isHidden = card.style.display === 'none' || card.style.display === '';
+                    card.style.display = isHidden ? 'block' : 'none';
+                    if (isHidden) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 });
             }
         });
