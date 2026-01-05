@@ -264,6 +264,38 @@ $fees_result = $conn->query($fees_query);
                             <li>Fees can be applied to All customers, only Residential, or only Commercial</li>
                         </ul>
                     </div>
+
+                    <!-- Delete Password Security Settings -->
+                    <div class="card border-warning mt-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-lock me-2"></i>Delete Password Protection
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">
+                                Set a password to protect delete operations in Readings and Billing modules. 
+                                This password will be required before any deletion can be performed.
+                            </p>
+                            
+                            <?php if ($password_set): ?>
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <strong>Password is set.</strong> Delete operations are protected.
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>No password set.</strong> Delete buttons will be disabled until a password is configured.
+                                </div>
+                            <?php endif; ?>
+
+                            <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#deletePasswordModal">
+                                <i class="fas fa-key me-2"></i>
+                                <?php echo $password_set ? 'Change Delete Password' : 'Set Delete Password'; ?>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
