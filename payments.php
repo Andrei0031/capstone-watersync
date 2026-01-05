@@ -8,6 +8,34 @@ if (!isset($_SESSION['admin_id'])) {
 include 'db.php';
 include 'late_payment_processor.php';
 
+// Ensure system_settings table exists for delete password configuration
+if ($conn instanceof mysqli) {
+    $create_settings_table = "CREATE TABLE IF NOT EXISTS system_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )";
+    $conn->query($create_settings_table);
+}
+
+// Check if delete actions are enabled (password set + toggle enabled)
+$delete_password_configured = false;
+$has_password = false;
+$delete_enabled = false;
+$settings_result = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('delete_password', 'delete_enabled')");
+if ($settings_result) {
+    while ($row = $settings_result->fetch_assoc()) {
+        if ($row['setting_key'] === 'delete_password' && !empty($row['setting_value'])) {
+            $has_password = true;
+        }
+        if ($row['setting_key'] === 'delete_enabled' && $row['setting_value'] === '1') {
+            $delete_enabled = true;
+        }
+    }
+}
+$delete_password_configured = $has_password && $delete_enabled;
+
 // Calculate statistics
 $total_sql = "SELECT 
     COUNT(*) as total,
@@ -909,9 +937,11 @@ $payments_result = $conn->query($payments_sql);
                                                 </button>
                                             </form>
                                         <?php endif; ?>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deletePayment(<?php echo $row['id']; ?>)" title="Delete Payment">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
+                                        <?php if ($delete_password_configured): ?>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deletePayment(<?php echo $row['id']; ?>)" title="Delete Payment">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

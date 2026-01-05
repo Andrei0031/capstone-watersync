@@ -9,6 +9,28 @@ if (!isset($_SESSION['admin_id'])) {
 include 'db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'])) {
+    // Check if delete actions are enabled in settings
+    $settings_result = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_enabled'");
+    $delete_enabled = false;
+    if ($settings_result && $row = $settings_result->fetch_assoc()) {
+        $delete_enabled = ($row['setting_value'] === '1');
+    }
+    if (!$delete_enabled) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Delete actions are currently disabled in settings.']);
+        exit();
+    }
+
+    // Check if password verification is required and was done
+    if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Password verification required']);
+        exit();
+    }
+
+    // Clear verification after use (one-time use)
+    unset($_SESSION['delete_verified']);
+
     $payment_id = $_POST['id'];
     
     // Start transaction
