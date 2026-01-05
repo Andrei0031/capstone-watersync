@@ -2008,7 +2008,6 @@ if (!$failed_result) {
                                         <th>Billing Cycle</th>
                                         <th>Meter Image</th>
                                         <th>Reading Value</th>
-                                        <th>Bill ID</th>
                                         <th>Process Date</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -2085,15 +2084,6 @@ if (!$failed_result) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php if (!empty($row['bill_id'])): ?>
-                                                    <a href="billing_list.php?bill_id=<?php echo $row['bill_id']; ?>" class="badge bg-success">
-                                                        Bill #<?php echo $row['bill_id']; ?>
-                                                    </a>
-                                                <?php else: ?>
-                                                    <span class="text-muted">N/A</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
                                                 <?php 
                                                     $processedDate = $row['processed_at'] ?? $row['processed_date'] ?? null;
                                                     if ($processedDate) {
@@ -2113,6 +2103,11 @@ if (!$failed_result) {
                                                 <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
+                                                <?php if ($delete_password_configured): ?>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
