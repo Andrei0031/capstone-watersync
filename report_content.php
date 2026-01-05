@@ -19,17 +19,87 @@ if ($report_type === 'dashboard') {
             </div>
         </div>
         <div class="col-md-3">
+            <div class="card metric-card text-center p-3" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">
+                <h3><?php echo $report_data['clients']['inactive_clients'] ?? 0; ?></h3>
+                <p class="mb-0">Inactive Clients</p>
+                <small><?php echo $report_data['clients']['total_clients'] ?? 0; ?> total clients</small>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card metric-card text-center p-3" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333;">
                 <h3><?php echo $report_data['overdue']['overdue_clients'] ?? 0; ?></h3>
                 <p class="mb-0">Overdue Clients</p>
                 <small>₱<?php echo number_format($report_data['overdue']['overdue_amount'] ?? 0, 2); ?> overdue</small>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card metric-card text-center p-3" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
-                <h3><?php echo $report_data['billing']['bills_generated'] ?? 0; ?></h3>
-                <p class="mb-0">Bills Generated</p>
-                <small>₱<?php echo number_format($report_data['billing']['total_billed'] ?? 0, 2); ?> billed</small>
+    </div>
+    
+    <!-- Customer Status Breakdown -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card report-card">
+                <div class="card-header">
+                    <h5><i class="fas fa-users me-2"></i>Customer Status Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Customer Type</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-check-circle text-success me-2"></i>
+                                                <strong>Active Customers</strong>
+                                            </td>
+                                            <td><?php echo $report_data['clients']['active_clients'] ?? 0; ?></td>
+                                            <td>
+                                                <?php 
+                                                $total = $report_data['clients']['total_clients'] ?? 0;
+                                                $active = $report_data['clients']['active_clients'] ?? 0;
+                                                echo $total > 0 ? number_format(($active / $total) * 100, 1) : 0;
+                                                ?>%
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-times-circle text-danger me-2"></i>
+                                                <strong>Inactive Customers</strong>
+                                            </td>
+                                            <td><?php echo $report_data['clients']['inactive_clients'] ?? 0; ?></td>
+                                            <td>
+                                                <?php 
+                                                $inactive = $report_data['clients']['inactive_clients'] ?? 0;
+                                                echo $total > 0 ? number_format(($inactive / $total) * 100, 1) : 0;
+                                                ?>%
+                                            </td>
+                                        </tr>
+                                        <tr class="table-info">
+                                            <td>
+                                                <i class="fas fa-users me-2"></i>
+                                                <strong>Total Customers</strong>
+                                            </td>
+                                            <td><strong><?php echo $total; ?></strong></td>
+                                            <td><strong>100%</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-container">
+                                <canvas id="customerStatusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -95,6 +165,50 @@ if ($report_type === 'dashboard') {
             options: {
                 responsive: true,
                 maintainAspectRatio: false
+            }
+        });
+        
+        // Customer Status Chart
+        const customerStatusCtx = document.getElementById('customerStatusChart').getContext('2d');
+        new Chart(customerStatusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Active Customers', 'Inactive Customers'],
+                datasets: [{
+                    label: 'Number of Customers',
+                    data: [
+                        <?php echo $report_data['clients']['active_clients'] ?? 0; ?>,
+                        <?php echo $report_data['clients']['inactive_clients'] ?? 0; ?>
+                    ],
+                    backgroundColor: ['#38ef7d', '#ff6b6b']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = <?php echo $report_data['clients']['total_clients'] ?? 0; ?>;
+                                const value = context.raw;
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return context.label + ': ' + value + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
             }
         });
     </script>
@@ -229,7 +343,120 @@ elseif ($report_type === 'collections') {
 
 // Clients Report
 elseif ($report_type === 'clients') {
+    // Get active and inactive customer breakdown
+    $client_status_sql = "SELECT 
+        COUNT(*) as total_clients,
+        SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as active_clients,
+        SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as inactive_clients
+        FROM client_list WHERE delete_flag = 0";
+    $client_status_data = $conn->query($client_status_sql)->fetch_assoc();
 ?>
+    <!-- Customer Status Overview -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <h3><?php echo $client_status_data['active_clients'] ?? 0; ?></h3>
+                <p class="mb-0"><i class="fas fa-check-circle me-2"></i>Active Customers</p>
+                <small>
+                    <?php 
+                    $total = $client_status_data['total_clients'] ?? 0;
+                    $active = $client_status_data['active_clients'] ?? 0;
+                    echo $total > 0 ? number_format(($active / $total) * 100, 1) : 0;
+                    ?>% of total
+                </small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;">
+                <h3><?php echo $client_status_data['inactive_clients'] ?? 0; ?></h3>
+                <p class="mb-0"><i class="fas fa-times-circle me-2"></i>Inactive Customers</p>
+                <small>
+                    <?php 
+                    $inactive = $client_status_data['inactive_clients'] ?? 0;
+                    echo $total > 0 ? number_format(($inactive / $total) * 100, 1) : 0;
+                    ?>% of total
+                </small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h3><?php echo $client_status_data['total_clients'] ?? 0; ?></h3>
+                <p class="mb-0"><i class="fas fa-users me-2"></i>Total Customers</p>
+                <small>All registered customers</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Customer Status Breakdown Table -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card report-card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Customer Status Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Customer Type</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Active Customers</strong>
+                                    </td>
+                                    <td><strong><?php echo $client_status_data['active_clients'] ?? 0; ?></strong></td>
+                                    <td>
+                                        <span class="badge bg-success">
+                                            <?php 
+                                            echo $total > 0 ? number_format(($active / $total) * 100, 1) : 0;
+                                            ?>%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Active</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-times-circle text-danger me-2"></i>
+                                        <strong>Inactive Customers</strong>
+                                    </td>
+                                    <td><strong><?php echo $client_status_data['inactive_clients'] ?? 0; ?></strong></td>
+                                    <td>
+                                        <span class="badge bg-danger">
+                                            <?php 
+                                            echo $total > 0 ? number_format(($inactive / $total) * 100, 1) : 0;
+                                            ?>%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger">Inactive</span>
+                                    </td>
+                                </tr>
+                                <tr class="table-info">
+                                    <td>
+                                        <i class="fas fa-users me-2"></i>
+                                        <strong>Total Customers</strong>
+                                    </td>
+                                    <td><strong><?php echo $total; ?></strong></td>
+                                    <td><strong><span class="badge bg-primary">100%</span></strong></td>
+                                    <td><strong>All Types</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Client Categories -->
     <div class="row mb-4">
         <?php foreach ($report_data['categories'] as $category): ?>
