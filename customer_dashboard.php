@@ -91,6 +91,37 @@ $stmt->bind_param("i", $_SESSION['client_id']);
 $stmt->execute();
 $payments = $stmt->get_result();
 
+// Get notification count for badge
+$notification_count = 0;
+// Count active notices
+$notices_count_query = "
+    SELECT COUNT(*) as count 
+    FROM notices 
+    WHERE (status = 'ongoing' OR 
+          (status = 'scheduled' AND start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) OR
+          (status = 'completed' AND end_date >= DATE_SUB(NOW(), INTERVAL 24 HOUR)))
+    AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+";
+$notices_count_result = $conn->query($notices_count_query);
+if ($notices_count_result) {
+    $notification_count += $notices_count_result->fetch_assoc()['count'];
+}
+
+// Count unacknowledged disconnection notices
+$disconnection_count_query = "
+    SELECT COUNT(*) as count 
+    FROM disconnection_notices 
+    WHERE client_id = ? 
+    AND status IN ('pending', 'sent')
+";
+$stmt_count = $conn->prepare($disconnection_count_query);
+$stmt_count->bind_param("i", $_SESSION['client_id']);
+$stmt_count->execute();
+$disconnection_count_result = $stmt_count->get_result();
+if ($disconnection_count_result) {
+    $notification_count += $disconnection_count_result->fetch_assoc()['count'];
+}
+
 // Get recent disconnection notices for the customer (exclude resolved notices)
 $notices_sql = "SELECT * FROM disconnection_notices 
                 WHERE client_id = ? 
@@ -765,6 +796,33 @@ $disconnection_notices = $stmt->get_result();
         .modal-dialog {
             z-index: 1050;
         }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.1);
+            }
+        }
+        .notification-badge {
+            animation: pulse 2s infinite;
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);
+        }
+        .notification-bubble {
+            animation: pulse 2s infinite;
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);
+            font-weight: 600;
+            line-height: 1;
+        }
+        #navbar-notification-link {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        #navbar-notification-link:hover {
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -782,6 +840,18 @@ $disconnection_notices = $stmt->get_result();
                     <li class="nav-item">
                         <a class="nav-link" href="customer_dashboard.php">
                             <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="navbar-notification-link" onclick="document.getElementById('nav-notifications-tab').click(); return false;" style="position: relative;">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($notification_count > 0): ?>
+                                <span class="badge bg-danger notification-bubble" id="navbar-notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.65rem; padding: 3px 6px; border-radius: 50%; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);">
+                                    <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-danger notification-bubble" id="navbar-notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.65rem; padding: 3px 6px; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);"></span>
+                            <?php endif; ?>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -872,6 +942,11 @@ $disconnection_notices = $stmt->get_result();
                         <button class="nav-link tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false"
                                 style="color: #007bff !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #007bff !important; border-bottom: 2px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
                             <i class="fas fa-bell me-2" style="display: inline !important; visibility: visible !important; color: #007bff !important;"></i>Notifications
+                            <?php if ($notification_count > 0): ?>
+                                <span class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);">
+                                    <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
+                                </span>
+                            <?php endif; ?>
                         </button>
                         <button class="nav-link tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false"
                                 style="color: #007bff !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #007bff !important; border-bottom: 2px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
@@ -2062,7 +2137,51 @@ $disconnection_notices = $stmt->get_result();
     <script src="assets/js/notifications.js"></script>
     <script>
     // Initialize tab functionality
+    // Update notification badge
+    function updateNotificationBadge() {
+        fetch('get_notification_count.php')
+            .then(response => response.json())
+            .then(data => {
+                // Update tab badge
+                const tabBadge = document.querySelector('#nav-notifications-tab .notification-badge');
+                if (tabBadge && data.success) {
+                    if (data.count > 0) {
+                        tabBadge.textContent = data.count > 99 ? '99+' : data.count;
+                        tabBadge.style.display = 'block';
+                    } else {
+                        tabBadge.style.display = 'none';
+                    }
+                } else if (data.success && data.count > 0) {
+                    // Create tab badge if it doesn't exist
+                    const tab = document.getElementById('nav-notifications-tab');
+                    if (tab && !tabBadge) {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge bg-danger notification-badge';
+                        newBadge.style.cssText = 'position: absolute; top: -5px; right: -5px; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);';
+                        newBadge.textContent = data.count > 99 ? '99+' : data.count;
+                        tab.appendChild(newBadge);
+                    }
+                }
+                
+                // Update navbar bubble badge
+                const navbarBadge = document.getElementById('navbar-notification-badge');
+                if (navbarBadge && data.success) {
+                    if (data.count > 0) {
+                        navbarBadge.textContent = data.count > 99 ? '99+' : data.count;
+                        navbarBadge.style.display = 'flex';
+                    } else {
+                        navbarBadge.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => console.error('Error updating notification badge:', error));
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
+        // Update notification badge on load and every 30 seconds
+        updateNotificationBadge();
+        setInterval(updateNotificationBadge, 30000);
+        
         // Force show first tab content
         const firstTab = document.getElementById('nav-overview');
         if (firstTab) {
