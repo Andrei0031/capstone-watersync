@@ -919,7 +919,7 @@ $payments_result = $conn->query($payments_sql);
                                 </td>
                                 <td><?php echo htmlspecialchars($row['reference_number']); ?></td>
                                 <td>₱<?php echo number_format($row['display_amount'], 2); ?></td>
-                                <td><?php echo date('M d, Y', strtotime($row['payment_date'])); ?></td>
+                                <td><?php echo date('M d, Y h:i A', strtotime($row['payment_date'])); ?></td>
                                 <td><?php echo date('M d, Y', strtotime($row['reading_date'])); ?></td>
                                 <td>
                                     <span class="status-badge status-verified"><?php echo htmlspecialchars($row['status_text']); ?></span>
@@ -1020,7 +1020,7 @@ $payments_result = $conn->query($payments_sql);
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Remaining Balance</label>
+                                    <label class="form-label">Expected Remaining Balance</label>
                                     <div class="input-group">
                                         <span class="input-group-text">₱</span>
                                         <input type="number" class="form-control" id="remainingBalance" step="0.01" readonly>
