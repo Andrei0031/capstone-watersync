@@ -59,6 +59,15 @@ try {
     $reference_number = $_POST['reference_number'];
     $amount_to_pay = floatval($_POST['amount']);
     
+    // Validate amount is positive
+    if ($amount_to_pay <= 0) {
+        send_json_response(false, 'Amount to pay must be greater than 0.');
+    }
+    
+    if ($amount_to_pay < 0) {
+        send_json_response(false, 'Amount to pay cannot be negative.');
+    }
+    
     // Validate bill IDs
     $bill_ids = json_decode($_POST['bill_ids'], true);
     if (!is_array($bill_ids) || empty($bill_ids)) {

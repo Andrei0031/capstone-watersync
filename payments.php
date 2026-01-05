@@ -1390,15 +1390,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Prevent negative and invalid characters in amount to pay
     amountToPayInput.addEventListener('keydown', function(e) {
-        if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+        // Prevent minus sign, 'e', 'E', and '+' keys
+        if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
             e.preventDefault();
+            return false;
+        }
+    });
+
+    // Prevent pasting negative values
+    amountToPayInput.addEventListener('paste', function(e) {
+        const paste = (e.clipboardData || window.clipboardData).getData('text');
+        const pastedValue = parseFloat(paste);
+        if (isNaN(pastedValue) || pastedValue < 0) {
+            e.preventDefault();
+            showWarning('Cannot paste negative values or invalid numbers');
+            return false;
+        }
+    });
+
+    // Ensure value is always positive on blur
+    amountToPayInput.addEventListener('blur', function() {
+        const value = parseFloat(this.value);
+        if (isNaN(value) || value < 0) {
+            this.value = '';
+            this.setCustomValidity('Amount to pay must be greater than 0');
+        } else if (value === 0) {
+            this.setCustomValidity('Amount to pay must be greater than 0');
         }
     });
 
     // Handle amount to pay changes
     amountToPayInput.addEventListener('input', function() {
+        // Remove any negative signs that might have been pasted or entered
+        let value = this.value;
+        if (value.includes('-')) {
+            value = value.replace(/-/g, '');
+            this.value = value;
+        }
+        
         const totalDue = parseFloat(totalAmountInput.value) || 0;
-        const amountToPay = parseFloat(this.value) || 0;
+        const amountToPay = parseFloat(value) || 0;
+        
+        // Ensure amount is not negative
+        if (amountToPay < 0) {
+            this.value = '';
+            this.setCustomValidity('Amount to pay cannot be negative');
+            return;
+        }
+        
         const remainingBalance = Math.max(0, totalDue - amountToPay);
         remainingBalanceInput.value = remainingBalance.toFixed(2);
         
