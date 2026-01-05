@@ -11,6 +11,17 @@ include 'db.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Check if password verification is required and was done
+    if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Password verification required'
+        ]);
+        exit();
+    }
+    
+    // Clear verification after use (one-time use)
+    unset($_SESSION['delete_verified']);
     // Debug log
     error_log("Delete bill request received: " . print_r($_POST, true));
     

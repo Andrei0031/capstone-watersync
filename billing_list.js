@@ -257,4 +257,150 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Delete bill with password verification
+    window.deleteBillWithPassword = function(billId) {
+        // Show password verification modal
+        const passwordModalId = 'deletePasswordModal';
+        let passwordModalElement = document.getElementById(passwordModalId);
+        
+        if (passwordModalElement) {
+            passwordModalElement.remove();
+        }
+        
+        const passwordModalHtml = `
+            <div class="modal fade" id="${passwordModalId}" tabindex="-1" aria-labelledby="${passwordModalId}Label" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="${passwordModalId}Label">
+                                <i class="fas fa-lock me-2"></i>Verify Delete Password
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Warning:</strong> This action cannot be undone. Please enter the delete password to confirm.
+                            </div>
+                            <div class="mb-3">
+                                <label for="deletePasswordInput" class="form-label">Delete Password</label>
+                                <input type="password" class="form-control" id="deletePasswordInput" placeholder="Enter delete password" autofocus>
+                                <div id="passwordError" class="text-danger mt-2" style="display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-danger" id="confirmDeleteWithPassword" data-bill-id="${billId}">
+                                <i class="fas fa-trash me-2"></i>Delete Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', passwordModalHtml);
+        passwordModalElement = document.getElementById(passwordModalId);
+        const passwordModal = new bootstrap.Modal(passwordModalElement);
+        
+        // Handle password input Enter key
+        document.getElementById('deletePasswordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('confirmDeleteWithPassword').click();
+            }
+        });
+        
+        // Handle confirm delete button
+        document.getElementById('confirmDeleteWithPassword').addEventListener('click', function() {
+            const password = document.getElementById('deletePasswordInput').value;
+            const billId = this.getAttribute('data-bill-id');
+            const errorDiv = document.getElementById('passwordError');
+            
+            if (!password) {
+                errorDiv.textContent = 'Password is required';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Verify password
+            fetch('verify_delete_password.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    passwordModal.hide();
+                    // Now proceed with deletion
+                    if (typeof showConfirm !== 'undefined') {
+                        showConfirm('Are you sure you want to delete this bill? This action cannot be undone.', function() {
+                            deleteBill(billId);
+                        });
+                    } else {
+                        if (confirm('Are you sure you want to delete this bill? This action cannot be undone.')) {
+                            deleteBill(billId);
+                        }
+                    }
+                } else {
+                    errorDiv.textContent = data.message || 'Incorrect password';
+                    errorDiv.style.display = 'block';
+                    document.getElementById('deletePasswordInput').value = '';
+                    document.getElementById('deletePasswordInput').focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                errorDiv.textContent = 'Error verifying password';
+                errorDiv.style.display = 'block';
+            });
+        });
+        
+        passwordModalElement.addEventListener('hidden.bs.modal', function() {
+            passwordModalElement.remove();
+        }, { once: true });
+        
+        passwordModal.show();
+        document.getElementById('deletePasswordInput').focus();
+    };
+
+    function deleteBill(billId) {
+        const formData = new FormData();
+        formData.append('bill_id', billId);
+        
+        fetch('delete_bill.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (typeof showSuccess !== 'undefined') {
+                    showSuccess(data.message);
+                } else {
+                    alert('Success: ' + data.message);
+                }
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                if (typeof showError !== 'undefined') {
+                    showError(data.message);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (typeof showError !== 'undefined') {
+                showError('Error deleting bill');
+            } else {
+                alert('Error deleting bill');
+            }
+        });
+    }
 }); 

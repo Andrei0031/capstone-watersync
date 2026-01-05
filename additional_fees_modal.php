@@ -85,6 +85,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// Create system_settings table if it doesn't exist
+$create_settings_table = "CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)";
+$conn->query($create_settings_table);
+
+// Handle delete password update
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_delete_password') {
+    $delete_password = $_POST['delete_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    if (empty($delete_password)) {
+        $error_message = "Password cannot be empty!";
+    } elseif ($delete_password !== $confirm_password) {
+        $error_message = "Passwords do not match!";
+    } else {
+        // Hash the password
+        $hashed_password = password_hash($delete_password, PASSWORD_DEFAULT);
+        
+        // Insert or update the delete password
+        $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('delete_password', ?) 
+                                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = CURRENT_TIMESTAMP");
+        $stmt->bind_param("ss", $hashed_password, $hashed_password);
+        
+        if ($stmt->execute()) {
+            $success_message = "Delete password updated successfully!";
+        } else {
+            $error_message = "Error updating password: " . $conn->error;
+        }
+    }
+}
+
+// Get current delete password status
+$password_set = false;
+$password_check = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
+if ($password_check && $password_check->num_rows > 0) {
+    $password_set = true;
+}
+
 // Fetch all fees
 $fees_query = "SELECT * FROM additional_fees ORDER BY created_at DESC";
 $fees_result = $conn->query($fees_query);
@@ -343,6 +385,49 @@ $fees_result = $conn->query($fees_query);
                     </div>
                 </form>
             </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Password Modal -->
+    <div class="modal fade" id="deletePasswordModal" tabindex="-1" aria-labelledby="deletePasswordModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="deletePasswordModalLabel">
+                        <i class="fas fa-key me-2"></i><?php echo $password_set ? 'Change' : 'Set'; ?> Delete Password
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="update_delete_password">
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            This password will be required to delete readings or bills. Keep it secure!
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="delete_password" class="form-label">Delete Password</label>
+                            <input type="password" class="form-control" id="delete_password" name="delete_password" required 
+                                   placeholder="Enter password" minlength="4">
+                            <small class="text-muted">Minimum 4 characters</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required 
+                                   placeholder="Confirm password" minlength="4">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-2"></i><?php echo $password_set ? 'Update' : 'Set'; ?> Password
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

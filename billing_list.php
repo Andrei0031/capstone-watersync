@@ -9,6 +9,13 @@ include 'db.php';
 include 'comprehensive_fee_manager.php';
 include 'simple_notifications.php';
 
+// Check if delete password is configured
+$delete_password_configured = false;
+$check_password = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
+if ($check_password && $check_password->num_rows > 0) {
+    $delete_password_configured = true;
+}
+
 $showNotificationModal = false; // Initialize to avoid undefined variable warning
 $message = ''; // Initialize message variable
 
@@ -1486,6 +1493,11 @@ if ($params) {
                                     <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary view-btn" data-id="<?php echo $row['id']; ?>" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                    <?php if ($delete_password_configured): ?>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteBillWithPassword(<?php echo $row['id']; ?>)" title="Delete Bill">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endwhile; 
@@ -1637,6 +1649,11 @@ if ($params) {
                                 <button class="btn btn-sm btn-outline-secondary print-receipt" data-id="<?php echo $row['id']; ?>" title="Print Receipt">
                                     <i class="fas fa-print"></i>
                                 </button>
+                                <?php if ($delete_password_configured): ?>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBillWithPassword(<?php echo $row['id']; ?>)" title="Delete Bill">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php 

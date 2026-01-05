@@ -66,12 +66,20 @@ try {
         
     } 
     // Handle single deletion
-    elseif (isset($_POST['id']) && !empty($_POST['id'])) {
-        $reading_id = intval($_POST['id']);
+    elseif (isset($_POST['reading_id']) && !empty($_POST['reading_id'])) {
+        $reading_id = intval($_POST['reading_id']);
         
         if ($reading_id <= 0) {
             throw new Exception('Invalid reading ID');
         }
+        
+        // Check if password verification is required and was done
+        if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {
+            throw new Exception('Password verification required');
+        }
+        
+        // Clear verification after use (one-time use)
+        unset($_SESSION['delete_verified']);
 
         // First, get the reading to check if it exists and get the image path
         $stmt = $conn->prepare("SELECT id, image_path, status FROM pending_meter_readings WHERE id = ?");

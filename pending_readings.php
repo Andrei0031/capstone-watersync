@@ -43,6 +43,13 @@ include 'simple_notifications.php';
 include 'automated_bill_creation.php';
 include 'image_cleanup_utility.php';
 
+// Check if delete password is configured
+$delete_password_configured = false;
+$check_password = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
+if ($check_password && $check_password->num_rows > 0) {
+    $delete_password_configured = true;
+}
+
 /**
  * Check if Tesseract OCR is available on the system
  */
@@ -1842,6 +1849,11 @@ if (!$failed_result) {
                                                 <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)" title="Verify / Correct Reading">
                                                     <i class="fas fa-check-circle"></i> Verify
                                                 </button>
+                                                <?php if ($delete_password_configured): ?>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
@@ -2676,33 +2688,128 @@ if (!$failed_result) {
             document.body.removeChild(link);
         }
 
-        function deleteReading(id) {
-            showConfirm('Are you sure you want to delete this reading?', function() {
-                fetch('delete_reading.php', {
+        function deleteReadingWithPassword(id) {
+            // Show password verification modal
+            const passwordModalId = 'deletePasswordModal';
+            let passwordModalElement = document.getElementById(passwordModalId);
+            
+            if (passwordModalElement) {
+                passwordModalElement.remove();
+            }
+            
+            const passwordModalHtml = `
+                <div class="modal fade" id="${passwordModalId}" tabindex="-1" aria-labelledby="${passwordModalId}Label" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="${passwordModalId}Label">
+                                    <i class="fas fa-lock me-2"></i>Verify Delete Password
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Warning:</strong> This action cannot be undone. Please enter the delete password to confirm.
+                                </div>
+                                <div class="mb-3">
+                                    <label for="deletePasswordInput" class="form-label">Delete Password</label>
+                                    <input type="password" class="form-control" id="deletePasswordInput" placeholder="Enter delete password" autofocus>
+                                    <div id="passwordError" class="text-danger mt-2" style="display: none;"></div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteWithPassword" data-reading-id="${id}">
+                                    <i class="fas fa-trash me-2"></i>Delete Reading
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', passwordModalHtml);
+            passwordModalElement = document.getElementById(passwordModalId);
+            const passwordModal = new bootstrap.Modal(passwordModalElement);
+            
+            // Handle password input Enter key
+            document.getElementById('deletePasswordInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('confirmDeleteWithPassword').click();
+                }
+            });
+            
+            // Handle confirm delete button
+            document.getElementById('confirmDeleteWithPassword').addEventListener('click', function() {
+                const password = document.getElementById('deletePasswordInput').value;
+                const readingId = this.getAttribute('data-reading-id');
+                const errorDiv = document.getElementById('passwordError');
+                
+                if (!password) {
+                    errorDiv.textContent = 'Password is required';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                // Verify password
+                fetch('verify_delete_password.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Content-Type': 'application/json',
                     },
-                    body: `id=${id}`
+                    body: JSON.stringify({ password: password })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showSuccess('Reading deleted successfully!');
-                        setTimeout(() => location.reload(), 1000);
+                        passwordModal.hide();
+                        // Now proceed with deletion
+                        showConfirm('Are you sure you want to delete this reading? This action cannot be undone.', function() {
+                            fetch('delete_reading.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ reading_id: readingId })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    showSuccess('Reading deleted successfully');
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1500);
+                                } else {
+                                    showError('Error deleting reading: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                showError('Error deleting reading');
+                            });
+                        });
                     } else {
-                        showError('Error deleting reading: ' + data.message);
+                        errorDiv.textContent = data.message || 'Incorrect password';
+                        errorDiv.style.display = 'block';
+                        document.getElementById('deletePasswordInput').value = '';
+                        document.getElementById('deletePasswordInput').focus();
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    showError('Error deleting reading');
+                    errorDiv.textContent = 'Error verifying password';
+                    errorDiv.style.display = 'block';
                 });
             });
+            
+            passwordModalElement.addEventListener('hidden.bs.modal', function() {
+                passwordModalElement.remove();
+            }, { once: true });
+            
+            passwordModal.show();
+            document.getElementById('deletePasswordInput').focus();
         }
-
-        // Delete functions removed - images are automatically deleted after processing
-        // Readings should not be deleted manually
 
         function editReading(id) {
             // Remove any existing modals first
