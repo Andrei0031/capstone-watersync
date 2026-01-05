@@ -56,16 +56,22 @@ try {
     $check_updated_at = $conn->query("SHOW COLUMNS FROM pending_meter_readings LIKE 'updated_at'");
     $has_updated_at = $check_updated_at && $check_updated_at->num_rows > 0;
     
+    // Update status to 'verified' if it was 'needs_review'
+    $current_status = $reading['status'] ?? 'pending';
+    $new_status = ($current_status === 'needs_review') ? 'verified' : $current_status;
+    
     if ($has_updated_at) {
         $update_sql = "UPDATE pending_meter_readings SET 
                         verified_reading = ?,
                         admin_notes = ?,
+                        status = ?,
                         updated_at = NOW()
                        WHERE id = ?";
     } else {
         $update_sql = "UPDATE pending_meter_readings SET 
                         verified_reading = ?,
-                        admin_notes = ?
+                        admin_notes = ?,
+                        status = ?
                        WHERE id = ?";
     }
     
@@ -81,7 +87,11 @@ try {
         $final_notes .= "\nNote: " . $admin_notes;
     }
     
-    $update_stmt->bind_param("dsi", $verified_reading, $final_notes, $reading_id);
+    if ($has_updated_at) {
+        $update_stmt->bind_param("dssi", $verified_reading, $final_notes, $new_status, $reading_id);
+    } else {
+        $update_stmt->bind_param("dssi", $verified_reading, $final_notes, $new_status, $reading_id);
+    }
     
     if ($update_stmt->execute()) {
         // Delete image after reading is updated/verified

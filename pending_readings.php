@@ -83,6 +83,8 @@ function isTesseractAvailable() {
 // Calculate statistics
 $total_readings = 0;
 $pending_count = 0;
+$needs_review_count = 0;
+$verified_count = 0;
 $processed_count = 0;
 $failed_count = 0;
 
@@ -90,6 +92,8 @@ $failed_count = 0;
 $stats_sql = "SELECT 
     COUNT(*) as total,
     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+    SUM(CASE WHEN status = 'needs_review' THEN 1 ELSE 0 END) as needs_review,
+    SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) as verified,
     SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as processed,
     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
     FROM pending_meter_readings";
@@ -97,6 +101,8 @@ $stats_result = $conn->query($stats_sql);
 if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $total_readings = $row['total'];
     $pending_count = $row['pending'];
+    $needs_review_count = $row['needs_review'] ?? 0;
+    $verified_count = $row['verified'] ?? 0;
     $processed_count = $row['processed'];
     $failed_count = $row['failed'];
 }
@@ -157,8 +163,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
         }
     }
     
-    // Update status enum if needed
-    $conn->query("ALTER TABLE pending_meter_readings MODIFY COLUMN status ENUM('pending', 'processed', 'failed') DEFAULT 'pending'");
+    // Update status enum if needed - add needs_review and verified statuses
+    $conn->query("ALTER TABLE pending_meter_readings MODIFY COLUMN status ENUM('pending', 'needs_review', 'verified', 'processed', 'failed') DEFAULT 'pending'");
     
     // Include Roboflow service and OCR functions
     require_once __DIR__ . '/api/roboflow_service.php';
@@ -326,22 +332,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     // unlink($croppedImagePath); // Uncomment to delete cropped images
                 }
                 
+                // Check if reading needs review based on consumption
+                $needsReview = false;
+                $statusToSet = 'verified'; // Default: verified (ready for billing)
+                
+                // Get previous reading to check consumption
+                $prev_stmt = $conn->prepare("SELECT reading FROM billing_list 
+                    WHERE client_id = (SELECT client_id FROM pending_meter_readings WHERE id = ?) 
+                    ORDER BY reading_date DESC LIMIT 1");
+                $prev_stmt->bind_param("i", $reading_id);
+                $prev_stmt->execute();
+                $prev_result = $prev_stmt->get_result();
+                $previous = $prev_result->fetch_assoc()['reading'] ?? 0;
+                
+                // Calculate consumption
+                $consumption = floatval($ocrReading) - floatval($previous);
+                
+                // Flag as "Needs Review" if consumption looks suspicious
+                if ($consumption < 0 || $consumption == 0 || $consumption > 200) {
+                    $needsReview = true;
+                    $statusToSet = 'needs_review';
+                }
+                
                 // Update reading status (force Asia/Manila timestamp via PHP)
                 $processedAt = date('Y-m-d H:i:s');
                 $update = $conn->prepare("UPDATE pending_meter_readings SET 
-                    status = 'processed',
+                    status = ?,
                     ocr_reading = ?,
                     extracted_text = ?,
                     processed_at = ?
                     WHERE id = ?");
-                $update->bind_param("dssi", $ocrReading, $extractedText, $processedAt, $reading_id);
+                $update->bind_param("sdssi", $statusToSet, $ocrReading, $extractedText, $processedAt, $reading_id);
                 
                 if (!$update->execute()) {
                     throw new Exception('Failed to update database: ' . $conn->error);
                 }
                 
-                // Delete image after successful processing
-                deleteImageAfterProcessing($reading_id, $conn);
+                // Don't delete image yet - keep it for verification if needed
+                // deleteImageAfterProcessing($reading_id, $conn);
                 
                 $processed_count++;
                 
@@ -383,7 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
     exit();
 }
 
-// Create new bills for processed readings
+// Create new bills for verified/needs_review readings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
     $selected_ids = $_POST['selected_processed'] ?? [];
     
@@ -392,7 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
             FROM pending_meter_readings pmr 
             JOIN client_list cl ON pmr.client_id = cl.id 
             LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
-            WHERE pmr.id = ? AND pmr.status = 'processed'");
+            WHERE pmr.id = ? AND pmr.status IN ('verified', 'needs_review')");
         $stmt->bind_param("i", $reading_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -554,16 +582,49 @@ if (!$pending_result) {
     $pending_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'pending' LIMIT 0");
 }
 
-// Fetch processed readings with billing cycle info
-// Prioritize verified_reading (manually corrected) over ocr_reading
-// Use LEFT JOIN to show readings even if client is missing/inactive
-$processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
+// Fetch needs_review readings - suspicious readings that need manual verification
+$needs_review_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
-    WHERE pmr.status = 'processed'
+    WHERE pmr.status = 'needs_review'
+    ORDER BY pmr.processed_at DESC";
+$needs_review_result = $conn->query($needs_review_sql);
+if (!$needs_review_result) {
+    error_log("Error fetching needs_review readings: " . $conn->error);
+    $needs_review_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'needs_review' LIMIT 0");
+}
+
+// Fetch verified readings - ready for billing
+$verified_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
+                  bc.cycle_name, bc.due_date as cycle_due_date,
+                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value
+    FROM pending_meter_readings pmr 
+    LEFT JOIN client_list cl ON pmr.client_id = cl.id 
+    LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
+    WHERE pmr.status = 'verified'
+    ORDER BY pmr.processed_at DESC";
+$verified_result = $conn->query($verified_sql);
+if (!$verified_result) {
+    error_log("Error fetching verified readings: " . $conn->error);
+    $verified_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'verified' LIMIT 0");
+}
+
+// Fetch processed readings - only readings that have bills created
+// Check if bill exists in billing_list table
+$processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
+                  bc.cycle_name, bc.due_date as cycle_due_date,
+                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
+                  bl.id as bill_id
+    FROM pending_meter_readings pmr 
+    LEFT JOIN client_list cl ON pmr.client_id = cl.id 
+    LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
+    INNER JOIN billing_list bl ON bl.client_id = pmr.client_id 
+        AND ABS(bl.reading - COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0)) < 1
+        AND bl.reading_date >= DATE_SUB(pmr.processed_at, INTERVAL 7 DAY)
+    WHERE pmr.status IN ('processed', 'verified')
     ORDER BY pmr.processed_at DESC, pmr.processed_date DESC";
 $processed_result = $conn->query($processed_sql);
 if (!$processed_result) {
@@ -1514,7 +1575,7 @@ if (!$failed_result) {
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="readingTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link <?php echo $pending_count > 0 ? 'active' : ''; ?>" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                <button class="nav-link <?php echo ($pending_count > 0 && $needs_review_count == 0 && $verified_count == 0) ? 'active' : ''; ?>" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
                     <i class="fas fa-clock me-2"></i>Pending
                     <?php if ($pending_count > 0): ?>
                     <span class="badge bg-warning ms-2"><?php echo $pending_count; ?></span>
@@ -1522,14 +1583,28 @@ if (!$failed_result) {
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link <?php echo $pending_count == 0 ? 'active' : ''; ?>" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed" type="button" role="tab">
-                    <i class="fas fa-check me-2"></i>Processed
-                    <span class="badge bg-success ms-2"><?php echo $processed_count; ?></span>
+                <button class="nav-link <?php echo ($needs_review_count > 0 && $pending_count == 0) ? 'active' : ''; ?>" id="needs-review-tab" data-bs-toggle="tab" data-bs-target="#needs-review" type="button" role="tab">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Needs Review
+                    <?php if ($needs_review_count > 0): ?>
+                    <span class="badge bg-warning ms-2"><?php echo $needs_review_count; ?></span>
+                    <?php endif; ?>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link <?php echo ($verified_count > 0 && $pending_count == 0 && $needs_review_count == 0) ? 'active' : ''; ?>" id="verified-tab" data-bs-toggle="tab" data-bs-target="#verified" type="button" role="tab">
+                    <i class="fas fa-check-circle me-2"></i>Verified
+                    <span class="badge bg-info ms-2"><?php echo $verified_count; ?></span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed" type="button" role="tab">
+                    <i class="fas fa-file-invoice-dollar me-2"></i>Processed (Bills Created)
+                    <span class="badge bg-success ms-2"><?php echo $processed_result->num_rows; ?></span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="failed-tab" data-bs-toggle="tab" data-bs-target="#failed" type="button" role="tab">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Failed
+                    <i class="fas fa-times-circle me-2"></i>Failed
                     <span class="badge bg-danger ms-2"><?php echo $failed_count; ?></span>
                 </button>
             </li>
@@ -1661,26 +1736,20 @@ if (!$failed_result) {
                 </div>
             </div>
 
-            <!-- Processed Readings Tab -->
-            <div class="tab-pane fade <?php echo $pending_count == 0 ? 'show active' : ''; ?>" id="processed" role="tabpanel">
+            <!-- Needs Review Tab -->
+            <div class="tab-pane fade <?php echo ($needs_review_count > 0 && $pending_count == 0) ? 'show active' : ''; ?>" id="needs-review" role="tabpanel">
                 <div class="card card-soft">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
-                        <h5 class="mb-0">Processed Readings</h5>
-                        <form method="POST" id="billCreationForm" class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-primary" id="selectAllProcessedBtn">
-                                <i class="fas fa-check-square me-2"></i>Select All
-                            </button>
-                            <button type="submit" name="create_bills" class="btn btn-success" id="createBillsBtn" disabled>
-                                <i class="fas fa-file-invoice-dollar me-2"></i>Create Bills
-                            </button>
-                        </form>
+                        <div>
+                            <h5 class="mb-0">Needs Review</h5>
+                            <small class="text-muted">Readings with suspicious consumption that require manual verification before billing.</small>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th width="50px"><input type="checkbox" id="selectAllProcessed"></th>
                                         <th>Customer</th>
                                         <th>Billing Cycle</th>
                                         <th>Meter Image</th>
@@ -1691,15 +1760,278 @@ if (!$failed_result) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if ($processed_result->num_rows > 0): ?>
-                                        <?php while($row = $processed_result->fetch_assoc()): ?>
+                                    <?php if ($needs_review_result->num_rows > 0): ?>
+                                        <?php while($row = $needs_review_result->fetch_assoc()): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm bg-warning">
+                                                        <?php 
+                                                            $firstname = $row['firstname'] ?? '';
+                                                            $lastname = $row['lastname'] ?? '';
+                                                            $initials = strtoupper(substr($firstname, 0, 1) . substr($lastname, 0, 1));
+                                                            echo $initials ?: '?';
+                                                        ?>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold">
+                                                            <?php 
+                                                                if ($firstname || $lastname) {
+                                                                    echo htmlspecialchars(trim($firstname . ' ' . $lastname));
+                                                                } else {
+                                                                    echo '<span class="text-muted">Client ID: ' . $row['client_id'] . '</span>';
+                                                                }
+                                                            ?>
+                                                        </div>
+                                                        <div class="text-muted"><?php echo htmlspecialchars($row['meter_code'] ?? 'N/A'); ?></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <?php if ($row['cycle_name']): ?>
+                                                    <span class="badge bg-primary"><?php echo htmlspecialchars($row['cycle_name']); ?></span>
+                                                    <br><small class="text-muted">Due: <?php echo date('M d, Y', strtotime($row['cycle_due_date'])); ?></small>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">No Cycle</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <img src="<?php echo htmlspecialchars($row['image_path']); ?>" 
+                                                     class="meter-image" 
+                                                     data-bs-toggle="modal" 
+                                                     data-bs-target="#imageModal"
+                                                     data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                    $ocrReading = $row['ocr_reading'] ?? null;
+                                                    $reading = $ocrReading ?? $row['reading_value'] ?? 0;
+                                                ?>
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge bg-warning me-2">
+                                                        <i class="fas fa-exclamation-triangle"></i> Needs Review
+                                                    </span>
+                                                    <strong><?php echo number_format($reading, 0); ?></strong>
+                                                </div>
+                                                <?php if ($ocrReading !== null): ?>
+                                                    <br><small class="text-muted">
+                                                        <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
+                                                    </small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                    $processedDate = $row['processed_at'] ?? null;
+                                                    if ($processedDate) {
+                                                        echo date('M d, Y H:i', strtotime($processedDate));
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                ?>
+                                            </td>
+                                            <td>
+                                                <span class="status-badge bg-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    Needs Review
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)" title="Verify / Correct Reading">
+                                                    <i class="fas fa-check-circle"></i> Verify
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted py-4">
+                                                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                                <p class="mb-0">No readings need review</p>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verified Readings Tab -->
+            <div class="tab-pane fade <?php echo ($verified_count > 0 && $pending_count == 0 && $needs_review_count == 0) ? 'show active' : ''; ?>" id="verified" role="tabpanel">
+                <div class="card card-soft">
+                    <div class="card-header d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <h5 class="mb-0">Verified Readings</h5>
+                            <small class="text-muted">Readings verified and ready for bill creation.</small>
+                        </div>
+                        <form method="POST" id="verifiedBillForm" class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary" id="selectAllVerifiedBtn">
+                                <i class="fas fa-check-square me-2"></i>Select All
+                            </button>
+                            <button type="submit" name="create_bills" class="btn btn-success" id="createBillsVerifiedBtn" disabled>
+                                <i class="fas fa-file-invoice-dollar me-2"></i>Create Bills
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th width="50px"><input type="checkbox" id="selectAllVerified"></th>
+                                        <th>Customer</th>
+                                        <th>Billing Cycle</th>
+                                        <th>Meter Image</th>
+                                        <th>Reading Value</th>
+                                        <th>Process Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($verified_result->num_rows > 0): ?>
+                                        <?php while($row = $verified_result->fetch_assoc()): ?>
                                         <tr>
                                             <td>
                                                 <input type="checkbox" name="selected_processed[]" 
-                                                       form="billCreationForm" 
+                                                       form="verifiedBillForm" 
                                                        value="<?php echo $row['id']; ?>" 
-                                                       class="processed-checkbox">
+                                                       class="verified-checkbox">
                                             </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm bg-info">
+                                                        <?php 
+                                                            $firstname = $row['firstname'] ?? '';
+                                                            $lastname = $row['lastname'] ?? '';
+                                                            $initials = strtoupper(substr($firstname, 0, 1) . substr($lastname, 0, 1));
+                                                            echo $initials ?: '?';
+                                                        ?>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold">
+                                                            <?php 
+                                                                if ($firstname || $lastname) {
+                                                                    echo htmlspecialchars(trim($firstname . ' ' . $lastname));
+                                                                } else {
+                                                                    echo '<span class="text-muted">Client ID: ' . $row['client_id'] . '</span>';
+                                                                }
+                                                            ?>
+                                                        </div>
+                                                        <div class="text-muted"><?php echo htmlspecialchars($row['meter_code'] ?? 'N/A'); ?></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <?php if ($row['cycle_name']): ?>
+                                                    <span class="badge bg-primary"><?php echo htmlspecialchars($row['cycle_name']); ?></span>
+                                                    <br><small class="text-muted">Due: <?php echo date('M d, Y', strtotime($row['cycle_due_date'])); ?></small>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">No Cycle</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <img src="<?php echo htmlspecialchars($row['image_path']); ?>" 
+                                                     class="meter-image" 
+                                                     data-bs-toggle="modal" 
+                                                     data-bs-target="#imageModal"
+                                                     data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                    $ocrReading = $row['ocr_reading'] ?? null;
+                                                    $verifiedReading = $row['verified_reading'] ?? null;
+                                                    $reading = $verifiedReading ?? $ocrReading ?? $row['reading_value'] ?? 0;
+                                                ?>
+                                                <?php if ($verifiedReading !== null): ?>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge bg-success me-2">
+                                                            <i class="fas fa-check-circle"></i> Verified
+                                                        </span>
+                                                        <strong class="text-success"><?php echo number_format($verifiedReading, 0); ?></strong>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <?php echo number_format($reading, 0); ?>
+                                                    <?php if ($ocrReading !== null): ?>
+                                                        <br><small class="text-muted">
+                                                            <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
+                                                        </small>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                    $processedDate = $row['processed_at'] ?? null;
+                                                    if ($processedDate) {
+                                                        echo date('M d, Y H:i', strtotime($processedDate));
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                ?>
+                                            </td>
+                                            <td>
+                                                <span class="status-badge bg-info">
+                                                    <i class="fas fa-check-circle"></i>
+                                                    Verified
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="8" class="text-center text-muted py-4">
+                                                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                                <p class="mb-0">No verified readings found</p>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processed Readings Tab (Bills Created) -->
+            <div class="tab-pane fade" id="processed" role="tabpanel">
+                <div class="card card-soft">
+                    <div class="card-header d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <h5 class="mb-0">Processed Readings</h5>
+                            <small class="text-muted">Readings with bills already created. These readings have been billed and are in the billing system.</small>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Billing Cycle</th>
+                                        <th>Meter Image</th>
+                                        <th>Reading Value</th>
+                                        <th>Bill ID</th>
+                                        <th>Process Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($processed_result->num_rows > 0): ?>
+                                        <?php while($row = $processed_result->fetch_assoc()): ?>
+                                        <tr>
                                             <td>
                                                 <div class="d-flex align-items-center">
                                                     <div class="avatar-sm bg-success">
@@ -1747,33 +2079,6 @@ if (!$failed_result) {
                                                     $ocrReading = $row['ocr_reading'] ?? null;
                                                     $verifiedReading = $row['verified_reading'] ?? null;
                                                     $reading = $verifiedReading ?? $ocrReading ?? $row['reading_value'] ?? 0;
-
-                                                    // Heuristic confidence check based on consumption vs previous bill
-                                                    $needsReview = false;
-                                                    $previous = 0;
-                                                    try {
-                                                        if (isset($row['client_id'])) {
-                                                            $prev_stmt = $conn->prepare("SELECT reading FROM billing_list WHERE client_id = ? ORDER BY reading_date DESC LIMIT 1");
-                                                            if ($prev_stmt) {
-                                                                $prev_stmt->bind_param("i", $row['client_id']);
-                                                                $prev_stmt->execute();
-                                                                $prev_result = $prev_stmt->get_result();
-                                                                $previous = $prev_result->fetch_assoc()['reading'] ?? 0;
-                                                                $prev_stmt->close();
-                                                            }
-                                                        }
-                                                    } catch (Exception $e) {
-                                                        // Fail silently in UI, just don't flag for review
-                                                    }
-
-                                                    $numericReading = is_numeric($reading) ? floatval($reading) : 0;
-                                                    $consumption = $numericReading - floatval($previous);
-
-                                                    // Flag as "Needs Review" if consumption looks suspicious
-                                                    // Example thresholds: negative, zero, or very large jump
-                                                    if ($consumption < 0 || $consumption == 0 || $consumption > 200) {
-                                                        $needsReview = true;
-                                                    }
                                                     
                                                     // Show verified reading prominently if it exists
                                                     if ($verifiedReading !== null):
@@ -1784,33 +2089,22 @@ if (!$failed_result) {
                                                         </span>
                                                         <strong class="text-success"><?php echo number_format($verifiedReading, 0); ?></strong>
                                                     </div>
-                                                    <?php if ($ocrReading !== null && abs($ocrReading - $verifiedReading) > 0.01): ?>
-                                                        <small class="text-muted d-block mt-1">
-                                                            OCR: <?php echo number_format($ocrReading, 0); ?> 
-                                                            <i class="fas fa-arrow-right mx-1"></i>
-                                                            Corrected: <?php echo number_format($verifiedReading, 0); ?>
-                                                        </small>
-                                                    <?php endif; ?>
                                                 <?php else: ?>
-                                                    <div class="d-flex align-items-center">
-                                                        <strong><?php echo number_format($reading, 0); ?></strong>
-                                                        <?php if ($needsReview): ?>
-                                                            <span class="badge bg-warning text-dark ms-2" title="Unusual consumption detected. Please verify this reading before creating a bill.">
-                                                                <i class="fas fa-exclamation-triangle me-1"></i>Needs Review
-                                                            </span>
-                                                        <?php endif; ?>
-                                                    </div>
+                                                    <?php echo number_format($reading, 0); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
                                                             <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
-                                                
-                                                <?php if (!empty($row['extracted_text'])): ?>
-                                                    <br><small class="text-muted" title="<?php echo htmlspecialchars($row['extracted_text']); ?>">
-                                                        <i class="fas fa-info-circle"></i> Details
-                                                    </small>
+                                            </td>
+                                            <td>
+                                                <?php if (!empty($row['bill_id'])): ?>
+                                                    <a href="billing_list.php?bill_id=<?php echo $row['bill_id']; ?>" class="badge bg-success">
+                                                        Bill #<?php echo $row['bill_id']; ?>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="text-muted">N/A</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -1825,25 +2119,23 @@ if (!$failed_result) {
                                             </td>
                                             <td>
                                                 <span class="status-badge status-processed">
-                                                    <i class="fas fa-check-circle"></i>
-                                                    Processed
+                                                    <i class="fas fa-file-invoice-dollar"></i>
+                                                    Bill Created
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')" title="View Meter Image">
+                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
                                                     <i class="fas fa-eye"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)" title="Verify / Correct Reading">
-                                                    <i class="fas fa-edit me-1"></i>Verify
                                                 </button>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">
-                                                <i class="fas fa-check-circle fa-3x mb-3"></i>
-                                                <p class="mb-0">No processed readings found</p>
+                                            <td colspan="8" class="text-center text-muted py-4">
+                                                <i class="fas fa-file-invoice-dollar fa-3x mb-3"></i>
+                                                <p class="mb-0">No processed readings with bills found</p>
+                                                <small class="text-muted">Readings will appear here after bills are created from the Verified tab.</small>
                                             </td>
                                         </tr>
                                     <?php endif; ?>
@@ -2215,11 +2507,37 @@ if (!$failed_result) {
                 });
             }
 
-            // Handle checkboxes for processed readings
+            // Handle checkboxes for verified readings
+            const selectAllVerified = document.getElementById('selectAllVerified');
+            const verifiedCheckboxes = document.querySelectorAll('.verified-checkbox');
+            const createBillsVerifiedBtn = document.getElementById('createBillsVerifiedBtn');
+
+            if (selectAllVerified && verifiedCheckboxes.length > 0) {
+                selectAllVerified.addEventListener('change', function() {
+                    verifiedCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    updateCreateBillsVerifiedButton();
+                });
+
+                verifiedCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', updateCreateBillsVerifiedButton);
+                });
+            }
+
+            function updateCreateBillsVerifiedButton() {
+                const checkedCount = document.querySelectorAll('.verified-checkbox:checked').length;
+                if (createBillsVerifiedBtn) {
+                    createBillsVerifiedBtn.disabled = checkedCount === 0;
+                }
+            }
+
+            // Handle checkboxes for processed readings (legacy - bills already created)
             const selectAllProcessed = document.getElementById('selectAllProcessed');
             const processedCheckboxes = document.querySelectorAll('.processed-checkbox');
             const createBillsBtn = document.getElementById('createBillsBtn');
 
+            if (selectAllProcessed && processedCheckboxes.length > 0) {
             selectAllProcessed.addEventListener('change', function() {
                 processedCheckboxes.forEach(checkbox => {
                     checkbox.checked = this.checked;
@@ -2230,10 +2548,13 @@ if (!$failed_result) {
             processedCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', updateCreateBillsButton);
             });
+            }
 
             function updateCreateBillsButton() {
                 const checkedCount = document.querySelectorAll('.processed-checkbox:checked').length;
+                if (createBillsBtn) {
                 createBillsBtn.disabled = checkedCount === 0;
+                }
             }
 
             // Handle checkboxes for failed readings
@@ -2272,15 +2593,15 @@ if (!$failed_result) {
                 });
             }
 
-            const selectAllProcessedBtn = document.getElementById('selectAllProcessedBtn');
-            if (selectAllProcessedBtn) {
-                selectAllProcessedBtn.addEventListener('click', function() {
-                    const allChecked = Array.from(processedCheckboxes).every(cb => cb.checked);
-                    processedCheckboxes.forEach(checkbox => {
+            const selectAllVerifiedBtn = document.getElementById('selectAllVerifiedBtn');
+            if (selectAllVerifiedBtn && selectAllVerified) {
+                selectAllVerifiedBtn.addEventListener('click', function() {
+                    const allChecked = Array.from(verifiedCheckboxes).every(cb => cb.checked);
+                    verifiedCheckboxes.forEach(checkbox => {
                         checkbox.checked = !allChecked;
                     });
-                    selectAllProcessed.checked = !allChecked;
-                    updateCreateBillsButton();
+                    selectAllVerified.checked = !allChecked;
+                    updateCreateBillsVerifiedButton();
                 });
             }
 
@@ -2796,7 +3117,7 @@ if (!$failed_result) {
                     console.error('Error:', error);
                     showError('Error retrying readings');
                 });
-            });
+                });
         }
 
         // Display processing result message
