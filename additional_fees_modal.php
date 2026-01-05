@@ -307,7 +307,14 @@ $fees_result = $conn->query($fees_query);
                             <li>Only active fees are applied during automated bill creation</li>
                             <li>
                                 Fees can be applied to All customers, only Residential, or only 
-                                <span id="showDeleteProtection" class="text-decoration-underline" style="cursor: pointer;">Commercial</span>
+                                <span
+                                    id="showDeleteProtection"
+                                    class="text-decoration-underline"
+                                    style="cursor: pointer; text-decoration: underline; font-weight: 600;"
+                                    title="Click to show advanced delete protection settings"
+                                >
+                                    Commercial
+                                </span>
                             </li>
                         </ul>
                     </div>
