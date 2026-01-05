@@ -9,6 +9,17 @@ include 'db.php';
 include 'comprehensive_fee_manager.php';
 include 'simple_notifications.php';
 
+// Ensure system_settings table exists for delete password configuration
+if ($conn instanceof mysqli) {
+    $create_settings_table = "CREATE TABLE IF NOT EXISTS system_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )";
+    $conn->query($create_settings_table);
+}
+
 // Check if delete password is configured
 $delete_password_configured = false;
 $check_password = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
