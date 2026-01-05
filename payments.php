@@ -938,9 +938,9 @@ $payments_result = $conn->query($payments_sql);
                                             </form>
                                         <?php endif; ?>
                                         <?php if ($delete_password_configured): ?>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deletePayment(<?php echo $row['id']; ?>)" title="Delete Payment">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deletePaymentWithPassword(<?php echo $row['id']; ?>)" title="Delete Payment">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -1875,68 +1875,141 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    function deletePaymentWithPassword(id) {
+        // Show password verification modal
+        const passwordModalId = 'deletePasswordModal';
+        let passwordModalElement = document.getElementById(passwordModalId);
+        
+        if (passwordModalElement) {
+            passwordModalElement.remove();
+        }
+        
+        const passwordModalHtml = `
+            <div class="modal fade" id="${passwordModalId}" tabindex="-1" aria-labelledby="${passwordModalId}Label" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="${passwordModalId}Label">
+                                <i class="fas fa-lock me-2"></i>Verify Delete Password
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Warning:</strong> This action cannot be undone. Please enter the delete password to confirm.
+                            </div>
+                            <div class="mb-3">
+                                <label for="deletePasswordInput" class="form-label">Delete Password</label>
+                                <input type="password" class="form-control" id="deletePasswordInput" placeholder="Enter delete password" autofocus>
+                                <div id="passwordError" class="text-danger mt-2" style="display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-danger" id="confirmDeleteWithPassword" data-payment-id="${id}">
+                                <i class="fas fa-trash me-2"></i>Delete Payment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', passwordModalHtml);
+        passwordModalElement = document.getElementById(passwordModalId);
+        const passwordModal = new bootstrap.Modal(passwordModalElement);
+        
+        // Handle password input Enter key
+        document.getElementById('deletePasswordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('confirmDeleteWithPassword').click();
+            }
+        });
+        
+        // Handle confirm delete button
+        document.getElementById('confirmDeleteWithPassword').addEventListener('click', function() {
+            const password = document.getElementById('deletePasswordInput').value;
+            const paymentId = this.getAttribute('data-payment-id');
+            const errorDiv = document.getElementById('passwordError');
+            
+            if (!password) {
+                errorDiv.textContent = 'Password is required';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Verify password
+            fetch('verify_delete_password.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    passwordModal.hide();
+                    // Now proceed with deletion
+                    if (typeof showConfirm !== 'undefined') {
+                        showConfirm('Are you sure you want to delete this payment? This action cannot be undone.', function() {
+                            deletePayment(paymentId);
+                        });
+                    } else {
+                        if (confirm('Are you sure you want to delete this payment? This action cannot be undone.')) {
+                            deletePayment(paymentId);
+                        }
+                    }
+                } else {
+                    errorDiv.textContent = data.message || 'Incorrect password';
+                    errorDiv.style.display = 'block';
+                    document.getElementById('deletePasswordInput').value = '';
+                    document.getElementById('deletePasswordInput').focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                errorDiv.textContent = 'Error verifying password';
+                errorDiv.style.display = 'block';
+            });
+        });
+        
+        passwordModalElement.addEventListener('hidden.bs.modal', function() {
+            passwordModalElement.remove();
+        }, { once: true });
+        
+        passwordModal.show();
+        document.getElementById('deletePasswordInput').focus();
+    }
+
     function deletePaymentFromModal() {
         const paymentId = document.getElementById('paymentIdView').value;
-        if (confirm('Are you sure you want to delete this payment record?')) {
-            fetch('delete_payment.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `id=${paymentId}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewPaymentModal'));
-                    viewModal.hide();
-                    showSuccess('Payment deleted successfully!');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showError('Error deleting payment: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showError('Error deleting payment');
-            });
-        }
+        deletePaymentWithPassword(paymentId);
     }
-
-    // Add this to your existing JavaScript
-    let paymentToDelete = null;
-    const deletePaymentModal = new bootstrap.Modal(document.getElementById('deletePaymentModal'));
 
     function deletePayment(id) {
-        paymentToDelete = id;
-        deletePaymentModal.show();
+        fetch('delete_payment.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `id=${id}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess('Payment deleted successfully!');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showError('Error deleting payment: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Error deleting payment');
+        });
     }
-
-    document.getElementById('confirmDeletePaymentBtn').addEventListener('click', function() {
-        if (paymentToDelete) {
-            fetch('delete_payment.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `id=${paymentToDelete}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    deletePaymentModal.hide();
-                    showSuccess('Payment deleted successfully!');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showError('Error deleting payment: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showError('Error deleting payment');
-            });
-        }
-    });
 
     // Sidebar toggle for mobile
     var sidebar = document.querySelector('.sidebar');
