@@ -41,6 +41,7 @@ if (isset($conn)) {
 }
 include 'simple_notifications.php';
 include 'automated_bill_creation.php';
+include 'image_cleanup_utility.php';
 
 /**
  * Check if Tesseract OCR is available on the system
@@ -339,6 +340,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     throw new Exception('Failed to update database: ' . $conn->error);
                 }
                 
+                // Delete image after successful processing
+                deleteImageAfterProcessing($reading_id, $conn);
+                
                 $processed_count++;
                 
             } catch (Exception $e) {
@@ -484,6 +488,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
                     WHERE id = ?");
                 $update->bind_param("i", $reading_id);
                 $update->execute();
+                
+                // Delete image after bill is created
+                deleteImageAfterProcessing($reading_id, $conn);
             }
         }
     }
@@ -1545,9 +1552,6 @@ if (!$failed_result) {
                             <button type="submit" name="process_selected" class="btn btn-primary" id="processSelectedBtn" disabled>
                                 <i class="fas fa-cogs me-2"></i>Process Selected
                             </button>
-                            <button type="button" class="btn btn-outline-danger" id="deleteSelectedPendingBtn" disabled onclick="deleteSelectedReadings('pending')">
-                                <i class="fas fa-trash me-2"></i>Delete Selected
-                            </button>
                         </form>
                     </div>
                     <div class="card-body">
@@ -1639,9 +1643,6 @@ if (!$failed_result) {
                                                 <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteReading(<?php echo $row['id']; ?>)">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
@@ -1671,9 +1672,6 @@ if (!$failed_result) {
                             </button>
                             <button type="submit" name="create_bills" class="btn btn-success" id="createBillsBtn" disabled>
                                 <i class="fas fa-file-invoice-dollar me-2"></i>Create Bills
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" id="deleteSelectedProcessedBtn" disabled onclick="deleteSelectedReadings('processed')">
-                                <i class="fas fa-trash me-2"></i>Delete Selected
                             </button>
                         </form>
                     </div>
@@ -1757,20 +1755,20 @@ if (!$failed_result) {
                                                         <span class="badge bg-success me-2">
                                                             <i class="fas fa-check-circle"></i> Verified
                                                         </span>
-                                                        <strong class="text-success"><?php echo number_format($verifiedReading, 2); ?></strong>
+                                                        <strong class="text-success"><?php echo number_format($verifiedReading, 0); ?></strong>
                                                     </div>
                                                     <?php if ($ocrReading !== null && abs($ocrReading - $verifiedReading) > 0.01): ?>
                                                         <small class="text-muted d-block mt-1">
-                                                            OCR: <?php echo number_format($ocrReading, 2); ?> 
+                                                            OCR: <?php echo number_format($ocrReading, 0); ?> 
                                                             <i class="fas fa-arrow-right mx-1"></i>
-                                                            Corrected: <?php echo number_format($verifiedReading, 2); ?>
+                                                            Corrected: <?php echo number_format($verifiedReading, 0); ?>
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php else: ?>
-                                                    <?php echo number_format($reading, 2); ?>
+                                                    <?php echo number_format($reading, 0); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
-                                                            <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 2); ?>
+                                                            <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
@@ -1804,9 +1802,6 @@ if (!$failed_result) {
                                                 <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteReading(<?php echo $row['id']; ?>)">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
@@ -1836,9 +1831,6 @@ if (!$failed_result) {
                             </button>
                             <button class="btn btn-danger" onclick="retryAllFailed()">
                                 <i class="fas fa-redo me-2"></i>Retry All
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" id="deleteSelectedFailedBtn" disabled onclick="deleteSelectedReadings('failed')">
-                                <i class="fas fa-trash me-2"></i>Delete Selected
                             </button>
                         </div>
                     </div>
@@ -1918,9 +1910,6 @@ if (!$failed_result) {
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-warning" onclick="retryReading(<?php echo $row['id']; ?>)">
                                                     <i class="fas fa-redo"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteReading(<?php echo $row['id']; ?>)">
-                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -2177,10 +2166,6 @@ if (!$failed_result) {
                 if (processSelectedBtn) {
                     processSelectedBtn.disabled = checkedCount === 0;
                 }
-                const deleteSelectedPendingBtn = document.getElementById('deleteSelectedPendingBtn');
-                if (deleteSelectedPendingBtn) {
-                    deleteSelectedPendingBtn.disabled = checkedCount === 0;
-                }
             }
 
             if (selectAllPending && pendingCheckboxes.length > 0) {
@@ -2215,16 +2200,11 @@ if (!$failed_result) {
             function updateCreateBillsButton() {
                 const checkedCount = document.querySelectorAll('.processed-checkbox:checked').length;
                 createBillsBtn.disabled = checkedCount === 0;
-                const deleteSelectedProcessedBtn = document.getElementById('deleteSelectedProcessedBtn');
-                if (deleteSelectedProcessedBtn) {
-                    deleteSelectedProcessedBtn.disabled = checkedCount === 0;
-                }
             }
 
             // Handle checkboxes for failed readings
             const selectAllFailed = document.getElementById('selectAllFailed');
             const failedCheckboxes = document.querySelectorAll('.failed-checkbox');
-            const deleteSelectedFailedBtn = document.getElementById('deleteSelectedFailedBtn');
 
             if (selectAllFailed) {
                 selectAllFailed.addEventListener('change', function() {
@@ -2241,9 +2221,6 @@ if (!$failed_result) {
 
             function updateDeleteFailedButton() {
                 const checkedCount = document.querySelectorAll('.failed-checkbox:checked').length;
-                if (deleteSelectedFailedBtn) {
-                    deleteSelectedFailedBtn.disabled = checkedCount === 0;
-                }
             }
 
             // Select All buttons
@@ -2369,80 +2346,8 @@ if (!$failed_result) {
             });
         }
 
-        function deleteSelectedReadings(type) {
-            let checkboxes;
-            let count = 0;
-            
-            if (type === 'pending') {
-                checkboxes = document.querySelectorAll('.pending-checkbox:checked');
-            } else if (type === 'processed') {
-                checkboxes = document.querySelectorAll('.processed-checkbox:checked');
-            } else if (type === 'failed') {
-                checkboxes = document.querySelectorAll('.failed-checkbox:checked');
-            }
-            
-            if (!checkboxes || checkboxes.length === 0) {
-                showWarning('Please select at least one reading to delete.');
-                return;
-            }
-            
-            count = checkboxes.length;
-            const confirmMessage = `Are you sure you want to delete ${count} reading(s)? This action cannot be undone.`;
-            
-            showConfirm(confirmMessage, function() {
-                // User confirmed - proceed with deletion
-                proceedWithDeletion();
-            });
-            
-            function proceedWithDeletion() {
-            
-            const ids = Array.from(checkboxes).map(cb => cb.value);
-            
-            // Show loading
-            const loadingHtml = `
-                <div class="alert alert-info alert-dismissible fade show" role="alert">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <div>Deleting ${count} reading(s)...</div>
-                    </div>
-                </div>
-            `;
-            document.querySelector('.main-content').insertAdjacentHTML('afterbegin', loadingHtml);
-            
-            // Prepare form data
-            const formData = new URLSearchParams();
-            ids.forEach(id => {
-                formData.append('ids[]', id);
-            });
-            
-            fetch('delete_reading.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccess(data.message);
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showError('Error deleting readings: ' + data.message);
-                    const loadingAlert = document.querySelector('.alert-info');
-                    if (loadingAlert) loadingAlert.remove();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showError('Error deleting readings');
-                const loadingAlert = document.querySelector('.alert-info');
-                if (loadingAlert) loadingAlert.remove();
-            });
-            }
-        }
+        // Delete functions removed - images are automatically deleted after processing
+        // Readings should not be deleted manually
 
         function editReading(id) {
             // Remove any existing modals first
@@ -2535,8 +2440,8 @@ if (!$failed_result) {
                     }
                     
                     const reading = data.data;
-                    const ocrReading = reading.ocr_reading !== null && reading.ocr_reading !== undefined ? reading.ocr_reading : 'N/A';
-                    const currentReading = reading.current_reading !== null && reading.current_reading !== undefined ? reading.current_reading : 0;
+                    const ocrReading = reading.ocr_reading !== null && reading.ocr_reading !== undefined ? Math.round(reading.ocr_reading) : 'N/A';
+                    const currentReading = reading.current_reading !== null && reading.current_reading !== undefined ? Math.round(reading.current_reading) : 0;
                     
                     // Small delay to ensure loading modal is removed before showing edit modal
                     setTimeout(() => {
@@ -2602,7 +2507,7 @@ if (!$failed_result) {
                                                             </span>
                                                             <input type="text" 
                                                                    class="form-control" 
-                                                                   value="${ocrReading}" 
+                                                                   value="${ocrReading === 'N/A' ? 'N/A' : Math.round(ocrReading)}" 
                                                                    readonly
                                                                    style="background-color: #f8f9fa;">
                                                             <span class="input-group-text bg-light">m³</span>
@@ -2624,7 +2529,7 @@ if (!$failed_result) {
                                                                    name="verified_reading" 
                                                                    id="verified_reading"
                                                                    value="${currentReading}" 
-                                                                   step="0.01" 
+                                                                   step="1" 
                                                                    min="0" 
                                                                    max="99999"
                                                                    required
@@ -2742,8 +2647,8 @@ if (!$failed_result) {
                         document.getElementById('editReadingForm').addEventListener('submit', function(e) {
                             e.preventDefault();
                             
-                            const verifiedReading = document.getElementById('verified_reading').value;
-                            if (!verifiedReading || verifiedReading < 0 || verifiedReading > 99999) {
+                            const verifiedReading = Math.round(parseFloat(document.getElementById('verified_reading').value));
+                            if (isNaN(verifiedReading) || verifiedReading < 0 || verifiedReading > 99999) {
                                 showWarning('Please enter a valid reading value between 0 and 99999');
                                 return;
                             }

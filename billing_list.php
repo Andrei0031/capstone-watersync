@@ -1213,9 +1213,6 @@ if ($params) {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Billing Management</h2>
         <div class="d-flex gap-2">
-            <button id="bulkDeleteBtn" class="btn btn-danger" style="display: none;" disabled>
-                <i class="fas fa-trash me-2"></i>Delete Selected (<span id="selectedCount">0</span>)
-            </button>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBillingModal">
                 <i class="fas fa-plus me-2"></i>Create New Bill
             </button>
@@ -1236,9 +1233,6 @@ if ($params) {
                 </div>
                 <div>
                     <span id="selectedBillsCount" class="text-muted me-3">0 bills selected</span>
-                    <button id="bulkDeleteBtn2" class="btn btn-sm btn-danger" disabled>
-                        <i class="fas fa-trash me-1"></i>Delete Selected
-                    </button>
                 </div>
             </div>
         </div>
@@ -1492,16 +1486,6 @@ if ($params) {
                                     <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary view-btn" data-id="<?php echo $row['id']; ?>" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="javascript:void(0)" 
-                                       class="btn btn-sm btn-outline-danger delete-btn" 
-                                       data-id="<?php echo $row['id']; ?>" 
-                                       data-customer="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>"
-                                       data-amount="<?php echo number_format($total, 2); ?>"
-                                       data-status="<?php echo $status_text; ?>"
-                                       data-status-class="<?php echo $status_class; ?>"
-                                       title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
                                 </td>
                             </tr>
                         <?php endwhile; 
@@ -1622,8 +1606,8 @@ if ($params) {
                                 <div class="d-flex flex-column">
                                     <span class="fw-bold"><?php echo number_format($consumption, 2); ?></span>
                                     <small class="text-muted">
-                                        Previous: <?php echo number_format($row['previous'], 2); ?><br>
-                                        Current: <?php echo number_format($row['reading'], 2); ?>
+                                        Previous: <?php echo number_format($row['previous'], 0); ?><br>
+                                        Current: <?php echo number_format($row['reading'], 0); ?>
                                     </small>
                                 </div>
                             </td>
@@ -2232,9 +2216,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateElement('viewBillNumber', billId);
                 updateElement('viewReadingDate', readingDate);
                 updateElement('viewDueDate', dueDate);
-                updateElement('viewPreviousReading', `${previous.toFixed(2)}`);
-                updateElement('viewCurrentReading', `${reading.toFixed(2)}`);
-                updateElement('viewConsumption', `${consumption.toFixed(2)}`);
+                updateElement('viewPreviousReading', `${Math.round(previous)}`);
+                updateElement('viewCurrentReading', `${Math.round(reading)}`);
+                updateElement('viewConsumption', `${consumption.toFixed(2)}`); // Consumption keeps decimals
                 updateElement('viewBaseRate', `₱${baseRate.toFixed(2)}`);
                 updateElement('viewExcessRate', `₱${excessRate.toFixed(2)}`);
                 updateElement('viewBaseCharge', `₱${baseCharge.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
@@ -2557,7 +2541,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     };
     
-    document.querySelectorAll('.delete-btn').forEach(button => {
+    // Delete button functionality removed - bills should not be deleted
+    /* document.querySelectorAll('.delete-btn').forEach(button => {
         button.addEventListener('click', async function() {
             const billId = this.getAttribute('data-id');
             const customer = this.getAttribute('data-customer') || 'Unknown Customer';
@@ -2650,21 +2635,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const selected = document.querySelectorAll('.bulk-delete-checkbox:checked');
         const count = selected.length;
         
-        if (count > 0) {
-            bulkActionControls.style.display = 'block';
-            bulkDeleteBtn.style.display = 'inline-block';
-            bulkDeleteBtn.disabled = false;
-            bulkDeleteBtn2.disabled = false;
-            selectedBillsCount.textContent = `${count} bill(s) selected`;
-            selectedCount.textContent = count;
-        } else {
-            bulkActionControls.style.display = 'none';
-            bulkDeleteBtn.style.display = 'none';
-            bulkDeleteBtn.disabled = true;
-            bulkDeleteBtn2.disabled = true;
-            selectedBillsCount.textContent = '0 bills selected';
-            selectedCount.textContent = '0';
-        }
+        // Bulk delete functionality removed - hide controls
+        bulkActionControls.style.display = 'none';
+        if (bulkDeleteBtn) bulkDeleteBtn.style.display = 'none';
+        if (bulkDeleteBtn2) bulkDeleteBtn2.style.display = 'none';
         
         // Update select all checkbox
         if (selectAllCheckbox) {
@@ -2720,8 +2694,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Bulk Delete Button Handler
-    function handleBulkDelete() {
+    // Bulk Delete Button Handler - REMOVED
+    /* function handleBulkDelete() {
         const selected = document.querySelectorAll('.bulk-delete-checkbox:checked');
         if (selected.length === 0) {
             showWarning('Please select at least one bill to delete.');
@@ -2767,15 +2741,16 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.appendChild(form);
             form.submit();
         }
-    }
+    } */
 
-    if (bulkDeleteBtn) {
-        bulkDeleteBtn.addEventListener('click', handleBulkDelete);
-    }
-    
-    if (bulkDeleteBtn2) {
-        bulkDeleteBtn2.addEventListener('click', handleBulkDelete);
-    }
+    // Delete button event listeners removed - bills should not be deleted
+    // if (bulkDeleteBtn) {
+    //     bulkDeleteBtn.addEventListener('click', handleBulkDelete);
+    // }
+    // 
+    // if (bulkDeleteBtn2) {
+    //     bulkDeleteBtn2.addEventListener('click', handleBulkDelete);
+    // }
 
     // Initialize bulk delete buttons state
     updateBulkDeleteButtons();

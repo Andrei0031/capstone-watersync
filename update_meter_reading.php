@@ -7,6 +7,7 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 include 'db.php';
+include 'image_cleanup_utility.php';
 
 header('Content-Type: application/json');
 
@@ -83,6 +84,9 @@ try {
     $update_stmt->bind_param("dsi", $verified_reading, $final_notes, $reading_id);
     
     if ($update_stmt->execute()) {
+        // Delete image after reading is updated/verified
+        deleteImageAfterProcessing($reading_id, $conn);
+        
         echo json_encode([
             'success' => true,
             'message' => 'Reading value updated successfully',

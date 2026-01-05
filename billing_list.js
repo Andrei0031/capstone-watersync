@@ -134,37 +134,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Delete Bill Functionality
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const billId = this.getAttribute('data-id');
-            const buttonElement = this;
-            
-            showConfirm('Are you sure you want to delete this bill?', function() {
-                fetch('delete_bill.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `bill_id=${billId}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showSuccess('Bill deleted successfully!');
-                        // Remove the row from the table
-                        buttonElement.closest('tr').remove();
-                    } else {
-                        showError('Error deleting bill: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showError('Error deleting bill');
-                });
-            });
-        });
-    });
+    // Delete Bill Functionality - REMOVED
+    // Bills should not be deleted manually
+    // document.querySelectorAll('.delete-btn').forEach(button => {
+    //     button.addEventListener('click', function() {
+    //         // Delete functionality removed
+    //     });
+    // });
 
     // Calculate totals function
     async function calculateTotals() {
@@ -208,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Update the display
-            document.getElementById('editConsumption').textContent = `${consumption.toFixed(2)}`;
+            document.getElementById('editConsumption').textContent = `${consumption.toFixed(2)}`; // Consumption keeps decimals
             document.getElementById('editBaseCharge').textContent = `₱${baseCharge.toFixed(2)}`;
             document.getElementById('editExcessCharge').textContent = `₱${excessCharge.toFixed(2)}`;
             document.getElementById('editTotalAmount').textContent = `₱${total.toFixed(2)}`;

@@ -7,6 +7,7 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 include 'db.php';
+include 'image_cleanup_utility.php';
 
 // Include OCR functions (Roboflow + Tesseract)
 require_once __DIR__ . '/api/ocr_functions.php';
@@ -153,6 +154,9 @@ try {
     if (!$update->execute()) {
         throw new Exception('Failed to update reading status: ' . $update->error);
     }
+
+    // Delete image after successful retry processing
+    deleteImageAfterProcessing($reading_id, $conn);
 
     echo json_encode([
         'success' => true,
