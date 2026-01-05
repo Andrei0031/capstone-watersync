@@ -120,11 +120,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     }
 }
 
-// Get current delete password status
+// Handle delete actions enable/disable toggle
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_delete_toggle') {
+    // Checkbox sends value when checked; when unchecked, no value is present
+    $enabled_flag = isset($_POST['delete_enabled']) && $_POST['delete_enabled'] === '1' ? '1' : '0';
+
+    $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('delete_enabled', ?) 
+                            ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = CURRENT_TIMESTAMP");
+    $stmt->bind_param("ss", $enabled_flag, $enabled_flag);
+    
+    if ($stmt->execute()) {
+        $success_message = $enabled_flag === '1'
+            ? "Delete actions have been enabled for Readings and Billing."
+            : "Delete actions have been disabled for Readings and Billing.";
+    } else {
+        $error_message = "Error updating delete settings: " . $conn->error;
+    }
+}
+
+// Get current delete password & toggle status
 $password_set = false;
-$password_check = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
-if ($password_check && $password_check->num_rows > 0) {
-    $password_set = true;
+$delete_enabled = false;
+$settings_result = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('delete_password', 'delete_enabled')");
+if ($settings_result) {
+    while ($row = $settings_result->fetch_assoc()) {
+        if ($row['setting_key'] === 'delete_password' && !empty($row['setting_value'])) {
+            $password_set = true;
+        }
+        if ($row['setting_key'] === 'delete_enabled' && $row['setting_value'] === '1') {
+            $delete_enabled = true;
+        }
+    }
 }
 
 // Fetch all fees
@@ -275,7 +301,7 @@ $fees_result = $conn->query($fees_query);
                         <div class="card-body">
                             <p class="text-muted">
                                 Set a password to protect delete operations in Readings and Billing modules. 
-                                This password will be required before any deletion can be performed.
+                                This password will be required before any deletion can be performed when protection is enabled.
                             </p>
                             
                             <?php if ($password_set): ?>
@@ -289,6 +315,21 @@ $fees_result = $conn->query($fees_query);
                                     <strong>No password set.</strong> Delete buttons will be disabled until a password is configured.
                                 </div>
                             <?php endif; ?>
+
+                            <form method="POST" class="mb-3">
+                                <input type="hidden" name="action" value="update_delete_toggle">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="delete_enabled" name="delete_enabled" value="1"
+                                           <?php echo $delete_enabled ? 'checked' : ''; ?>
+                                           onchange="this.form.submit()">
+                                    <label class="form-check-label" for="delete_enabled">
+                                        Enable delete actions in Readings &amp; Billing
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    When disabled, delete buttons will be hidden and delete requests will be blocked even if a password is set.
+                                </small>
+                            </form>
 
                             <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#deletePasswordModal">
                                 <i class="fas fa-key me-2"></i>

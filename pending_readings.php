@@ -54,12 +54,22 @@ if ($conn instanceof mysqli) {
     $conn->query($create_settings_table);
 }
 
-// Check if delete password is configured
+// Check if delete actions are enabled (password set + toggle enabled)
 $delete_password_configured = false;
-$check_password = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_password'");
-if ($check_password && $check_password->num_rows > 0) {
-    $delete_password_configured = true;
+$has_password = false;
+$delete_enabled = false;
+$settings_result = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('delete_password', 'delete_enabled')");
+if ($settings_result) {
+    while ($row = $settings_result->fetch_assoc()) {
+        if ($row['setting_key'] === 'delete_password' && !empty($row['setting_value'])) {
+            $has_password = true;
+        }
+        if ($row['setting_key'] === 'delete_enabled' && $row['setting_value'] === '1') {
+            $delete_enabled = true;
+        }
+    }
 }
+$delete_password_configured = $has_password && $delete_enabled;
 
 /**
  * Check if Tesseract OCR is available on the system

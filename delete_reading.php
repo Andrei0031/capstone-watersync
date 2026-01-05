@@ -72,6 +72,16 @@ try {
         if ($reading_id <= 0) {
             throw new Exception('Invalid reading ID');
         }
+
+        // Check if delete actions are enabled in settings
+        $settings_result = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_enabled'");
+        $delete_enabled = false;
+        if ($settings_result && $row = $settings_result->fetch_assoc()) {
+            $delete_enabled = ($row['setting_value'] === '1');
+        }
+        if (!$delete_enabled) {
+            throw new Exception('Delete actions are currently disabled in settings.');
+        }
         
         // Check if password verification is required and was done
         if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {

@@ -11,6 +11,20 @@ include 'db.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Check if delete actions are enabled in settings
+    $settings_result = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_enabled'");
+    $delete_enabled = false;
+    if ($settings_result && $row = $settings_result->fetch_assoc()) {
+        $delete_enabled = ($row['setting_value'] === '1');
+    }
+    if (!$delete_enabled) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Delete actions are currently disabled in settings.'
+        ]);
+        exit();
+    }
+
     // Check if password verification is required and was done
     if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {
         echo json_encode([
