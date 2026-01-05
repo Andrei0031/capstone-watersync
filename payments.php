@@ -1093,7 +1093,7 @@ $payments_result = $conn->query($payments_sql);
                         <strong id="referenceNumberView"></strong>
                     </div>
                     <div class="col-6">
-                        <small class="text-muted d-block">Amount</small>
+                        <small class="text-muted d-block">Amount Paid</small>
                         <strong id="amountView"></strong>
                     </div>
                     <div class="col-6">
@@ -1838,7 +1838,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set payment details
                 document.getElementById('referenceNumberView').textContent = payment.reference_number;
-                document.getElementById('amountView').textContent = '₱' + payment.amount;
+                // Show total amount paid if available (for multi-bill payments), otherwise show single payment amount
+                const amountToDisplay = payment.total_amount_paid || payment.amount;
+                document.getElementById('amountView').textContent = '₱' + amountToDisplay;
                 document.getElementById('paymentDateView').textContent = payment.formatted_payment_date;
                 document.getElementById('paymentMethodView').textContent = payment.payment_method;
                 
