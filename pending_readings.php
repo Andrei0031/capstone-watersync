@@ -1747,6 +1747,33 @@ if (!$failed_result) {
                                                     $ocrReading = $row['ocr_reading'] ?? null;
                                                     $verifiedReading = $row['verified_reading'] ?? null;
                                                     $reading = $verifiedReading ?? $ocrReading ?? $row['reading_value'] ?? 0;
+
+                                                    // Heuristic confidence check based on consumption vs previous bill
+                                                    $needsReview = false;
+                                                    $previous = 0;
+                                                    try {
+                                                        if (isset($row['client_id'])) {
+                                                            $prev_stmt = $conn->prepare("SELECT reading FROM billing_list WHERE client_id = ? ORDER BY reading_date DESC LIMIT 1");
+                                                            if ($prev_stmt) {
+                                                                $prev_stmt->bind_param("i", $row['client_id']);
+                                                                $prev_stmt->execute();
+                                                                $prev_result = $prev_stmt->get_result();
+                                                                $previous = $prev_result->fetch_assoc()['reading'] ?? 0;
+                                                                $prev_stmt->close();
+                                                            }
+                                                        }
+                                                    } catch (Exception $e) {
+                                                        // Fail silently in UI, just don't flag for review
+                                                    }
+
+                                                    $numericReading = is_numeric($reading) ? floatval($reading) : 0;
+                                                    $consumption = $numericReading - floatval($previous);
+
+                                                    // Flag as "Needs Review" if consumption looks suspicious
+                                                    // Example thresholds: negative, zero, or very large jump
+                                                    if ($consumption < 0 || $consumption == 0 || $consumption > 200) {
+                                                        $needsReview = true;
+                                                    }
                                                     
                                                     // Show verified reading prominently if it exists
                                                     if ($verifiedReading !== null):
@@ -1765,7 +1792,14 @@ if (!$failed_result) {
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php else: ?>
-                                                    <?php echo number_format($reading, 0); ?>
+                                                    <div class="d-flex align-items-center">
+                                                        <strong><?php echo number_format($reading, 0); ?></strong>
+                                                        <?php if ($needsReview): ?>
+                                                            <span class="badge bg-warning text-dark ms-2" title="Unusual consumption detected. Please verify this reading before creating a bill.">
+                                                                <i class="fas fa-exclamation-triangle me-1"></i>Needs Review
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    </div>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
                                                             <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
@@ -1796,11 +1830,11 @@ if (!$failed_result) {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
+                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')" title="View Meter Image">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
-                                                    <i class="fas fa-edit"></i>
+                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)" title="Verify / Correct Reading">
+                                                    <i class="fas fa-edit me-1"></i>Verify
                                                 </button>
                                             </td>
                                         </tr>
