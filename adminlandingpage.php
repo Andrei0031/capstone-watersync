@@ -1201,7 +1201,7 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
 
 <script>
 let revenueChart;
-let paymentStatusChart;
+// paymentStatusChart removed - replaced with bar graph
 
 // Initialize charts
 $(document).ready(function() {
@@ -1766,18 +1766,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Update Payment Status Chart (with proper null checks)
-        if (paymentStatusChart && paymentStatusChart.options && paymentStatusChart.options.plugins) {
-            try {
-                if (paymentStatusChart.options.plugins.legend && paymentStatusChart.options.plugins.legend.labels) {
-                    paymentStatusChart.options.plugins.legend.labels.color = textColor;
-                    paymentStatusChart.options.plugins.legend.labels.boxWidth = 15;
-                }
-                paymentStatusChart.update();
-            } catch (e) {
-                console.warn('Could not update payment status chart theme:', e);
-            }
-        }
+        // Payment Status Chart removed - replaced with bar graph (no theme update needed)
 
         // Update other elements that might need color adjustment
         document.querySelectorAll('.card-title').forEach(title => {
