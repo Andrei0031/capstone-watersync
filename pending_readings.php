@@ -105,6 +105,7 @@ $needs_review_count = 0;
 $verified_count = 0;
 $processed_count = 0;
 $failed_count = 0;
+$ocr_processed_count = 0;
 
 // Get counts for each status
 $stats_sql = "SELECT 
@@ -123,10 +124,16 @@ if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $verified_count = $row['verified'] ?? 0;
     $processed_count = $row['processed'];
     $failed_count = $row['failed'];
+
+    // OCR-processed readings include all readings successfully scanned by OCR,
+    // regardless of whether they still need review, are verified, or already processed into bills.
+    $ocr_processed_count = $needs_review_count + $verified_count + $processed_count;
 }
 
-// Calculate success rate
-$success_rate = $total_readings > 0 ? round(($processed_count / $total_readings) * 100) : 0;
+// Calculate success rate based on OCR outcomes:
+// success = OCR-processed readings, total attempts = OCR-processed + failed.
+$attempts = $ocr_processed_count + $failed_count;
+$success_rate = $attempts > 0 ? round(($ocr_processed_count / $attempts) * 100) : 0;
 
 // Get readings uploaded today
 $today_sql = "SELECT COUNT(*) as today_count FROM pending_meter_readings 
@@ -1482,52 +1489,6 @@ if (!$failed_result) {
             </div>
                         <?php endif; ?>
 
-        <!-- Automated Bill Creation Messages -->
-        <?php if (isset($_GET['auto_bills_created'])): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i>
-                <strong>Automated Bill Creation Completed!</strong> 
-                Successfully processed <?php echo isset($_GET['count']) ? (int)$_GET['count'] : 0; ?> meter readings and created bills automatically.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if (isset($_GET['auto_bills_error'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i>
-                <strong>Automated Bill Creation Error:</strong> 
-                <?php echo htmlspecialchars($_GET['auto_bills_error']); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <!-- Automated Bill Creation Controls -->
-        <?php if ($active_cycle): ?>
-            <div class="card card-soft mb-4" style="border-left: 4px solid #007bff;">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h6 class="mb-1 text-primary">
-                                <i class="fas fa-magic me-2"></i>
-                                <strong>Automated Bill Creation</strong>
-                            </h6>
-                            <p class="mb-0 text-muted">
-                                Automatically create bills for all <strong>scanned and processed</strong> meter readings with OCR values in the current billing cycle.
-                                This will create bills for all customers who have submitted meter readings and apply water rates plus any additional fees.
-                            </p>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <form method="POST" id="autoCreateBillsForm" style="display: inline;">
-                                <button type="submit" name="auto_create_bills" id="autoCreateBillsBtn" class="btn btn-primary">
-                                    <i class="fas fa-bolt me-2"></i>Auto-Create Bills for All Scanned Readings
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-
         <!-- Stats Row -->
         <div class="row mb-4">
             <div class="col-md-3">
@@ -1546,8 +1507,8 @@ if (!$failed_result) {
                 <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%);">
                     <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
                         <div>
-                            <h6 class="text-white-50 mb-2">Processed</h6>
-                            <h3 class="mb-1 text-white"><?php echo $processed_count; ?></h3>
+                            <h6 class="text-white-50 mb-2">OCR Processed</h6>
+                            <h3 class="mb-1 text-white"><?php echo $ocr_processed_count; ?></h3>
                             <small class="text-white-50"><?php echo $success_rate; ?>% success rate</small>
                         </div>
                         <i class="fas fa-check-circle stat-icon"></i>
@@ -1580,14 +1541,6 @@ if (!$failed_result) {
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Auto-Processing Notice -->
-        <div class="alert alert-info alert-dismissible fade show" role="alert">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>Auto-Processing Enabled:</strong> Meter readings uploaded from mobile devices are now automatically processed with OCR. No manual processing required! 
-            <strong>Batch upload</strong> is available via <code>api/batch_upload_readings.php</code> for uploading multiple readings at once.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
 
         <!-- Tabs -->
