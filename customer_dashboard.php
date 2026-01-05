@@ -33,7 +33,7 @@ $balance_sql = "WITH PaymentTotals AS (
         billing_id,
         COALESCE(SUM(amount), 0) as total_paid
     FROM payment_list
-    WHERE client_id = ? AND status = 1
+    WHERE client_id = ?
     GROUP BY billing_id
 )
 SELECT 

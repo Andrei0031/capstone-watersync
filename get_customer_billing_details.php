@@ -40,7 +40,7 @@ try {
             COALESCE(SUM(amount), 0) as total_paid,
             MAX(payment_date) as last_payment_date
         FROM payment_list
-        WHERE billing_id IN (SELECT id FROM billing_list WHERE client_id = ?) AND status = 1
+        WHERE billing_id IN (SELECT id FROM billing_list WHERE client_id = ?)
         GROUP BY billing_id
     )
     SELECT 

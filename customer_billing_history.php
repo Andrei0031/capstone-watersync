@@ -61,7 +61,7 @@ $sql = "WITH PaymentTotals AS (
         billing_id,
         COALESCE(SUM(amount), 0) as total_paid
     FROM payment_list
-    WHERE client_id = ? AND status = 1
+    WHERE client_id = ?
     GROUP BY billing_id
 )
 SELECT 
@@ -279,8 +279,11 @@ $years = $stmt->get_result();
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="client_notices.php">
+                        <a class="nav-link" href="client_notices.php" style="position: relative;">
                             <i class="fas fa-bell"></i> Notices
+                            <span id="notificationBadge" class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; display: none;">
+                                0
+                            </span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -610,5 +613,31 @@ $years = $stmt->get_result();
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update notification badge
+        function updateNotificationBadge() {
+            fetch('get_notification_count.php')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notificationBadge');
+                    if (badge && data.success) {
+                        if (data.count > 0) {
+                            badge.textContent = data.count > 99 ? '99+' : data.count;
+                            badge.style.display = 'block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(error => console.error('Error updating notification badge:', error));
+        }
+        
+        // Update badge on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateNotificationBadge();
+            // Update every 30 seconds
+            setInterval(updateNotificationBadge, 30000);
+        });
+    </script>
 </body>
 </html> 
