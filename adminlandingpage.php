@@ -1143,7 +1143,7 @@ $(document).ready(function() {
         setTimeout(function() {
             if (typeof Chart === 'undefined') {
                 console.error('Chart.js still not loaded after timeout!');
-                alert('Chart.js library failed to load. Please refresh the page.');
+                showError('Chart.js library failed to load. Please refresh the page.');
                 return;
             }
             updateRevenueChart('monthly');
@@ -1300,7 +1300,7 @@ function updateRevenueChart(period) {
         // Check if Chart.js is loaded
         if (typeof Chart === 'undefined') {
             console.error('Chart.js is not loaded!');
-            alert('Chart.js library is missing. Please refresh the page.');
+            showError('Chart.js library is missing. Please refresh the page.');
             return;
         }
 
@@ -1820,14 +1820,15 @@ function updateReport() {
             // Close modal
             bootstrap.Modal.getInstance(document.getElementById('reportModal')).hide();
             // Refresh the page to show updated data
-            location.reload();
+            showSuccess('Report updated successfully!');
+            setTimeout(() => location.reload(), 1000);
         } else {
-            alert('Error updating report: ' + data.message);
+            showError('Error updating report: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error updating report. Please try again.');
+        showError('Error updating report. Please try again.');
     });
 }
 
@@ -1952,5 +1953,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Notification System -->
+<script src="assets/js/notifications.js"></script>
 </body>
 </html>

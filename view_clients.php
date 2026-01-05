@@ -2723,7 +2723,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!addressNewInput.value.trim()) {
                     e.preventDefault();
                     addressNewInput.focus();
-                    alert('Please enter a new address');
+                    showWarning('Please enter a new address');
                     return false;
                 }
                 // Replace the select value with the new address
@@ -2804,7 +2804,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bulkDeleteBtn.addEventListener('click', function() {
             const selected = document.querySelectorAll('.customer-checkbox:checked');
             if (selected.length === 0) {
-                alert('Please select at least one customer to delete.');
+                showWarning('Please select at least one customer to delete.');
                 return;
             }
 
@@ -3140,7 +3140,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (file) {
                 var fileName = file.name.toLowerCase();
                 if (!fileName.endsWith('.csv')) {
-                    alert('Please select a CSV file');
+                    showWarning('Please select a CSV file');
                     this.value = '';
                 }
             }
@@ -3304,7 +3304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var confirmCheckbox = document.getElementById('confirmDelete');
         
         if (!adminPassword || !confirmCheckbox) {
-            alert('Error: Form elements not found');
+            showError('Error: Form elements not found');
             return;
         }
         
@@ -3317,10 +3317,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (readingToDelete) {
                 deleteHistoricalReading(readingToDelete);
             } else {
-                alert('Error: No reading selected for deletion');
+                showError('Error: No reading selected for deletion');
             }
         } else {
-            alert('Please enter your admin password and confirm you understand the action.');
+            showWarning('Please enter your admin password and confirm you understand the action.');
         }
     }
     
@@ -3343,14 +3343,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 deleteModal.hide();
                 
                 // Show success message
-                alert('Historical reading deleted successfully');
+                showSuccess('Historical reading deleted successfully');
                 refreshReadings();
             } else {
-                alert('Error deleting reading: ' + data.message);
+                showError('Error deleting reading: ' + data.message);
             }
         })
         .catch(error => {
-            alert('Error deleting reading: ' + error.message);
+            showError('Error deleting reading: ' + error.message);
         });
     }
 
@@ -3375,6 +3375,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Notification System -->
+<script src="assets/js/notifications.js"></script>
 
 </body>
 </html>

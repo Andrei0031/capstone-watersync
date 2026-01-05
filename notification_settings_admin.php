@@ -462,6 +462,8 @@ $email_test_mode = getSetting('email_test_mode', '0');
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     <script>
         function updateSMSFields() {
             const provider = document.getElementById('sms_provider').value;
@@ -509,7 +511,7 @@ $email_test_mode = getSetting('email_test_mode', '0');
         
         // XAMPP guidance function
         function showXAMPPGuidance() {
-            alert('Email Solutions for WaterSync:\n\n' +
+            const message = 'Email Solutions for WaterSync:\n\n' +
                   '🚀 HOSTING DEPLOYMENT (Recommended):\n' +
                   '   - Upload to web hosting (Hostinger, etc.)\n' +
                   '   - Configure hosting SMTP settings\n' +
@@ -522,7 +524,8 @@ $email_test_mode = getSetting('email_test_mode', '0');
                   '   - Use SMS notifications for now\n' +
                   '   - Deploy to hosting for email\n' +
                   '   - Check HOSTING_DEPLOYMENT_GUIDE.md\n\n' +
-                  'Your system will work perfectly when hosted!');
+                  'Your system will work perfectly when hosted!';
+            showInfo(message.replace(/\n/g, '<br>'));
         }
     </script>
 </body>

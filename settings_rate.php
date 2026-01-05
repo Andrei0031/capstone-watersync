@@ -2319,6 +2319,8 @@ if ($mobile_users_result) {
 
     <!-- Bootstrap 5 JS Bundle (Popper.js included) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     <script>
         // Theme switcher logic
         const themeToggle = document.getElementById('theme-toggle');
@@ -3006,7 +3008,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (!confirmCheck) {
                     e.preventDefault();
-                    alert('Please confirm that you understand this action cannot be undone.');
+                    showWarning('Please confirm that you understand this action cannot be undone.');
                     return false;
                 }
                 
@@ -3163,7 +3165,7 @@ function attachTokenCopyHandlers() {
                     this.classList.remove('btn-success');
                 }, 2000);
             }).catch(() => {
-                alert('Unable to copy token automatically. Please copy it manually.');
+                showWarning('Unable to copy token automatically. Please copy it manually.');
             });
         });
 

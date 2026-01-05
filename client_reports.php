@@ -1159,6 +1159,8 @@ $notices = $conn->query($notices_query);
     <!-- Add Bootstrap and other required scripts before the closing body tag -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     
     <script>
     function editNotice(notice) {
@@ -1205,7 +1207,7 @@ $notices = $conn->query($notices_query);
             
             if (!checked) {
                 e.preventDefault();
-                alert('Please select at least one affected area.');
+                showWarning('Please select at least one affected area.');
             }
         });
     });
@@ -1274,7 +1276,7 @@ $notices = $conn->query($notices_query);
 
                 if (!isValid) {
                     e.preventDefault();
-                    alert('Please fill in all required fields.');
+                    showWarning('Please fill in all required fields.');
                 }
             });
         }

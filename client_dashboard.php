@@ -442,6 +442,8 @@ $reports = $stmt->get_result();
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -473,18 +475,18 @@ $reports = $stmt->get_result();
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert(data.message);
+                        showSuccess(data.message);
                         // Clear form
                         outageForm.reset();
                         // Optionally refresh the page or update the UI
-                        window.location.reload();
+                        setTimeout(() => window.location.reload(), 1000);
                     } else {
-                        alert(data.message || 'Error submitting report');
+                        showError(data.message || 'Error submitting report');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error submitting report. Please try again.');
+                    showError('Error submitting report. Please try again.');
                 });
             });
         }

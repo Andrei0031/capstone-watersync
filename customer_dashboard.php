@@ -2058,6 +2058,8 @@ $disconnection_notices = $stmt->get_result();
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     <script>
     // Initialize tab functionality
     document.addEventListener('DOMContentLoaded', function() {
@@ -2169,7 +2171,7 @@ $disconnection_notices = $stmt->get_result();
 
     // View report details function
     window.viewReportDetails = function(reportId) {
-        alert(`Viewing details for report ID: ${reportId}`);
+        showInfo(`Viewing details for report ID: ${reportId}`);
     }
 
     // View notice function for notifications tab
@@ -2192,16 +2194,16 @@ $disconnection_notices = $stmt->get_result();
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('Report submitted successfully');
+                        showSuccess('Report submitted successfully');
                         this.reset();
-                        location.reload();
+                        setTimeout(() => location.reload(), 1000);
                     } else {
-                        alert(data.message || 'Error submitting report');
+                        showError(data.message || 'Error submitting report');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error submitting report');
+                    showError('Error submitting report');
                 });
             });
         }

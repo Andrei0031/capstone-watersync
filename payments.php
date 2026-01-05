@@ -1143,6 +1143,8 @@ $payments_result = $conn->query($payments_sql);
 
 <!-- Bootstrap JS and other scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Notification System -->
+<script src="assets/js/notifications.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Check for payment_id in URL parameters
@@ -1784,7 +1786,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error generating reference number');
+            showError('Error generating reference number');
         });
     }
 
@@ -1839,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error loading payment details');
+                showError('Error loading payment details');
             });
     }
 
@@ -1858,14 +1860,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewPaymentModal'));
                     viewModal.hide();
-                    location.reload();
+                    showSuccess('Payment deleted successfully!');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Error deleting payment: ' + data.message);
+                    showError('Error deleting payment: ' + data.message);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error deleting payment');
+                showError('Error deleting payment');
             });
         }
     }
@@ -1892,14 +1895,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     deletePaymentModal.hide();
-                    location.reload();
+                    showSuccess('Payment deleted successfully!');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Error deleting payment: ' + data.message);
+                    showError('Error deleting payment: ' + data.message);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error deleting payment');
+                showError('Error deleting payment');
             });
         }
     });

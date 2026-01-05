@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.removeAttribute('disabled');
                     
                     if (data.error) {
-                        alert(data.error);
+                        showError(data.error);
                         return;
                     }
                     
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Remove loading state
                     this.removeAttribute('disabled');
                     console.error('Error:', error);
-                    alert('Error fetching billing details. Please try again.');
+                    showError('Error fetching billing details. Please try again.');
                 });
         });
     });
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Network error occurred. Please try again.');
+                showError('Network error occurred. Please try again.');
             })
             .finally(() => {
                 // Restore button state

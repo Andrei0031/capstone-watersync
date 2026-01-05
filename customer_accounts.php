@@ -415,12 +415,12 @@ function changePassword() {
     const confirmPassword = document.getElementById('confirmPassword').value;
     
     if (!newPassword || !confirmPassword) {
-        alert('Please fill in both password fields');
+        showWarning('Please fill in both password fields');
         return;
     }
     
     if (newPassword !== confirmPassword) {
-        alert('Passwords do not match');
+        showWarning('Passwords do not match');
         return;
     }
     
@@ -437,10 +437,10 @@ function changePassword() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Password changed successfully');
+            showSuccess('Password changed successfully');
             bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
         } else {
-            alert('Error changing password: ' + data.message);
+            showError('Error changing password: ' + data.message);
         }
     });
 }
@@ -460,9 +460,10 @@ function toggleAccountStatus(id, currentStatus) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                location.reload();
+                showSuccess('Account status updated successfully!');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('Error updating account status');
+                showError('Error updating account status');
             }
         });
     }
@@ -482,9 +483,10 @@ function deleteAccount(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                location.reload();
+                showSuccess('Account deleted successfully!');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('Error deleting account');
+                showError('Error deleting account');
             }
         });
     }

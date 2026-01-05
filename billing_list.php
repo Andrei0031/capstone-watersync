@@ -2277,7 +2277,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Remove loading state
                 this.removeAttribute('disabled');
                 console.error('Error viewing bill:', error);
-                alert('Error viewing bill details: ' + error.message);
+                showError('Error viewing bill details: ' + error.message);
             }
         });
     });
@@ -2321,7 +2321,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error marking bill as paid: ' + error.message);
+            showError('Error marking bill as paid: ' + error.message);
         }
     });
 
@@ -2403,7 +2403,7 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', function() {
                 const billId = this.getAttribute('data-id');
                 // Add your receipt viewing logic here
-                alert('View receipt for bill #' + billId);
+                showInfo('View receipt for bill #' + billId);
             });
         });
 
@@ -2411,7 +2411,7 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', function() {
                 const billId = this.getAttribute('data-id');
                 // Add your receipt printing logic here
-                alert('Print receipt for bill #' + billId);
+                showInfo('Print receipt for bill #' + billId);
             });
         });
     }
@@ -2468,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('editTotalInput').value = total.toFixed(2);
         } catch (error) {
             console.error('Error calculating totals:', error);
-            alert('Error calculating bill totals: ' + error.message);
+            showError('Error calculating bill totals: ' + error.message);
         }
     }
 
@@ -2546,13 +2546,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadingDiv.style.display = 'none';
                     contentDiv.style.display = 'block';
                 } else {
-                    alert('Error loading customer details: ' + (data.message || 'Unknown error'));
+                    showError('Error loading customer details: ' + (data.message || 'Unknown error'));
                     modal.hide();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error loading customer details: ' + error.message);
+                showError('Error loading customer details: ' + error.message);
                 modal.hide();
             });
     };
@@ -2626,7 +2626,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error deleting bill: ' + error.message);
+                    showError('Error deleting bill: ' + error.message);
                     // Restore the button state
                     this.disabled = false;
                     this.innerHTML = originalHtml;
@@ -2724,7 +2724,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleBulkDelete() {
         const selected = document.querySelectorAll('.bulk-delete-checkbox:checked');
         if (selected.length === 0) {
-            alert('Please select at least one bill to delete.');
+            showWarning('Please select at least one bill to delete.');
             return;
         }
 
@@ -2840,7 +2840,7 @@ document.addEventListener('DOMContentLoaded', function() {
         getPreviousReadingBtn.addEventListener('click', async function() {
             const clientId = clientSelect.value;
             if (!clientId) {
-                alert('Please select a client first');
+                showWarning('Please select a client first');
                 return;
             }
             const previousReading = await fetchPreviousReading(clientId);
@@ -3042,6 +3042,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Notification System -->
+<script src="assets/js/notifications.js"></script>
 <!-- Custom JS -->
 <script src="assets/js/billing_list.js"></script>
 </body>

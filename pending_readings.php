@@ -1431,9 +1431,8 @@ if (!$failed_result) {
                             </p>
                         </div>
                         <div class="col-md-4 text-end">
-                            <form method="POST" style="display: inline;">
-                                <button type="submit" name="auto_create_bills" class="btn btn-primary" 
-                                        onclick="return confirm('Create bills automatically for all scanned and processed meter readings in the current billing cycle? This will create bills for all customers with valid OCR readings. This action cannot be undone.')">
+                            <form method="POST" id="autoCreateBillsForm" style="display: inline;">
+                                <button type="submit" name="auto_create_bills" id="autoCreateBillsBtn" class="btn btn-primary">
                                     <i class="fas fa-bolt me-2"></i>Auto-Create Bills for All Scanned Readings
                                 </button>
                             </form>
@@ -2011,6 +2010,8 @@ if (!$failed_result) {
 
     <!-- Bootstrap JS and other scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Notification System -->
+    <script src="assets/js/notifications.js"></script>
     <script>
         // Theme toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -2031,6 +2032,18 @@ if (!$failed_result) {
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Handle auto-create bills form confirmation
+            const autoCreateBillsForm = document.getElementById('autoCreateBillsForm');
+            if (autoCreateBillsForm) {
+                autoCreateBillsForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    showConfirm('Create bills automatically for all scanned and processed meter readings in the current billing cycle? This will create bills for all customers with valid OCR readings. This action cannot be undone.', function() {
+                        // User confirmed - submit the form
+                        autoCreateBillsForm.submit();
+                    });
+                });
+            }
+            
             // Handle image modal
             const imageModal = document.getElementById('imageModal');
             imageModal.addEventListener('show.bs.modal', function(event) {
@@ -2049,7 +2062,7 @@ if (!$failed_result) {
                     const selectedReadings = document.querySelectorAll('input[name="selected_readings[]"]:checked');
                     
                     if (selectedReadings.length === 0) {
-                        alert('Please select at least one reading to process.');
+                        showWarning('Please select at least one reading to process.');
                         return;
                     }
                     
@@ -2070,7 +2083,7 @@ if (!$failed_result) {
                     const timeoutId = setTimeout(() => {
                         controller.abort();
                         loadingModal.hide();
-                        alert('Processing timed out after 5 minutes. The Roboflow API may be slow. Please try again or check server logs.');
+                        showError('Processing timed out after 5 minutes. The Roboflow API may be slow. Please try again or check server logs.');
                     }, 300000); // 5 minute timeout (increased from 2 minutes)
                     
                     // Submit via AJAX
@@ -2332,7 +2345,7 @@ if (!$failed_result) {
         }
 
         function deleteReading(id) {
-            if (confirm('Are you sure you want to delete this reading?')) {
+            showConfirm('Are you sure you want to delete this reading?', function() {
                 fetch('delete_reading.php', {
                     method: 'POST',
                     headers: {
@@ -2343,16 +2356,17 @@ if (!$failed_result) {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        location.reload();
+                        showSuccess('Reading deleted successfully!');
+                        setTimeout(() => location.reload(), 1000);
                     } else {
-                        alert('Error deleting reading: ' + data.message);
+                        showError('Error deleting reading: ' + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error deleting reading');
+                    showError('Error deleting reading');
                 });
-            }
+            });
         }
 
         function deleteSelectedReadings(type) {
@@ -2368,16 +2382,19 @@ if (!$failed_result) {
             }
             
             if (!checkboxes || checkboxes.length === 0) {
-                alert('Please select at least one reading to delete.');
+                showWarning('Please select at least one reading to delete.');
                 return;
             }
             
             count = checkboxes.length;
             const confirmMessage = `Are you sure you want to delete ${count} reading(s)? This action cannot be undone.`;
             
-            if (!confirm(confirmMessage)) {
-                return;
-            }
+            showConfirm(confirmMessage, function() {
+                // User confirmed - proceed with deletion
+                proceedWithDeletion();
+            });
+            
+            function proceedWithDeletion() {
             
             const ids = Array.from(checkboxes).map(cb => cb.value);
             
@@ -2410,18 +2427,21 @@ if (!$failed_result) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert(data.message);
-                    location.reload();
+                    showSuccess(data.message);
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Error deleting readings: ' + data.message);
-                    document.querySelector('.alert-info').remove();
+                    showError('Error deleting readings: ' + data.message);
+                    const loadingAlert = document.querySelector('.alert-info');
+                    if (loadingAlert) loadingAlert.remove();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error deleting readings');
-                document.querySelector('.alert-info').remove();
+                showError('Error deleting readings');
+                const loadingAlert = document.querySelector('.alert-info');
+                if (loadingAlert) loadingAlert.remove();
             });
+            }
         }
 
         function editReading(id) {
@@ -2724,7 +2744,7 @@ if (!$failed_result) {
                             
                             const verifiedReading = document.getElementById('verified_reading').value;
                             if (!verifiedReading || verifiedReading < 0 || verifiedReading > 99999) {
-                                alert('Please enter a valid reading value between 0 and 99999');
+                                showWarning('Please enter a valid reading value between 0 and 99999');
                                 return;
                             }
                             
@@ -2754,14 +2774,14 @@ if (!$failed_result) {
                                         document.body.style.paddingRight = '';
                                     }, 300);
                                     // Show success message
-                                    alert('Reading value updated successfully!');
-                                    location.reload();
+                                    showSuccess('Reading value updated successfully!');
+                                    setTimeout(() => location.reload(), 1000);
                                 } else {
                                     throw new Error(data.message);
                                 }
                             })
                             .catch(error => {
-                                alert('Error updating reading: ' + error.message);
+                                showError('Error updating reading: ' + error.message);
                                 submitBtn.disabled = false;
                                 submitBtn.innerHTML = originalText;
                             });
@@ -2792,7 +2812,7 @@ if (!$failed_result) {
                     }
                     errorMessage += '\n\nPlease check the browser console (F12) for more details.';
                     
-                    alert(errorMessage);
+                    showError(errorMessage);
                 });
         }
 
@@ -2807,35 +2827,37 @@ if (!$failed_result) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    showSuccess('Reading retry initiated successfully!');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Error retrying reading: ' + data.message);
+                    showError('Error retrying reading: ' + data.message);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error retrying reading');
+                showError('Error retrying reading');
             });
         }
 
         function retryAllFailed() {
-            if (confirm('Are you sure you want to retry processing all failed readings?')) {
+            showConfirm('Are you sure you want to retry processing all failed readings?', function() {
                 fetch('retry_all_readings.php', {
                     method: 'POST'
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        location.reload();
+                        showSuccess('Retry process initiated successfully!');
+                        setTimeout(() => location.reload(), 1000);
                     } else {
-                        alert('Error retrying readings: ' + data.message);
+                        showError('Error retrying readings: ' + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error retrying readings');
+                    showError('Error retrying readings');
                 });
-            }
+            });
         }
 
         // Display processing result message

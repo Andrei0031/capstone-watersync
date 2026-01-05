@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Remove loading state
                     this.removeAttribute('disabled');
                     console.error('Detailed error:', error); // Debug log
-                    alert('Error fetching billing details: ' + error.message);
+                    showError('Error fetching billing details: ' + error.message);
                 });
         });
     });
@@ -137,9 +137,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Delete Bill Functionality
     document.querySelectorAll('.delete-btn').forEach(button => {
         button.addEventListener('click', function() {
-            if (confirm('Are you sure you want to delete this bill?')) {
-                const billId = this.getAttribute('data-id');
-                
+            const billId = this.getAttribute('data-id');
+            const buttonElement = this;
+            
+            showConfirm('Are you sure you want to delete this bill?', function() {
                 fetch('delete_bill.php', {
                     method: 'POST',
                     headers: {
@@ -150,17 +151,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        showSuccess('Bill deleted successfully!');
                         // Remove the row from the table
-                        this.closest('tr').remove();
+                        buttonElement.closest('tr').remove();
                     } else {
-                        alert('Error deleting bill: ' + data.message);
+                        showError('Error deleting bill: ' + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error deleting bill');
+                    showError('Error deleting bill');
                 });
-            }
+            });
         });
     });
 
@@ -213,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('editTotalInput').value = total.toFixed(2);
         } catch (error) {
             console.error('Error calculating totals:', error);
-            alert('Error calculating bill totals: ' + error.message);
+            showError('Error calculating bill totals: ' + error.message);
         }
     }
 
@@ -270,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error updating bill: ' + error.message);
+                showError('Error updating bill: ' + error.message);
             })
             .finally(() => {
                 // Restore button state

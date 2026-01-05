@@ -403,7 +403,7 @@ elseif ($report_type === 'overdue') {
                         </td>
                         <td class="text-danger fw-bold">₱<?php echo number_format($bill['balance_due'], 2); ?></td>
                         <td>
-                            <button class="btn btn-sm btn-warning" onclick="alert('Contact client at <?php echo $bill['contact']; ?>')">
+                            <button class="btn btn-sm btn-warning" onclick="showInfo('Contact client at <?php echo $bill['contact']; ?>')">
                                 <i class="fas fa-phone"></i> Contact
                             </button>
                         </td>

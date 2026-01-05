@@ -440,6 +440,8 @@ if (!$payment) {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Notification System -->
+<script src="assets/js/notifications.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Theme Toggle
@@ -469,14 +471,15 @@ function deletePayment(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                window.location.href = 'payments.php';
+                showSuccess('Payment deleted successfully!');
+                setTimeout(() => window.location.href = 'payments.php', 1000);
             } else {
-                alert('Error deleting payment: ' + data.message);
+                showError('Error deleting payment: ' + data.message);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error deleting payment');
+            showError('Error deleting payment');
         });
     }
 }
