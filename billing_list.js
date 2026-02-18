@@ -5,12 +5,16 @@ document.documentElement.setAttribute('data-theme', savedTheme);
 // --- Admin "secret delete" for bills (define early so inline onclick always works) ---
 // Uses prompt/confirm so it works even if Bootstrap modals are not available.
 window.deleteBillWithPassword = async function(billId) {
+    console.log('=== DELETE BILL FUNCTION CALLED ===', billId);
+    alert('Delete function called for bill ID: ' + billId); // Temporary debug
     try {
         const idNum = parseInt(billId, 10);
         if (!idNum) {
+            console.error('Invalid bill ID:', billId);
             throw new Error('Invalid bill ID');
         }
 
+        console.log('Prompting for password...');
         const password = prompt('Enter the admin delete password to delete this bill:');
         if (password === null) return; // user cancelled
         if (!password) throw new Error('Delete password is required.');

@@ -3057,6 +3057,67 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Notification System -->
 <script src="assets/js/notifications.js"></script>
+<!-- Delete Bill Function (inline to ensure it's always available) -->
+<script>
+// Admin "secret delete" for bills - defined inline so onclick always works
+window.deleteBillWithPassword = async function(billId) {
+    console.log('=== DELETE BILL FUNCTION CALLED ===', billId);
+    try {
+        const idNum = parseInt(billId, 10);
+        if (!idNum) {
+            alert('Invalid bill ID: ' + billId);
+            return;
+        }
+
+        const password = prompt('Enter the admin delete password to delete this bill:');
+        if (password === null) return; // user cancelled
+        if (!password) {
+            alert('Delete password is required.');
+            return;
+        }
+
+        const ok = confirm(
+            'Are you sure you want to delete this bill?\n\n' +
+            'This will permanently remove the bill and related payments/notices.\n' +
+            'This action cannot be undone.'
+        );
+        if (!ok) return;
+
+        const response = await fetch('delete_bill.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bill_id: idNum, password })
+        });
+
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('delete_bill.php returned non-JSON:', text);
+            alert('Delete failed: Server returned invalid response.');
+            return;
+        }
+
+        if (!data.success) {
+            alert('Delete failed: ' + (data.message || 'Unknown error'));
+            return;
+        }
+
+        if (typeof showSuccess !== 'undefined') {
+            showSuccess(data.message || 'Bill deleted successfully');
+        } else {
+            alert('Success: ' + (data.message || 'Bill deleted successfully'));
+        }
+
+        setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+        console.error('Delete bill error:', err);
+        const msg = err?.message || 'Delete failed.';
+        alert('Error: ' + msg);
+    }
+};
+</script>
 <!-- Custom JS -->
 <script src="billing_list.js"></script>
 </body>
