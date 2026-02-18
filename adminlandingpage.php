@@ -1352,40 +1352,89 @@ function updateRevenueChart(period) {
         }
 
         try {
+            // Create a soft gradient for the actual revenue line
+            const gradientActual = revenueCtx.createLinearGradient(0, 0, 0, 200);
+            gradientActual.addColorStop(0, 'rgba(78, 115, 223, 0.25)');
+            gradientActual.addColorStop(1, 'rgba(78, 115, 223, 0)');
+
+            // Apply gradient fill to the first dataset (Actual)
+            if (datasets[0]) {
+                datasets[0].backgroundColor = gradientActual;
+                datasets[0].fill = true;
+                datasets[0].tension = 0.35;
+                datasets[0].pointRadius = 4;
+                datasets[0].pointHoverRadius = 5;
+            }
+            // Subtle styling for forecast series
+            if (datasets[1]) {
+                datasets[1].tension = 0.35;
+                datasets[1].pointRadius = 3;
+                datasets[1].pointHoverRadius = 4;
+            }
+
             revenueChart = new Chart(revenueCtx, {
-            type: 'line',
-            data: {
-                labels: allLabels,
-                datasets: datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    y: { beginAtZero: true, ticks: { callback: function(value){ return '₱' + value.toLocaleString(); } }, grid: { color: 'rgba(0,0,0,0.1)' } },
-                    x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: datasets
                 },
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    tooltip: { 
-                        filter: function(ti){ return ti.raw !== null; }, 
-                        callbacks: { 
-                            label: function(ctx){ 
-                                const v = ctx.raw; 
-                                if (v === null) return null;
-                                return ctx.dataset.label + ': ₱' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); 
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value){ return '₱' + value.toLocaleString(); },
+                                color: '#6c757d',
+                                font: { size: 11 }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#6c757d',
+                                font: { size: 11 }
+                            },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 16 }
+                        },
+                        tooltip: { 
+                            backgroundColor: 'rgba(33, 37, 41, 0.9)',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            titleFont: { size: 12, weight: '600' },
+                            bodyFont: { size: 11 },
+                            padding: 10,
+                            displayColors: true,
+                            filter: function(ti){ return ti.raw !== null; }, 
+                            callbacks: { 
+                                label: function(ctx){ 
+                                    const v = ctx.raw; 
+                                    if (v === null) return null;
+                                    return ctx.dataset.label + ': ₱' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); 
+                                } 
                             } 
-                        } 
-                    }
-                },
-                elements: {
-                    line: {
-                        spanGaps: true  // Allow lines to span gaps for better visualization
+                        }
+                    },
+                    elements: {
+                        line: {
+                            borderWidth: 2,
+                            spanGaps: true
+                        },
+                        point: {
+                            hitRadius: 8
+                        }
                     }
                 }
-            }
-        });
+            });
         console.log('Chart created successfully');
         } catch (chartError) {
             console.error('Error creating chart:', chartError);
