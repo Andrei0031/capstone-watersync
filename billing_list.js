@@ -2,6 +2,63 @@
 const savedTheme = localStorage.getItem('theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
+// --- Admin "secret delete" for bills (define early so inline onclick always works) ---
+// Uses prompt/confirm so it works even if Bootstrap modals are not available.
+window.deleteBillWithPassword = async function(billId) {
+    try {
+        const idNum = parseInt(billId, 10);
+        if (!idNum) {
+            throw new Error('Invalid bill ID');
+        }
+
+        const password = prompt('Enter the admin delete password to delete this bill:');
+        if (password === null) return; // user cancelled
+        if (!password) throw new Error('Delete password is required.');
+
+        const ok = confirm(
+            'Are you sure you want to delete this bill?\n\n' +
+            'This will permanently remove the bill and related payments/notices.\n' +
+            'This action cannot be undone.'
+        );
+        if (!ok) return;
+
+        const response = await fetch('delete_bill.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bill_id: idNum, password })
+        });
+
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('delete_bill.php returned non-JSON:', text);
+            throw new Error('Delete failed (server returned invalid response).');
+        }
+
+        if (!data.success) {
+            throw new Error(data.message || 'Delete failed.');
+        }
+
+        if (typeof showSuccess !== 'undefined') {
+            showSuccess(data.message || 'Bill deleted successfully');
+        } else {
+            alert(data.message || 'Bill deleted successfully');
+        }
+
+        setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+        console.error('Delete bill error:', err);
+        const msg = err?.message || 'Delete failed.';
+        if (typeof showError !== 'undefined') {
+            showError(msg);
+        } else {
+            alert(msg);
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     // Theme Toggle
     const themeToggle = document.getElementById('theme-toggle');
