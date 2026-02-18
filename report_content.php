@@ -772,6 +772,32 @@ elseif ($report_type === 'billing') {
 ?>
     <!-- Billing Summary -->
     <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-primary text-white">
+                <h4>₱<?php echo number_format(array_sum(array_column($report_data['monthly_billing'], 'total_amount')), 2); ?></h4>
+                <p class="mb-0">Total Billed (Selected Period)</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-success text-white">
+                <h4><?php echo array_sum(array_column($report_data['monthly_billing'], 'bills_generated')); ?></h4>
+                <p class="mb-0">Total Bills Generated</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-info text-white">
+                <h4>
+                    <?php 
+                    $totalConsumption = array_sum(array_column($report_data['monthly_billing'], 'total_consumption'));
+                    echo number_format($totalConsumption, 2);
+                    ?>
+                </h4>
+                <p class="mb-0">Total Consumption (m³)</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
         <div class="col-md-12">
             <div class="card report-card">
                 <div class="card-header">

@@ -294,6 +294,7 @@ elseif ($report_type === 'billing') {
         COUNT(*) as bills_generated,
         SUM(total) as total_amount,
         AVG(total) as average_bill,
+        SUM(reading - previous) as total_consumption,
         COUNT(CASE WHEN status = 1 THEN 1 END) as paid_bills,
         COUNT(CASE WHEN status = 0 AND due_date < CURRENT_DATE() THEN 1 END) as overdue_bills
         FROM billing_list 
