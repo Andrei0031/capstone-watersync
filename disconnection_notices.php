@@ -343,6 +343,30 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
         background: linear-gradient(135deg, #e3f9e5 0%, #b2f2bb 100%);
     }
 
+    /* Dark mode variants for stat cards */
+    html[data-theme="dark"] .stat-card,
+    [data-theme="dark"] .stat-card {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        color: #e4e6eb;
+    }
+
+    html[data-theme="dark"] .stat-card.pending,
+    [data-theme="dark"] .stat-card.pending {
+        background: linear-gradient(135deg, #3b2c02 0%, #7c5e10 100%);
+    }
+    html[data-theme="dark"] .stat-card.sent,
+    [data-theme="dark"] .stat-card.sent {
+        background: linear-gradient(135deg, #0b2545 0%, #123e7c 100%);
+    }
+    html[data-theme="dark"] .stat-card.critical,
+    [data-theme="dark"] .stat-card.critical {
+        background: linear-gradient(135deg, #4b0f19 0%, #a3122f 100%);
+    }
+    html[data-theme="dark"] .stat-card.resolved,
+    [data-theme="dark"] .stat-card.resolved {
+        background: linear-gradient(135deg, #083828 0%, #0f5132 100%);
+    }
+
     .table {
         color: var(--table-cell-text);
         background-color: var(--table-bg);
@@ -358,6 +382,12 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
         font-size: 0.85rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+    }
+
+    html[data-theme="dark"] .table thead th,
+    [data-theme="dark"] .table thead th {
+        background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+        color: #e5e7eb;
     }
 
     .table tbody tr {
@@ -591,7 +621,7 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
     .filters-card {
         border-radius: 16px;
         border: none;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
     }
 
     .filters-card .form-label {
