@@ -799,7 +799,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $message = "✅ SMS test sent successfully! Check your phone.";
                 $messageClass = "alert-success";
             } else {
-                $error_msg = $sms_result['error'] ?? 'Unknown error';
+                $raw_error = $sms_result['error'] ?? ($sms_result['message'] ?? 'Unknown error');
+                if (is_array($raw_error) || is_object($raw_error)) {
+                    $error_msg = json_encode($raw_error);
+                } else {
+                    $error_msg = (string)$raw_error;
+                }
                 $message = "❌ SMS test failed: " . $error_msg;
                 $messageClass = "alert-danger";
             }
@@ -829,7 +834,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $message = "✅ Overdue SMS test sent successfully! Check your phone.";
                 $messageClass = "alert-success";
             } else {
-                $error_msg = $sms_result['error'] ?? $sms_result['message'] ?? 'Unknown error';
+                $raw_error = $sms_result['error'] ?? ($sms_result['message'] ?? 'Unknown error');
+                if (is_array($raw_error) || is_object($raw_error)) {
+                    $error_msg = json_encode($raw_error);
+                } else {
+                    $error_msg = (string)$raw_error;
+                }
                 $message = "❌ Overdue SMS test failed: " . $error_msg;
                 $messageClass = "alert-danger";
             }
