@@ -1,7 +1,115 @@
 /**
  * WaterSync Notification System
- * Replaces all alert() calls with proper Bootstrap alert notifications
+ * Replaces all alert() calls with modern, animated Bootstrap-based toast notifications
  */
+
+/**
+ * Inject minimal CSS for stacked, animated notifications (once per page)
+ */
+function ensureNotificationStyles() {
+    if (document.getElementById('ws-notification-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'ws-notification-styles';
+    style.innerHTML = `
+        .ws-notification-container {
+            position: fixed;
+            z-index: 9999;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+        .ws-top-right { top: 0; right: 0; }
+        .ws-top-left { top: 0; left: 0; }
+        .ws-bottom-right { bottom: 0; right: 0; }
+        .ws-bottom-left { bottom: 0; left: 0; }
+        .ws-top-center {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .ws-notification {
+            pointer-events: auto;
+            border-radius: 0.75rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            align-items: flex-start;
+            padding: 0.75rem 1rem;
+            min-width: 280px;
+            max-width: 420px;
+            animation: ws-slide-in 0.25s ease-out;
+        }
+
+        .ws-notification .ws-icon {
+            font-size: 1.4rem;
+            margin-right: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        .ws-notification .ws-content {
+            flex: 1;
+        }
+
+        .ws-notification .ws-title {
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+            font-size: 0.95rem;
+        }
+
+        .ws-notification .ws-message {
+            margin: 0;
+            font-size: 0.85rem;
+        }
+
+        .ws-notification .btn-close {
+            margin-left: 0.75rem;
+            margin-top: 0.1rem;
+        }
+
+        @keyframes ws-slide-in {
+            from {
+                opacity: 0;
+                transform: translateX(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes ws-slide-out {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(8px);
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+/**
+ * Get or create a container element for the given position
+ */
+function getNotificationContainer(positionKey) {
+    const existing = document.querySelector(`.ws-notification-container[data-position="${positionKey}"]`);
+    if (existing) return existing;
+
+    const container = document.createElement('div');
+    container.className = `ws-notification-container ws-${positionKey}`;
+    container.dataset.position = positionKey;
+    document.body.appendChild(container);
+    return container;
+}
 
 /**
  * Show a notification message box
@@ -11,6 +119,8 @@
  * @param {string} position - Position: 'top-right', 'top-left', 'bottom-right', 'bottom-left', 'top-center' (default: 'top-right')
  */
 function showNotification(message, type = 'info', duration = 5000, position = 'top-right') {
+    ensureNotificationStyles();
+
     // Map type to Bootstrap alert class
     const alertTypes = {
         'success': 'success',
@@ -22,16 +132,16 @@ function showNotification(message, type = 'info', duration = 5000, position = 't
     
     const alertClass = alertTypes[type] || 'info';
     
-    // Map position to CSS classes
-    const positionClasses = {
-        'top-right': 'top-0 end-0',
-        'top-left': 'top-0 start-0',
-        'bottom-right': 'bottom-0 end-0',
-        'bottom-left': 'bottom-0 start-0',
-        'top-center': 'top-0 start-50 translate-middle-x'
+    // Map position key to container class suffix
+    const positionKeys = {
+        'top-right': 'top-right',
+        'top-left': 'top-left',
+        'bottom-right': 'bottom-right',
+        'bottom-left': 'bottom-left',
+        'top-center': 'top-center'
     };
     
-    const positionClass = positionClasses[position] || 'top-0 end-0';
+    const positionKey = positionKeys[position] || 'top-right';
     
     // Determine icon based on type
     const icons = {
@@ -46,10 +156,10 @@ function showNotification(message, type = 'info', duration = 5000, position = 't
     
     // Determine title based on type
     const titles = {
-        'success': 'Success!',
-        'error': 'Error!',
-        'danger': 'Error!',
-        'warning': 'Warning!',
+        'success': 'Success',
+        'error': 'Error',
+        'danger': 'Error',
+        'warning': 'Warning',
         'info': 'Notice'
     };
     
@@ -59,33 +169,45 @@ function showNotification(message, type = 'info', duration = 5000, position = 't
     const notificationId = 'notification-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     const alertDiv = document.createElement('div');
     alertDiv.id = notificationId;
-    alertDiv.className = `alert alert-${alertClass} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${alertClass} alert-dismissible fade show ws-notification`;
     alertDiv.setAttribute('role', 'alert');
-    alertDiv.style.cssText = `position: fixed; ${positionClass.includes('translate') ? '' : positionClass.replace('top-0', 'top: 20px').replace('end-0', 'right: 20px').replace('start-0', 'left: 20px').replace('bottom-0', 'bottom: 20px')}; z-index: 9999; min-width: 300px; max-width: 500px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);`;
-    
-    if (positionClass.includes('translate')) {
-        alertDiv.style.cssText += ' transform: translateX(-50%);';
+
+    alertDiv.innerHTML = `
+        <i class="fas ${icon} ws-icon"></i>
+        <div class="ws-content">
+            <div class="ws-title">${title}</div>
+            <p class="ws-message">${message}</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    // Close handler (with slide-out animation)
+    const closeNotification = () => {
+        if (!alertDiv) return;
+        alertDiv.style.animation = 'ws-slide-out 0.2s ease-in forwards';
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 200);
+    };
+
+    const closeButton = alertDiv.querySelector('.btn-close');
+    if (closeButton) {
+        closeButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeNotification();
+        });
     }
     
-    alertDiv.innerHTML = `
-        <i class="fas ${icon} me-2"></i>
-        <strong>${title}</strong> ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" onclick="document.getElementById('${notificationId}').remove()"></button>
-    `;
-    
-    // Add to body
-    document.body.appendChild(alertDiv);
+    // Add to appropriate container (enables stacking)
+    const container = getNotificationContainer(positionKey);
+    // Newest on top
+    container.insertBefore(alertDiv, container.firstChild);
     
     // Auto-remove after duration
     if (duration > 0) {
-        setTimeout(function() {
-            const notification = document.getElementById(notificationId);
-            if (notification) {
-                // Add fade out animation
-                notification.classList.remove('show');
-                setTimeout(function() {
-                    notification.remove();
-                }, 300); // Match Bootstrap fade duration
+        setTimeout(() => {
+            if (document.getElementById(notificationId)) {
+                closeNotification();
             }
         }, duration);
     }
