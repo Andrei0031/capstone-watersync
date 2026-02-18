@@ -1249,10 +1249,10 @@ function updateRevenueChart(period) {
     }
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
-    const forecastMethod = 'linear'; // Always use Linear Regression
+    const forecastMethod = 'seasonal'; // Use seasonal time-series forecasting
 
-    // Fetch paid revenue forecast using Linear Regression
-    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Linear Regression');
+    // Fetch paid revenue forecast using Seasonal Time Series model
+    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Seasonal Time Series');
     $.ajax({
         url: 'dashboard_data.php',
         method: 'GET',
@@ -1318,7 +1318,7 @@ function updateRevenueChart(period) {
 
         const datasets = [
             { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
-            { label: 'Forecasted Revenue (Linear Regression)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
+            { label: 'Forecasted Revenue (Seasonal Time Series)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
         ];
         
         console.log('LINEAR REGRESSION forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
