@@ -87,6 +87,18 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
         transition: background-color 0.3s, color 0.3s;
     }
 
+    /* Dark mode readability improvements */
+    html[data-theme="dark"] .text-muted,
+    [data-theme="dark"] .text-muted {
+        color: #cbd5f5 !important;
+    }
+
+    html[data-theme="dark"] .bg-light,
+    [data-theme="dark"] .bg-light {
+        background-color: #111827 !important;
+        color: var(--text-color) !important;
+    }
+
     .sidebar {
         height: 100vh;
         background-color: var(--sidebar-bg);
