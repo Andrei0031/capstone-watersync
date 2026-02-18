@@ -223,19 +223,40 @@ class DashboardData {
 
     /**
      * Total water consumption per purok (entire barangay breakdown).
-     * Assumes client_list has a 'purok' field storing purok/zone name.
+     * If a 'purok' column doesn't exist, falls back to using client address.
      */
     public function getConsumptionPerPurok() {
-        $sql = "SELECT 
-                    COALESCE(cl.purok, 'Unspecified') AS purok,
-                    SUM(b.reading - b.previous) AS total_cubic
-                FROM billing_list b
-                JOIN client_list cl ON b.client_id = cl.id
-                WHERE b.reading IS NOT NULL 
-                  AND b.previous IS NOT NULL
-                  AND cl.delete_flag = 0
-                GROUP BY COALESCE(cl.purok, 'Unspecified')
-                ORDER BY purok ASC";
+        // Detect if 'purok' column exists in client_list
+        $hasPurok = false;
+        if ($colResult = $this->conn->query("SHOW COLUMNS FROM client_list LIKE 'purok'")) {
+            $hasPurok = $colResult->num_rows > 0;
+        }
+
+        if ($hasPurok) {
+            $sql = "SELECT 
+                        COALESCE(cl.purok, 'Unspecified') AS area_label,
+                        SUM(b.reading - b.previous) AS total_cubic
+                    FROM billing_list b
+                    JOIN client_list cl ON b.client_id = cl.id
+                    WHERE b.reading IS NOT NULL 
+                      AND b.previous IS NOT NULL
+                      AND cl.delete_flag = 0
+                    GROUP BY COALESCE(cl.purok, 'Unspecified')
+                    ORDER BY area_label ASC";
+        } else {
+            // Fallback: group by address when purok column is not available
+            $sql = "SELECT 
+                        COALESCE(cl.address, 'Unspecified') AS area_label,
+                        SUM(b.reading - b.previous) AS total_cubic
+                    FROM billing_list b
+                    JOIN client_list cl ON b.client_id = cl.id
+                    WHERE b.reading IS NOT NULL 
+                      AND b.previous IS NOT NULL
+                      AND cl.delete_flag = 0
+                    GROUP BY COALESCE(cl.address, 'Unspecified')
+                    ORDER BY area_label ASC";
+        }
+
         $result = $this->conn->query($sql);
         $data = [];
         if ($result) {

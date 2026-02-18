@@ -967,13 +967,13 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
         <div class="col-md-6">
             <div class="card card-soft mb-4">
                 <div class="card-body">
-                    <h5 class="card-title">Consumption by Purok</h5>
-                    <p class="text-muted mb-2">Total cubic meters generated per purok</p>
+                    <h5 class="card-title">Consumption by Area / Purok</h5>
+                    <p class="text-muted mb-2">Total cubic meters generated per purok (or address if purok is not set)</p>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Purok</th>
+                                    <th>Area / Purok</th>
                                     <th class="text-end">Total Consumption (m³)</th>
                                 </tr>
                             </thead>
@@ -981,7 +981,7 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                                 <?php if (!empty($purok_consumption)): ?>
                                     <?php foreach ($purok_consumption as $row): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($row['purok']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['area_label']); ?></td>
                                             <td class="text-end"><?php echo number_format($row['total_cubic'], 2); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
