@@ -61,6 +61,53 @@ if (isset($_SESSION['client_id'])) {
         animation: pulse 2s infinite;
         box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);
     }
+
+    /* Enhanced top navigation bar */
+    .customer-top-navbar {
+        background: linear-gradient(135deg, #0D47A1, #2196F3);
+        box-shadow: 0 10px 25px rgba(13, 71, 161, 0.45);
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
+    }
+
+    .customer-top-navbar .navbar-brand {
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        font-size: 1.1rem;
+    }
+
+    .customer-top-navbar .nav-link {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.4rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.85);
+        transition: background-color 0.2s ease-out, color 0.2s ease-out, transform 0.15s ease-out;
+    }
+
+    .customer-top-navbar .nav-link i {
+        font-size: 0.95rem;
+    }
+
+    .customer-top-navbar .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .customer-top-navbar .nav-link.active {
+        background-color: #ffffff;
+        color: #0D47A1 !important;
+        box-shadow: 0 4px 12px rgba(13, 71, 161, 0.35);
+    }
+
+    .customer-top-navbar .nav-link.active i {
+        color: #0D47A1 !important;
+    }
 </style>
 <script>
     // Update notification badge dynamically
@@ -97,7 +144,7 @@ if (isset($_SESSION['client_id'])) {
         setInterval(updateNotificationBadge, 30000);
     });
 </script>
-<nav class="navbar navbar-expand-lg navbar-dark mb-4" style="background: linear-gradient(45deg, #0D47A1, #2196F3);">
+<nav class="navbar navbar-expand-lg navbar-dark mb-4 customer-top-navbar">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center" href="customer_dashboard.php">
             <img src="icons/Logo.png" alt="WaterSync Logo" style="height: 40px; filter: brightness(0) invert(1); margin-right: 10px;">
