@@ -16,6 +16,7 @@ $date_to = $_GET['date_to'] ?? date('Y-m-d'); // Today
 
 // Ensure report_logs table exists and log this report view (except for history itself)
 try {
+    // Ensure table exists
     $conn->query("CREATE TABLE IF NOT EXISTS report_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         admin_id INT NULL,
@@ -23,17 +24,23 @@ try {
         date_from DATE NOT NULL,
         date_to DATE NOT NULL,
         ip_address VARCHAR(45) DEFAULT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL,
         INDEX idx_report_type (report_type),
         INDEX idx_created_at (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    // Ensure created_at is DATETIME without automatic timezone surprises
+    @$conn->query("ALTER TABLE report_logs MODIFY COLUMN created_at DATETIME NOT NULL");
+
     if ($report_type !== 'logs' && isset($_SESSION['admin_id'])) {
         $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
         $admin_id = (int)$_SESSION['admin_id'];
-        $stmtLog = $conn->prepare("INSERT INTO report_logs (admin_id, report_type, date_from, date_to, ip_address) VALUES (?, ?, ?, ?, ?)");
+        // Use PHP time which is already forced to Asia/Manila via timezone_helper
+        $created_at = date('Y-m-d H:i:s');
+
+        $stmtLog = $conn->prepare("INSERT INTO report_logs (admin_id, report_type, date_from, date_to, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?)");
         if ($stmtLog) {
-            $stmtLog->bind_param("issss", $admin_id, $report_type, $date_from, $date_to, $ip_address);
+            $stmtLog->bind_param("isssss", $admin_id, $report_type, $date_from, $date_to, $ip_address, $created_at);
             $stmtLog->execute();
             $stmtLog->close();
         }
