@@ -98,25 +98,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resolve_report'])) {
     $stmt->close();
 }
 
-// Get filter parameter
+// Get filter parameters
 $status_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : 'all';
+$date_from = isset($_GET['date_from']) ? $_GET['date_from'] : date('Y-m-01');
+$date_to = isset($_GET['date_to']) ? $_GET['date_to'] : date('Y-m-d');
+$notice_status_filter = isset($_GET['notice_status']) ? $_GET['notice_status'] : 'active';
 
-// Build reports query with filter
+// Build reports query with filters (status + date range)
 $reports_query = "
     SELECT o.*, cl.firstname, cl.lastname
     FROM outage_reports o
-    JOIN client_list cl ON o.client_id = cl.id";
+    JOIN client_list cl ON o.client_id = cl.id
+    WHERE DATE(o.created_at) BETWEEN '{$date_from}' AND '{$date_to}'";
     
 if ($status_filter === 'pending') {
-    $reports_query .= " WHERE o.status = 0";
+    $reports_query .= " AND o.status = 0";
 } elseif ($status_filter === 'resolved') {
-    $reports_query .= " WHERE o.status = 1";
+    $reports_query .= " AND o.status = 1";
 }
 
 $reports_query .= " ORDER BY o.created_at DESC";
 $reports = $conn->query($reports_query);
 
-// Get statistics
+// Get statistics (overall, not filtered by date)
 $stats_query = "
     SELECT 
         COUNT(*) as total_reports,
@@ -126,15 +130,27 @@ $stats_query = "
     FROM outage_reports";
 $stats = $conn->query($stats_query)->fetch_assoc();
 
-// Get active notices
+// Notices query with status + date filters
 $notices_query = "
     SELECT n.*, a.username as admin_name
     FROM notices n
     JOIN admin a ON n.created_by = a.id
-    WHERE (n.status = 'ongoing' OR 
-          (n.status = 'scheduled' AND n.start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) OR
-          (n.status = 'completed' AND n.end_date >= DATE_SUB(NOW(), INTERVAL 24 HOUR)))
-    ORDER BY 
+    WHERE DATE(n.start_date) BETWEEN '{$date_from}' AND '{$date_to}'";
+
+if ($notice_status_filter === 'ongoing') {
+    $notices_query .= " AND n.status = 'ongoing'";
+} elseif ($notice_status_filter === 'scheduled') {
+    $notices_query .= " AND n.status = 'scheduled'";
+} elseif ($notice_status_filter === 'completed') {
+    $notices_query .= " AND n.status = 'completed'";
+} else {
+    // 'active' (default) – show ongoing + upcoming + recent completed (same logic as before)
+    $notices_query .= " AND (n.status = 'ongoing' 
+          OR (n.status = 'scheduled' AND n.start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) 
+          OR (n.status = 'completed' AND n.end_date >= DATE_SUB(NOW(), INTERVAL 24 HOUR)))";
+}
+
+$notices_query .= " ORDER BY 
         CASE n.status
             WHEN 'ongoing' THEN 1
             WHEN 'scheduled' THEN 2
@@ -652,6 +668,40 @@ $notices = $conn->query($notices_query);
     <div class="main-content">
         <h2 class="mb-4">Client Reports & Notices Management</h2>
 
+        <!-- Global Filters for Reports & Notices -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="GET" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">From Date</label>
+                        <input type="date" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">To Date</label>
+                        <input type="date" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Notice Status</label>
+                        <select name="notice_status" class="form-select">
+                            <option value="active" <?php echo $notice_status_filter === 'active' ? 'selected' : ''; ?>>Active (ongoing / upcoming / recent)</option>
+                            <option value="ongoing" <?php echo $notice_status_filter === 'ongoing' ? 'selected' : ''; ?>>Ongoing</option>
+                            <option value="scheduled" <?php echo $notice_status_filter === 'scheduled' ? 'selected' : ''; ?>>Scheduled</option>
+                            <option value="completed" <?php echo $notice_status_filter === 'completed' ? 'selected' : ''; ?>>Completed</option>
+                            <option value="all" <?php echo $notice_status_filter === 'all' ? 'selected' : ''; ?>>All Statuses</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-2"></i>Apply Filters
+                        </button>
+                    </div>
+                    <!-- Preserve current report status filter -->
+                    <input type="hidden" name="status_filter" value="<?php echo htmlspecialchars($status_filter); ?>">
+                </form>
+            </div>
+        </div>
+
         <?php if ($success_message): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <?php echo $success_message; ?>
@@ -721,13 +771,21 @@ $notices = $conn->query($notices_query);
                             <i class="fas fa-chart-bar me-2"></i>Client Reports
                         </h5>
                         <div class="btn-group" role="group">
-                            <a href="?status_filter=all" class="btn btn-sm <?php echo $status_filter === 'all' ? 'btn-primary' : 'btn-outline-primary'; ?>">
+                            <?php
+                            // Helper to build URLs that keep date and notice filters
+                            $baseQuery = http_build_query([
+                                'date_from' => $date_from,
+                                'date_to' => $date_to,
+                                'notice_status' => $notice_status_filter,
+                            ]);
+                            ?>
+                            <a href="?<?php echo $baseQuery; ?>&status_filter=all" class="btn btn-sm <?php echo $status_filter === 'all' ? 'btn-primary' : 'btn-outline-primary'; ?>">
                                 All
                             </a>
-                            <a href="?status_filter=pending" class="btn btn-sm <?php echo $status_filter === 'pending' ? 'btn-warning' : 'btn-outline-warning'; ?>">
+                            <a href="?<?php echo $baseQuery; ?>&status_filter=pending" class="btn btn-sm <?php echo $status_filter === 'pending' ? 'btn-warning' : 'btn-outline-warning'; ?>">
                                 Pending
                             </a>
-                            <a href="?status_filter=resolved" class="btn btn-sm <?php echo $status_filter === 'resolved' ? 'btn-success' : 'btn-outline-success'; ?>">
+                            <a href="?<?php echo $baseQuery; ?>&status_filter=resolved" class="btn btn-sm <?php echo $status_filter === 'resolved' ? 'btn-success' : 'btn-outline-success'; ?>">
                                 Resolved
                             </a>
                         </div>
