@@ -1327,26 +1327,52 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function exportReport(format, button) {
+async function exportReport(format, button) {
     const urlParams = new URLSearchParams(window.location.search);
-    const reportType = encodeURIComponent(urlParams.get('type') || 'dashboard');
-    const dateFrom = encodeURIComponent(urlParams.get('date_from') || '<?php echo $date_from; ?>');
-    const dateTo = encodeURIComponent(urlParams.get('date_to') || '<?php echo $date_to; ?>');
-    
+    const rawType = urlParams.get('type') || 'dashboard';
+    const rawFrom = urlParams.get('date_from') || '<?php echo $date_from; ?>';
+    const rawTo = urlParams.get('date_to') || '<?php echo $date_to; ?>';
+
     if (format === 'pdf') {
         showInfo('PDF export feature is coming soon! Please use CSV export for now.');
         return;
     }
-    
-    // Optional loading state
-    if (button) {
-        showExportLoading(button);
+
+    const reportType = encodeURIComponent(rawType);
+    const dateFrom = encodeURIComponent(rawFrom);
+    const dateTo = encodeURIComponent(rawTo);
+
+    const exportUrl = `export_reports.php?type=${reportType}&format=${format}&date_from=${dateFrom}&date_to=${dateTo}`;
+
+    // CSV: fetch as blob and force a download via an invisible link
+    if (format === 'csv') {
+        if (button) {
+            showExportLoading(button);
+        }
+        try {
+            const response = await fetch(exportUrl, { credentials: 'same-origin' });
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `watersync_${rawType}_report_${rawFrom}_to_${rawTo}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('CSV export failed', e);
+            showError('CSV export failed. Please try again.');
+        } finally {
+            if (button) {
+                // reset label handled inside showExportLoading timer
+                button.disabled = false;
+            }
+        }
+        return;
     }
 
-    // Create export URL (encode parameters for safety)
-    const exportUrl = `export_reports.php?type=${reportType}&format=${format}&date_from=${dateFrom}&date_to=${dateTo}`;
-    
-    // Trigger download
+    // Fallback: navigate for other formats
     window.location.href = exportUrl;
 }
 
