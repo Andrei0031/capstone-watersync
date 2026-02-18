@@ -22,7 +22,9 @@ $pending_payments = $dashboard->getPendingPayments();
 $average_bill = $dashboard->getAverageBill();
 $payment_status = $dashboard->getPaymentStatusData();
 $recent_transactions = $dashboard->getRecentTransactions();
-$payment_predictions = $dashboard->getPaymentPredictions();
+// Water consumption stats
+$total_consumption = $dashboard->getTotalConsumption();
+$purok_consumption = $dashboard->getConsumptionPerPurok();
 $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list WHERE delete_flag = 0 AND status = 1 ORDER BY lastname, firstname");
 ?>
 <!DOCTYPE html>
@@ -946,54 +948,54 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
         </div>
     </div>
 
-    <!-- Predictive Analytics Section -->
+    <!-- Water Consumption Summary -->
     <div class="row">
         <div class="col-md-6">
-            <div class="card card-soft">
+            <div class="card card-soft mb-4">
                 <div class="card-body">
-                    <h5 class="card-title">Payment Predictions</h5>
-                    <div class="prediction-item">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-arrow-up prediction-icon trend-up"></i>
-                            <div>
-                                <div class="text-muted">Expected Payments (Next Month)</div>
-                                <div class="prediction-value">₱<?php echo number_format($payment_predictions['expected_payment'], 2); ?></div>
-                            </div>
-                        </div>
-                        <div class="prediction-trend">
-                            <i class="fas fa-arrow-<?php echo $payment_predictions['payment_trend'] >= 0 ? 'up' : 'down'; ?> me-2 trend-<?php echo $payment_predictions['payment_trend'] >= 0 ? 'up' : 'down'; ?>"></i>
-                            <span><?php echo abs($payment_predictions['payment_trend']); ?>%</span>
-                        </div>
-                    </div>
-                    <div class="prediction-item">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-exclamation-triangle prediction-icon text-warning"></i>
-                            <div>
-                                <div class="text-muted">Predicted Late Payments</div>
-                                <div class="prediction-value"><?php echo $payment_predictions['predicted_late']; ?> Bills</div>
-                            </div>
-                        </div>
-                        <div class="prediction-trend text-warning">
-                            <span><?php echo $payment_predictions['predicted_late'] > 5 ? 'High Risk' : ($payment_predictions['predicted_late'] > 2 ? 'Medium Risk' : 'Low Risk'); ?></span>
-                        </div>
-                    </div>
-                    <div class="prediction-item">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-clock prediction-icon text-info"></i>
-                            <div>
-                                <div class="text-muted">Average Payment Delay</div>
-                                <div class="prediction-value"><?php echo $payment_predictions['avg_delay']; ?> Days</div>
-                            </div>
-                        </div>
-                        <div class="prediction-trend">
-                            <i class="fas fa-arrow-<?php echo $payment_predictions['avg_delay'] <= 5 ? 'down' : 'up'; ?> me-2 trend-<?php echo $payment_predictions['avg_delay'] <= 5 ? 'down' : 'up'; ?>"></i>
-                            <span><?php echo $payment_predictions['avg_delay'] <= 5 ? 'Good' : 'Needs Improvement'; ?></span>
-                        </div>
+                    <h5 class="card-title">Total Water Consumption</h5>
+                    <p class="text-muted mb-2">Entire barangay (all time, based on billing readings)</p>
+                    <div class="d-flex align-items-baseline gap-3">
+                        <h2 class="mb-0">
+                            <?php echo number_format($total_consumption, 2); ?>
+                            <small class="fs-6 text-muted">m³</small>
+                        </h2>
                     </div>
                 </div>
             </div>
         </div>
-        
+        <div class="col-md-6">
+            <div class="card card-soft mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Consumption by Purok</h5>
+                    <p class="text-muted mb-2">Total cubic meters generated per purok</p>
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Purok</th>
+                                    <th class="text-end">Total Consumption (m³)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($purok_consumption)): ?>
+                                    <?php foreach ($purok_consumption as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['purok']); ?></td>
+                                            <td class="text-end"><?php echo number_format($row['total_cubic'], 2); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted">No consumption data available yet.</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Notices History Card -->

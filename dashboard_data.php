@@ -206,6 +206,46 @@ class DashboardData {
         return $transactions;
     }
 
+    /**
+     * Total water consumption (all time) in cubic meters.
+     * Uses reading - previous from billing_list.
+     */
+    public function getTotalConsumption() {
+        $sql = "SELECT SUM(reading - previous) AS total_cubic 
+                FROM billing_list 
+                WHERE reading IS NOT NULL AND previous IS NOT NULL";
+        $result = $this->conn->query($sql);
+        if ($result && $row = $result->fetch_assoc()) {
+            return (float) ($row['total_cubic'] ?? 0);
+        }
+        return 0;
+    }
+
+    /**
+     * Total water consumption per purok (entire barangay breakdown).
+     * Assumes client_list has a 'purok' field storing purok/zone name.
+     */
+    public function getConsumptionPerPurok() {
+        $sql = "SELECT 
+                    COALESCE(cl.purok, 'Unspecified') AS purok,
+                    SUM(b.reading - b.previous) AS total_cubic
+                FROM billing_list b
+                JOIN client_list cl ON b.client_id = cl.id
+                WHERE b.reading IS NOT NULL 
+                  AND b.previous IS NOT NULL
+                  AND cl.delete_flag = 0
+                GROUP BY COALESCE(cl.purok, 'Unspecified')
+                ORDER BY purok ASC";
+        $result = $this->conn->query($sql);
+        $data = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        return $data;
+    }
+
     public function getPaymentPredictions() {
         // Calculate expected payments for next month based on average of last 3 months
         $sql = "SELECT AVG(monthly_total) as expected_payment
