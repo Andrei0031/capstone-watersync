@@ -1,6 +1,8 @@
 <?php
 // Basic initialization
 session_start();
+// Use Philippine time for all automated payment timestamps
+date_default_timezone_set('Asia/Manila');
 header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 0);

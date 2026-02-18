@@ -5,6 +5,9 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
+// Use Philippine timezone for manual payment entries
+date_default_timezone_set('Asia/Manila');
+
 include 'db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

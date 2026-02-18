@@ -5,6 +5,9 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
+// Ensure all payment dates use Philippine time
+date_default_timezone_set('Asia/Manila');
+
 include 'db.php';
 include 'late_payment_processor.php';
 
@@ -1049,14 +1052,12 @@ $payments_result = $conn->query($payments_sql);
                     <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Payment Date</label>
-                            <input type="date" class="form-control" name="payment_date" value="<?php echo date('Y-m-d'); ?>" required>
+                            <input type="date" class="form-control" name="payment_date" value="<?php echo date('Y-m-d'); ?>" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Payment Method</label>
                             <select class="form-select" name="payment_method" required>
                                 <option value="cash">Cash</option>
-                                <option value="gcash">GCash</option>
-                                <option value="bank_transfer">Bank Transfer</option>
                             </select>
                         </div>
                     </div>
