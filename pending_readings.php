@@ -2720,55 +2720,33 @@ if (!$failed_result) {
                     errorDiv.style.display = 'block';
                     return;
                 }
-                
-                // Verify password
-                fetch('verify_delete_password.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ password: password })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        passwordModal.hide();
-                        // Now proceed with deletion
-                        showConfirm('Are you sure you want to delete this reading? This action cannot be undone.', function() {
-                            fetch('delete_reading.php', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ reading_id: readingId })
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    showSuccess('Reading deleted successfully');
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 1500);
-                                } else {
-                                    showError('Error deleting reading: ' + data.message);
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error:', error);
-                                showError('Error deleting reading');
-                            });
-                        });
-                    } else {
-                        errorDiv.textContent = data.message || 'Incorrect password';
-                        errorDiv.style.display = 'block';
-                        document.getElementById('deletePasswordInput').value = '';
-                        document.getElementById('deletePasswordInput').focus();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    errorDiv.textContent = 'Error verifying password';
-                    errorDiv.style.display = 'block';
+
+                // Hide password modal and confirm before delete
+                passwordModal.hide();
+
+                showConfirm('Are you sure you want to delete this reading? This action cannot be undone.', function() {
+                    fetch('delete_reading.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ reading_id: readingId, password: password })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showSuccess('Reading deleted successfully');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            showError('Error deleting reading: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showError('Error deleting reading');
+                    });
                 });
             });
             
