@@ -2237,7 +2237,7 @@ if ($mobile_users_result) {
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
                             <strong>Mobile App Integration:</strong> Once activated, meter readers using the mobile app 
-                            will automatically submit readings to this billing cycle when connected to the same network.
+                            will automatically submit readings to this billing cycle whenever an internet connection is available.
                         </div>
                     </div>
                     <div class="modal-footer">
