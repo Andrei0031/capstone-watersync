@@ -819,49 +819,54 @@ $disconnection_notices = $stmt->get_result();
             line-height: 1;
         }
 
-        /* Minimal pill-style dashboard tabs (like mobile bottom nav) */
+        /* Minimal top-nav style dashboard tabs (aligned with system blue theme) */
         .dashboard-tabs-container {
             background: #ffffff;
-            border-radius: 999px;
-            padding: 10px 18px;
+            border-radius: 14px;
+            padding: 6px 18px;
             margin-bottom: 16px;
-            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
         }
 
         .dashboard-tabs-container .nav-tabs {
             border-bottom: none;
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: center;
+            gap: 12px;
         }
 
         .nav-tabs .dashboard-tab-button {
             position: relative;
             border: none;
             background: transparent !important;
-            color: #90caf9 !important; /* light blue to match system palette */
+            color: #e3f2fd !important; /* light blue-grey */
             font-weight: 500 !important;
-            padding: 8px 16px !important;
-            min-width: 90px;
-            text-align: center !important;
+            padding: 8px 10px !important;
+            min-width: 100px;
+            text-align: left !important;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            transition: color 0.2s ease-out, background-color 0.2s ease-out;
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon {
-            display: flex;
-            justify-content: center;
+            display: inline-flex;
             align-items: center;
-            margin-bottom: 4px;
-            font-size: 1.25rem;
+            justify-content: center;
+            font-size: 1rem;
         }
 
         .nav-tabs .dashboard-tab-button .tab-label {
             display: block;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 500;
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon i {
-            color: #90caf9 !important;
+            color: #e3f2fd !important;
         }
 
         .nav-tabs .dashboard-tab-button.active {
@@ -876,7 +881,7 @@ $disconnection_notices = $stmt->get_result();
         .nav-tabs .dashboard-tab-button .notif-dot {
             position: absolute;
             top: 4px;
-            right: 22px;
+            right: 6px;
             width: 8px;
             height: 8px;
             border-radius: 50%;
