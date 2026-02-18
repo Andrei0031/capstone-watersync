@@ -58,8 +58,8 @@ if ($format === 'csv') {
                     date('M d, Y', strtotime($row['payment_date'])),
                     $row['payment_method'],
                     $row['payment_count'],
-                    '₱' . number_format($row['total_amount'], 2),
-                    '₱' . number_format($row['verified_amount'], 2)
+                    number_format($row['total_amount'], 2, '.', ''),
+                    number_format($row['verified_amount'], 2, '.', '')
                 ]);
             }
             
@@ -91,7 +91,7 @@ if ($format === 'csv') {
                     $row['firstname'] . ' ' . $row['lastname'],
                     $row['meter_code'],
                     $row['payment_count'],
-                    '₱' . number_format($row['total_paid'], 2)
+                    number_format($row['total_paid'], 2, '.', '')
                 ]);
             }
             break;
@@ -126,9 +126,9 @@ if ($format === 'csv') {
                     $row['meter_code'],
                     $row['contact'],
                     $row['total_bills'] ?? 0,
-                    '₱' . number_format($row['total_billed'] ?? 0, 2),
+                    number_format($row['total_billed'] ?? 0, 2, '.', ''),
                     $row['payments_made'] ?? 0,
-                    '₱' . number_format($row['total_paid'] ?? 0, 2),
+                    number_format($row['total_paid'] ?? 0, 2, '.', ''),
                     $row['status'] == 1 ? 'Active' : 'Inactive'
                 ]);
             }
@@ -166,10 +166,10 @@ if ($format === 'csv') {
                     $row['meter_code'],
                     date('M d, Y', strtotime($row['reading_date'])),
                     date('M d, Y', strtotime($row['due_date'])),
-                    $row['days_overdue'] . ' days',
-                    '₱' . number_format($row['total'], 2),
-                    '₱' . number_format($row['amount_paid'], 2),
-                    '₱' . number_format($row['balance_due'], 2)
+                    $row['days_overdue'],
+                    number_format($row['total'], 2, '.', ''),
+                    number_format($row['amount_paid'], 2, '.', ''),
+                    number_format($row['balance_due'], 2, '.', '')
                 ]);
             }
             break;
@@ -206,8 +206,8 @@ if ($format === 'csv') {
                 fputcsv($output, [
                     $row['month_name'] . ' ' . $row['year'],
                     $row['bills_generated'],
-                    '₱' . number_format($row['total_amount'], 2),
-                    '₱' . number_format($row['average_bill'], 2),
+                    number_format($row['total_amount'], 2, '.', ''),
+                    number_format($row['average_bill'], 2, '.', ''),
                     $row['paid_bills'],
                     $row['overdue_bills']
                 ]);
@@ -241,15 +241,15 @@ if ($format === 'csv') {
             
             while ($row = $fees_result->fetch_assoc()) {
                 $rate_display = $row['fee_type'] === 'fixed' ? 
-                    '₱' . number_format($row['fee_amount'], 2) : 
-                    number_format($row['fee_amount'], 2) . '%';
+                    number_format($row['fee_amount'], 2, '.', '') : 
+                    number_format($row['fee_amount'], 2, '.', '') . '%';
                     
                 fputcsv($output, [
                     $row['fee_name'],
                     ucfirst($row['fee_type']),
                     $rate_display,
                     $row['times_applied'] ?? 0,
-                    '₱' . number_format($row['total_collected'] ?? 0, 2)
+                    number_format($row['total_collected'] ?? 0, 2, '.', '')
                 ]);
             }
             
@@ -281,7 +281,7 @@ if ($format === 'csv') {
                     $row['fee_name'],
                     $row['firstname'] . ' ' . $row['lastname'],
                     date('M d, Y', strtotime($row['reading_date'])),
-                    '₱' . number_format($row['fee_amount'], 2)
+                    number_format($row['fee_amount'], 2, '.', '')
                 ]);
             }
             break;
@@ -323,11 +323,11 @@ if ($format === 'csv') {
                 WHERE bl.status = 0 AND bl.due_date < CURRENT_DATE()")->fetch_assoc();
             
             fputcsv($output, ['Total Payments', $collections['total_payments']]);
-            fputcsv($output, ['Total Collections', '₱' . number_format($collections['verified_collected'], 2)]);
+            fputcsv($output, ['Total Collections', number_format($collections['verified_collected'], 2, '.', '')]);
             fputcsv($output, ['Active Clients', $clients_data['active_clients']]);
             fputcsv($output, ['Total Clients', $clients_data['total_clients']]);
             fputcsv($output, ['Overdue Clients', $overdue_data['overdue_clients']]);
-            fputcsv($output, ['Overdue Amount', '₱' . number_format($overdue_data['overdue_amount'], 2)]);
+            fputcsv($output, ['Overdue Amount', number_format($overdue_data['overdue_amount'], 2, '.', '')]);
             break;
     }
     
