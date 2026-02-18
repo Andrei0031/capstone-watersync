@@ -90,13 +90,19 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
     /* Dark mode readability improvements */
     html[data-theme="dark"] .text-muted,
     [data-theme="dark"] .text-muted {
-        color: #cbd5f5 !important;
+        color: #e5e7eb !important;
     }
 
     html[data-theme="dark"] .bg-light,
     [data-theme="dark"] .bg-light {
         background-color: #111827 !important;
         color: var(--text-color) !important;
+    }
+
+    /* Stronger subtitle color for key analytics text */
+    .consumption-subtitle {
+        color: var(--text-color) !important;
+        opacity: 0.9;
     }
 
     .sidebar {
@@ -966,11 +972,11 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
             <div class="card card-soft mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Total Water Consumption</h5>
-                    <p class="text-muted mb-2">Entire barangay (all time, based on billing readings)</p>
+                    <p class="text-muted mb-2 consumption-subtitle">Entire barangay (all time, based on billing readings)</p>
                     <div class="d-flex align-items-baseline gap-3">
                         <h2 class="mb-0">
                             <?php echo number_format($total_consumption, 2); ?>
-                            <small class="fs-6 text-muted">m³</small>
+                            <small class="fs-6 text-muted consumption-subtitle">m³</small>
                         </h2>
                     </div>
                 </div>
@@ -980,7 +986,7 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
             <div class="card card-soft mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Consumption by Area / Purok</h5>
-                    <p class="text-muted mb-2">Total cubic meters generated per purok (or address if purok is not set)</p>
+                    <p class="text-muted mb-2 consumption-subtitle">Total cubic meters generated per purok (or address if purok is not set)</p>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead>
