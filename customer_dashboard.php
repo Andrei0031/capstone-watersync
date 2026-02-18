@@ -887,17 +887,59 @@ $disconnection_notices = $stmt->get_result();
                 font-size: 0.75rem;
             }
         }
-        #navbar-notification-link {
-            cursor: pointer;
-            transition: transform 0.2s ease;
+
+        /* Enhanced top navbar for customer dashboard */
+        .customer-dashboard-nav {
+            background: linear-gradient(90deg, #0D47A1, #2196F3);
+            box-shadow: 0 6px 18px rgba(13, 71, 161, 0.45);
         }
-        #navbar-notification-link:hover {
-            transform: scale(1.1);
+
+        .customer-dashboard-nav .navbar-brand img {
+            height: 38px;
+            margin-right: 10px;
+        }
+
+        .customer-dashboard-nav .navbar-brand {
+            font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+
+        .customer-dashboard-nav .nav-link {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.35rem 0.9rem;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.86);
+            transition: background-color 0.2s ease-out, color 0.2s ease-out, transform 0.15s ease-out;
+        }
+
+        .customer-dashboard-nav .nav-link i {
+            font-size: 0.95rem;
+        }
+
+        .customer-dashboard-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.14);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .customer-dashboard-nav .nav-link.active {
+            background-color: #ffffff;
+            color: #0D47A1 !important;
+            box-shadow: 0 4px 12px rgba(13, 71, 161, 0.35);
+        }
+
+        .customer-dashboard-nav .nav-link.active i {
+            color: #0D47A1 !important;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4 customer-dashboard-nav">
         <div class="container">
             <a class="navbar-brand" href="customer_dashboard.php">
                 <img src="icons/Logo.png" alt="WaterSync Logo">
@@ -909,20 +951,8 @@ $disconnection_notices = $stmt->get_result();
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="customer_dashboard.php">
+                        <a class="nav-link active" href="customer_dashboard.php">
                             <i class="fas fa-home"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" id="navbar-notification-link" onclick="document.getElementById('nav-notifications-tab').click(); return false;" style="position: relative;">
-                            <i class="fas fa-bell"></i>
-                            <?php if ($notification_count > 0): ?>
-                                <span class="badge bg-danger notification-bubble" id="navbar-notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.65rem; padding: 3px 6px; border-radius: 50%; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);">
-                                    <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
-                                </span>
-                            <?php else: ?>
-                                <span class="badge bg-danger notification-bubble" id="navbar-notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.65rem; padding: 3px 6px; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);"></span>
-                            <?php endif; ?>
                         </a>
                     </li>
                     <li class="nav-item">
