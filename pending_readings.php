@@ -1565,7 +1565,7 @@ if (!$failed_result) {
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link <?php echo ($needs_review_count > 0 && $pending_count == 0) ? 'active' : ''; ?>" id="needs-review-tab" data-bs-toggle="tab" data-bs-target="#needs-review" type="button" role="tab">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Needs Review
+                    <i class="fas fa-exclamation-triangle me-2"></i>Needs Verification
                     <?php if ($needs_review_count > 0): ?>
                     <span class="badge bg-warning ms-2"><?php echo $needs_review_count; ?></span>
                     <?php endif; ?>
@@ -1717,12 +1717,12 @@ if (!$failed_result) {
                 </div>
             </div>
 
-            <!-- Needs Review Tab -->
+            <!-- Needs Verification Tab -->
             <div class="tab-pane fade <?php echo ($needs_review_count > 0 && $pending_count == 0) ? 'show active' : ''; ?>" id="needs-review" role="tabpanel">
                 <div class="card card-soft">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <div>
-                            <h5 class="mb-0">Needs Review</h5>
+                            <h5 class="mb-0">Needs Verification</h5>
                             <small class="text-muted">Readings with suspicious consumption that require manual verification before billing.</small>
                         </div>
                     </div>
@@ -1789,8 +1789,8 @@ if (!$failed_result) {
                                                     $reading = $ocrReading ?? $row['reading_value'] ?? 0;
                                                 ?>
                                                 <div class="d-flex align-items-center">
-                                                    <span class="badge bg-warning me-2">
-                                                        <i class="fas fa-exclamation-triangle"></i> Needs Review
+                                                    <span class="badge bg-danger me-2">
+                                                        <i class="fas fa-exclamation-triangle"></i> Needs Verification
                                                     </span>
                                                     <strong><?php echo number_format($reading, 0); ?></strong>
                                                 </div>
@@ -1811,9 +1811,9 @@ if (!$failed_result) {
                                                 ?>
                                             </td>
                                             <td>
-                                                <span class="status-badge bg-warning">
+                                                <span class="status-badge bg-danger">
                                                     <i class="fas fa-exclamation-triangle"></i>
-                                                    Needs Review
+                                                    Needs Verification
                                                 </span>
                                             </td>
                                             <td>
