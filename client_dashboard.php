@@ -85,58 +85,70 @@ $reports = $stmt->get_result();
             color: var(--text-color);
         }
 
+        /* Modern gradient sidebar like the reference */
         .sidebar {
             height: 100vh;
-            background-color: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color);
-            padding-top: 20px;
+            background: linear-gradient(135deg, #0d47a1, #2196f3);
+            padding-top: 32px;
             position: fixed;
             width: 250px;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header {
-            padding: 20px;
-            text-align: center;
+            padding: 0 24px 32px;
+            text-align: left;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         /* Prevent logo from being affected by dark mode filters */
         .sidebar-header img {
-            filter: none !important;
-            opacity: 1 !important;
+            max-height: 40px;
         }
 
-        html[data-theme="dark"] .sidebar-header img,
-        [data-theme="dark"] .sidebar-header img {
-            filter: none !important;
-            opacity: 1 !important;
-            mix-blend-mode: normal !important;
+        .sidebar-header-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
         }
 
-        /* Keep sidebar-header background light in dark mode for logo visibility */
-        html[data-theme="dark"] .sidebar-header,
-        [data-theme="dark"] .sidebar-header {
-            background-color: #fff !important;
-        }
-
+        /* Navigation items: icon + label similar to mobile bottom nav */
         .sidebar a {
-            padding: 12px 20px;
+            padding: 10px 24px;
             display: flex;
             align-items: center;
-            color: var(--text-color);
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.8);
             text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .sidebar a:hover,
-        .sidebar a.active {
-            background-color: var(--hover-bg);
-            color: var(--hover-text);
+            font-weight: 500;
+            transition: all 0.2s ease-out;
         }
 
         .sidebar a i {
-            margin-right: 10px;
-            width: 20px;
+            width: 22px;
             text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .sidebar a span {
+            font-size: 0.9rem;
+        }
+
+        .sidebar a:hover {
+            color: #ffffff;
+            transform: translateX(4px);
+        }
+
+        .sidebar a.active {
+            color: #ff3366;
+        }
+
+        .sidebar a.active i {
+            color: #ff3366;
         }
 
         .main-content {
@@ -237,7 +249,8 @@ $reports = $stmt->get_result();
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <img src="icons/Logo.png" alt="Water Billing Logo" class="img-fluid" style="max-height: 90px;" />
+            <img src="icons/Logo.png" alt="Water Billing Logo" class="img-fluid" />
+            <span class="sidebar-header-title">WaterSync</span>
         </div>
         <a href="client_dashboard.php" class="active">
             <i class="fas fa-home"></i>
