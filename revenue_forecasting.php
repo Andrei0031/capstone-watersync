@@ -187,6 +187,65 @@ class RevenueForecast {
     }
     
     /**
+     * Exponential Smoothing (Holt's Linear Method)
+     * Time-series model that smooths level and trend with exponential weights.
+     *
+     * @param array $historicalData Array of ['period' => 'YYYY-MM', 'revenue' => number]
+     * @param int   $forecastMonths Number of future months to forecast
+     * @param float $alpha          Smoothing factor for level (0 < α ≤ 1)
+     * @param float $beta           Smoothing factor for trend (0 < β ≤ 1)
+     */
+    public function exponentialSmoothingForecast($historicalData, $forecastMonths = 6, $alpha = 0.3, $beta = 0.1) {
+        if (count($historicalData) < 1) {
+            return [];
+        }
+
+        // Sort by period just in case
+        usort($historicalData, function($a, $b) {
+            return strcmp($a['period'], $b['period']);
+        });
+
+        // Initialize level (L) and trend (T)
+        $y0 = floatval($historicalData[0]['revenue']);
+        $L = $y0;
+        $T = 0.0;
+        if (count($historicalData) >= 2) {
+            $y1 = floatval($historicalData[1]['revenue']);
+            $T = $y1 - $y0; // initial trend estimate
+        }
+
+        // Update level and trend for all historical points
+        $lastPeriod = $historicalData[0]['period'];
+        foreach ($historicalData as $index => $data) {
+            $Yt = floatval($data['revenue']);
+            if ($index === 0) {
+                $lastPeriod = $data['period'];
+                continue; // already used as initialization
+            }
+
+            $Lt_prev = $L;
+            $L = $alpha * $Yt + (1 - $alpha) * ($L + $T);
+            $T = $beta * ($L - $Lt_prev) + (1 - $beta) * $T;
+            $lastPeriod = $data['period'];
+        }
+
+        // Generate forecasts m steps ahead: F_{t+m} = L_t + m*T_t
+        $forecasts = [];
+        for ($m = 1; $m <= $forecastMonths; $m++) {
+            $nextPeriod = date('Y-m', strtotime($lastPeriod . '-01 +' . $m . ' month'));
+            $forecastValue = $L + $m * $T;
+
+            $forecasts[] = [
+                'period' => $nextPeriod,
+                'revenue' => max(0, $forecastValue),
+                'type' => 'exponential_smoothing_forecast'
+            ];
+        }
+
+        return $forecasts;
+    }
+    
+    /**
      * Seasonal Forecasting
      * Considers seasonal patterns and growth trends
      */
@@ -277,6 +336,7 @@ class RevenueForecast {
         // Get forecasts from different methods
         $linearForecast = $this->linearForecast($historicalData, $forecastMonths);
         $movingAvgForecast = $this->movingAverageForecast($historicalData, $forecastMonths);
+        $expForecast = $this->exponentialSmoothingForecast($historicalData, $forecastMonths);
         $seasonalForecast = $this->seasonalForecast($historicalData, $forecastMonths);
         
         // Calculate ensemble forecast (average of available methods), guard for missing indexes
@@ -291,6 +351,10 @@ class RevenueForecast {
             if (isset($movingAvgForecast[$i])) {
                 $values[] = (float)$movingAvgForecast[$i]['revenue'];
                 $period = $period ?? $movingAvgForecast[$i]['period'];
+            }
+            if (isset($expForecast[$i])) {
+                $values[] = (float)$expForecast[$i]['revenue'];
+                $period = $period ?? $expForecast[$i]['period'];
             }
             if (isset($seasonalForecast[$i])) {
                 $values[] = (float)$seasonalForecast[$i]['revenue'];
@@ -314,12 +378,14 @@ class RevenueForecast {
             'forecasts' => [
                 'linear' => $linearForecast,
                 'moving_average' => $movingAvgForecast,
+                'exponential' => $expForecast,
                 'seasonal' => $seasonalForecast,
                 'ensemble' => $ensembleForecast
             ],
             'methods' => [
                 'linear' => 'Linear Trend',
                 'moving_average' => 'Moving Average',
+                'exponential' => 'Exponential Smoothing',
                 'seasonal' => 'Seasonal Analysis',
                 'ensemble' => 'Combined Forecast'
             ]
@@ -344,6 +410,7 @@ class RevenueForecast {
         // Get forecasts from different methods
         $linearForecast = $this->linearForecast($historicalData, $forecastMonths);
         $movingAvgForecast = $this->movingAverageForecast($historicalData, $forecastMonths);
+        $expForecast = $this->exponentialSmoothingForecast($historicalData, $forecastMonths);
         $seasonalForecast = $this->seasonalForecast($historicalData, $forecastMonths);
         
         // Calculate ensemble forecast (average of available methods), guard for missing indexes
@@ -358,6 +425,10 @@ class RevenueForecast {
             if (isset($movingAvgForecast[$i])) {
                 $values[] = (float)$movingAvgForecast[$i]['revenue'];
                 $period = $period ?? $movingAvgForecast[$i]['period'];
+            }
+            if (isset($expForecast[$i])) {
+                $values[] = (float)$expForecast[$i]['revenue'];
+                $period = $period ?? $expForecast[$i]['period'];
             }
             if (isset($seasonalForecast[$i])) {
                 $values[] = (float)$seasonalForecast[$i]['revenue'];
@@ -381,12 +452,14 @@ class RevenueForecast {
             'forecasts' => [
                 'linear' => $linearForecast,
                 'moving_average' => $movingAvgForecast,
+                'exponential' => $expForecast,
                 'seasonal' => $seasonalForecast,
                 'ensemble' => $ensembleForecast
             ],
             'methods' => [
                 'linear' => 'Linear Trend',
                 'moving_average' => 'Moving Average',
+                'exponential' => 'Exponential Smoothing',
                 'seasonal' => 'Seasonal Analysis',
                 'ensemble' => 'Combined Forecast'
             ]
