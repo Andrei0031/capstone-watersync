@@ -819,20 +819,43 @@ $disconnection_notices = $stmt->get_result();
             line-height: 1;
         }
 
+        /* Dashboard tabs container */
+        .dashboard-tabs-container {
+            background: radial-gradient(circle at top, rgba(33, 150, 243, 0.18), transparent 60%),
+                        linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 24px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+        }
+
+        .dashboard-tabs-container .nav-tabs {
+            border-bottom: none;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
         /* Enhanced dashboard tabs */
         .nav-tabs .dashboard-tab-button {
-            border-radius: 999px;
-            box-shadow: 0 6px 16px rgba(25, 118, 210, 0.18);
-            transition: all 0.25s ease;
-            overflow: hidden;
+            position: relative;
+            border-radius: 18px;
+            border: 1px solid rgba(30, 136, 229, 0.45);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
             color: #1e88e5 !important;
-            background-color: #ffffff !important;
-            border: 2px solid #1e88e5 !important;
             font-weight: 600 !important;
-            padding: 14px 22px !important;
+            padding: 12px 22px !important;
             max-width: 220px !important;
             min-width: 150px !important;
             text-align: center !important;
+            transition: all 0.22s ease-out;
+        }
+
+        .nav-tabs .dashboard-tab-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(25, 118, 210, 0.22);
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon {
@@ -845,7 +868,7 @@ $disconnection_notices = $stmt->get_result();
 
         .nav-tabs .dashboard-tab-button .tab-label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.86rem;
             font-weight: 600;
             white-space: nowrap;
         }
@@ -857,8 +880,8 @@ $disconnection_notices = $stmt->get_result();
         .nav-tabs .dashboard-tab-button.active {
             color: #ffffff !important;
             background: linear-gradient(135deg, #1e88e5, #42a5f5) !important;
-            border: 0 !important;
-            box-shadow: 0 10px 24px rgba(25, 118, 210, 0.35);
+            border-color: transparent !important;
+            box-shadow: 0 14px 30px rgba(25, 118, 210, 0.45);
             transform: translateY(-2px);
         }
 
@@ -866,31 +889,36 @@ $disconnection_notices = $stmt->get_result();
             color: #ffffff !important;
         }
 
+        /* Bubble indicators above tabs */
         .dashboard-tab-bubble {
             position: absolute;
-            top: -10px;
+            top: -14px;
             left: 50%;
             transform: translateX(-50%);
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             border-radius: 999px;
-            padding: 0;
+            padding: 2px 8px;
             pointer-events: none;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
             animation: pulse 2s infinite;
         }
 
         .dashboard-tab-bubble-dot {
             width: 10px;
             height: 10px;
+            border-radius: 999px;
             background: linear-gradient(135deg, #4dabf7, #1e88e5);
             box-shadow: 0 0 0 3px rgba(144, 202, 249, 0.7);
         }
 
         .dashboard-tab-bubble-count {
-            min-width: 20px;
+            min-width: 22px;
             height: 20px;
-            padding: 0 4px;
+            padding: 0 6px;
+            border-radius: 999px;
             background: linear-gradient(135deg, #ff416c, #ff4b2b);
             color: #ffffff;
             font-size: 0.7rem;
@@ -899,6 +927,9 @@ $disconnection_notices = $stmt->get_result();
         }
 
         @media (max-width: 576px) {
+            .dashboard-tabs-container {
+                padding: 10px 10px;
+            }
             .nav-tabs .dashboard-tab-button {
                 max-width: 48% !important;
                 flex: 0 0 48% !important;
@@ -1021,9 +1052,9 @@ $disconnection_notices = $stmt->get_result();
         </div>
 
         <!-- Tab Navigation -->
-        <div style="margin: 0; padding: 0;">
-            <nav style="margin: 0; padding: 0;">
-                <div class="nav nav-tabs" id="nav-tab" role="tablist" style="background-color: #ffffff; border-bottom: none; margin: 0; padding: 0; display: flex !important; justify-content: center !important; flex-wrap: wrap !important; gap: 10px !important;">
+        <div class="dashboard-tabs-container">
+            <nav>
+                <div class="nav nav-tabs" id="nav-tab" role="tablist">
                         <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true" style="position: relative !important; flex: 1 !important;">
                             <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
                             <span class="tab-icon">
