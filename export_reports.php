@@ -16,9 +16,11 @@ $date_to = $_GET['date_to'] ?? date('Y-m-d');
 $filename = "water_billing_" . $report_type . "_report_" . date('Y-m-d');
 
 if ($format === 'csv') {
-    // Set headers for CSV download (Excel-friendly, forces download)
-    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+    // Set headers for CSV download (force Save As dialog in most browsers)
+    header('Content-Type: application/octet-stream; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     
     // Create a file pointer connected to PHP output stream
     $output = fopen('php://output', 'w');
