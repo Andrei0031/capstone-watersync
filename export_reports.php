@@ -25,9 +25,6 @@ if ($format === 'csv') {
     // Create a file pointer connected to PHP output stream
     $output = fopen('php://output', 'w');
     
-    // Add UTF-8 BOM for proper Excel encoding
-    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-    
     // Export based on report type
     switch ($report_type) {
         case 'collections':
