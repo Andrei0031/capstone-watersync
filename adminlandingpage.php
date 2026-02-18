@@ -693,7 +693,6 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                             <button class="btn btn-sm btn-outline-primary" data-period="quarterly">Quarterly</button>
                             <button class="btn btn-sm btn-outline-primary" data-period="yearly">Yearly</button>
                             </div>
-                                    <span class="badge bg-primary px-3 py-2">Linear Regression</span>
                                     <select id="forecastHorizon" class="form-select form-select-sm" style="width: auto;">
                                         <option value="6" selected>6 months</option>
                                         <option value="12">12 months</option>
