@@ -819,121 +819,84 @@ $disconnection_notices = $stmt->get_result();
             line-height: 1;
         }
 
-        /* Dashboard tabs container */
+        /* Minimal pill-style dashboard tabs (like mobile bottom nav) */
         .dashboard-tabs-container {
-            background: radial-gradient(circle at top, rgba(33, 150, 243, 0.18), transparent 60%),
-                        linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border-radius: 24px;
-            padding: 14px 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+            background: #ffffff;
+            border-radius: 999px;
+            padding: 10px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
         }
 
         .dashboard-tabs-container .nav-tabs {
             border-bottom: none;
             display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Enhanced dashboard tabs */
         .nav-tabs .dashboard-tab-button {
             position: relative;
-            border-radius: 18px;
-            border: 1px solid rgba(30, 136, 229, 0.45);
-            background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
-            color: #1e88e5 !important;
-            font-weight: 600 !important;
-            padding: 12px 22px !important;
-            max-width: 220px !important;
-            min-width: 150px !important;
+            border: none;
+            background: transparent !important;
+            color: #9e9e9e !important;
+            font-weight: 500 !important;
+            padding: 8px 16px !important;
+            min-width: 90px;
             text-align: center !important;
-            transition: all 0.22s ease-out;
-        }
-
-        .nav-tabs .dashboard-tab-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 10px 24px rgba(25, 118, 210, 0.22);
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon {
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-bottom: 2px;
-            font-size: 1.1rem;
+            margin-bottom: 4px;
+            font-size: 1.25rem;
         }
 
         .nav-tabs .dashboard-tab-button .tab-label {
             display: block;
-            font-size: 0.86rem;
-            font-weight: 600;
-            white-space: nowrap;
+            font-size: 0.8rem;
+            font-weight: 500;
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon i {
-            color: #1e88e5 !important;
+            color: #9e9e9e !important;
         }
 
         .nav-tabs .dashboard-tab-button.active {
-            color: #ffffff !important;
-            background: linear-gradient(135deg, #1e88e5, #42a5f5) !important;
-            border-color: transparent !important;
-            box-shadow: 0 14px 30px rgba(25, 118, 210, 0.45);
-            transform: translateY(-2px);
+            color: #e91e63 !important;
         }
 
         .nav-tabs .dashboard-tab-button.active .tab-icon i {
-            color: #ffffff !important;
+            color: #e91e63 !important;
         }
 
-        /* Bubble indicators above tabs */
-        .dashboard-tab-bubble {
+        /* Small red dot for notifications when there are new items */
+        .nav-tabs .dashboard-tab-button .notif-dot {
             position: absolute;
-            top: -14px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 999px;
-            padding: 2px 8px;
-            pointer-events: none;
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
-            animation: pulse 2s infinite;
-        }
-
-        .dashboard-tab-bubble-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #4dabf7, #1e88e5);
-            box-shadow: 0 0 0 3px rgba(144, 202, 249, 0.7);
-        }
-
-        .dashboard-tab-bubble-count {
-            min-width: 22px;
-            height: 20px;
-            padding: 0 6px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #ff416c, #ff4b2b);
-            color: #ffffff;
-            font-size: 0.7rem;
-            font-weight: 700;
-            box-shadow: 0 0 0 3px rgba(255, 205, 210, 0.7);
+            top: 4px;
+            right: 22px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff1744;
+            box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.4);
         }
 
         @media (max-width: 576px) {
             .dashboard-tabs-container {
-                padding: 10px 10px;
+                padding: 8px 14px;
             }
             .nav-tabs .dashboard-tab-button {
-                max-width: 48% !important;
-                flex: 0 0 48% !important;
-                padding: 10px 14px !important;
+                padding: 6px 8px !important;
+                min-width: 70px;
+            }
+            .nav-tabs .dashboard-tab-button .tab-icon {
+                font-size: 1.1rem;
+            }
+            .nav-tabs .dashboard-tab-button .tab-label {
+                font-size: 0.75rem;
             }
         }
         #navbar-notification-link {
@@ -1054,36 +1017,29 @@ $disconnection_notices = $stmt->get_result();
         <!-- Tab Navigation -->
         <div class="dashboard-tabs-container">
             <nav>
-                <div class="nav nav-tabs" id="nav-tab" role="tablist">
-                        <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true" style="position: relative !important; flex: 1 !important;">
-                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                <div class="nav nav-tabs w-100" id="nav-tab" role="tablist">
+                        <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true">
                             <span class="tab-icon">
                                 <i class="fas fa-tachometer-alt"></i>
                             </span>
                             <span class="tab-label">Dashboard Overview</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false" style="position: relative !important; flex: 1 !important;">
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false">
                             <?php if ($notification_count > 0): ?>
-                                <span class="dashboard-tab-bubble dashboard-tab-bubble-count">
-                                    <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
-                                </span>
-                            <?php else: ?>
-                                <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                                <span class="notif-dot"></span>
                             <?php endif; ?>
                             <span class="tab-icon">
                                 <i class="fas fa-bell"></i>
                             </span>
                             <span class="tab-label">Notifications</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false" style="position: relative !important; flex: 1 !important;">
-                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false">
                             <span class="tab-icon">
                                 <i class="fas fa-file-invoice-dollar"></i>
                             </span>
                             <span class="tab-label">Billing Information</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-reports-tab" data-bs-toggle="tab" data-bs-target="#nav-reports" type="button" role="tab" aria-controls="nav-reports" aria-selected="false" style="position: relative !important; flex: 1 !important;">
-                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-reports-tab" data-bs-toggle="tab" data-bs-target="#nav-reports" type="button" role="tab" aria-controls="nav-reports" aria-selected="false">
                             <span class="tab-icon">
                                 <i class="fas fa-exclamation-triangle"></i>
                             </span>
