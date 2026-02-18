@@ -1408,6 +1408,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Clear default 0.00 on focus so user can type immediately
+    amountToPayInput.addEventListener('focus', function() {
+        const value = this.value.trim();
+        if (value === '' || parseFloat(value) === 0) {
+            this.value = '';
+        }
+    });
+
     // Ensure value is always positive on blur
     amountToPayInput.addEventListener('blur', function() {
         const value = parseFloat(this.value);
