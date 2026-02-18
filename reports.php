@@ -14,6 +14,34 @@ $report_type = $_GET['type'] ?? 'dashboard';
 $date_from = $_GET['date_from'] ?? date('Y-m-01'); // First day of current month
 $date_to = $_GET['date_to'] ?? date('Y-m-d'); // Today
 
+// Ensure report_logs table exists and log this report view (except for history itself)
+try {
+    $conn->query("CREATE TABLE IF NOT EXISTS report_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        admin_id INT NULL,
+        report_type VARCHAR(50) NOT NULL,
+        date_from DATE NOT NULL,
+        date_to DATE NOT NULL,
+        ip_address VARCHAR(45) DEFAULT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_report_type (report_type),
+        INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    if ($report_type !== 'logs' && isset($_SESSION['admin_id'])) {
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+        $admin_id = (int)$_SESSION['admin_id'];
+        $stmtLog = $conn->prepare("INSERT INTO report_logs (admin_id, report_type, date_from, date_to, ip_address) VALUES (?, ?, ?, ?, ?)");
+        if ($stmtLog) {
+            $stmtLog->bind_param("issss", $admin_id, $report_type, $date_from, $date_to, $ip_address);
+            $stmtLog->execute();
+            $stmtLog->close();
+        }
+    }
+} catch (Exception $e) {
+    // Fail silently if logging fails – do not break reports
+}
+
 // Dashboard Summary
 if ($report_type === 'dashboard') {
     // Total collections this month
@@ -409,6 +437,24 @@ elseif ($report_type === 'disconnections') {
         'disco_stats' => $disco_stats,
         'scheduled_notices' => $scheduled,
         'logs' => $logs
+    ];
+}
+
+// Report History (Audit Log)
+elseif ($report_type === 'logs') {
+    // Show history of generated reports, filter by created_at between selected dates
+    $logs_sql = "SELECT rl.*, a.username 
+                 FROM report_logs rl
+                 LEFT JOIN admin a ON rl.admin_id = a.id
+                 WHERE DATE(rl.created_at) BETWEEN ? AND ?
+                 ORDER BY rl.created_at DESC";
+    $stmt = $conn->prepare($logs_sql);
+    $stmt->bind_param("ss", $date_from, $date_to);
+    $stmt->execute();
+    $logs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $report_data = [
+        'report_logs' => $logs
     ];
 }
 ?>
@@ -1131,6 +1177,20 @@ elseif ($report_type === 'disconnections') {
                             <?php endif; ?>
                         </a>
 
+                        <a href="?type=logs&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'logs' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Report History</h6>
+                                <small>Who viewed which report</small>
+                            </div>
+                            <?php if ($report_type === 'logs'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+
                         <a href="?type=disconnections&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
                            class="report-nav-item <?php echo $report_type === 'disconnections' ? 'active' : ''; ?>">
                             <div class="report-nav-icon" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
@@ -1166,6 +1226,7 @@ elseif ($report_type === 'disconnections') {
                                     'collectibles' => 'Collectibles (Unpaid Bills)',
                                     'billing' => 'Billing Summary Report',
                                     'fees' => 'Additional Fees Report',
+                                    'logs' => 'Report History (Audit Log)',
                                     'disconnections' => 'Disconnection Tracking Report'
                                 ];
                                 $icons = [
@@ -1176,6 +1237,7 @@ elseif ($report_type === 'disconnections') {
                                     'collectibles' => 'fa-hand-holding-usd',
                                     'billing' => 'fa-file-invoice',
                                     'fees' => 'fa-tags',
+                                    'logs' => 'fa-history',
                                     'disconnections' => 'fa-plug-circle-bolt'
                                 ];
                                 ?>

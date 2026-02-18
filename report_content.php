@@ -1027,6 +1027,66 @@ elseif ($report_type === 'fees') {
 <?php
 }
 
+// Report History (Audit Log)
+elseif ($report_type === 'logs') {
+    $logs = $report_data['report_logs'] ?? [];
+?>
+    <div class="card report-card mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-history me-2"></i>Report History (Audit Log)</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-0">
+                This table shows which admin opened which report, with the date range they used, for the selected period.
+            </p>
+        </div>
+    </div>
+
+    <div class="card report-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Viewed At</th>
+                        <th>Admin User</th>
+                        <th>Report Type</th>
+                        <th>Period (From → To)</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($logs as $log): ?>
+                    <tr>
+                        <td><?php echo date('M d, Y H:i', strtotime($log['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($log['username'] ?? ('Admin #' . $log['admin_id'])); ?></td>
+                        <td>
+                            <span class="badge bg-secondary text-uppercase">
+                                <?php echo htmlspecialchars($log['report_type']); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php echo date('M d, Y', strtotime($log['date_from'])); ?>
+                            &nbsp;→&nbsp;
+                            <?php echo date('M d, Y', strtotime($log['date_to'])); ?>
+                        </td>
+                        <td><?php echo htmlspecialchars($log['ip_address'] ?? ''); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($logs)): ?>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            No report views recorded for the selected period.
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<?php
+}
+
 // Disconnection Tracking Report
 elseif ($report_type === 'disconnections') {
     $stats = $report_data['disco_stats'] ?? [];
