@@ -312,36 +312,88 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
     }
 
     .stat-card {
-        border-left: 4px solid;
-        transition: transform 0.2s;
-        background-color: var(--card-bg);
+        border: none;
+        border-radius: 18px;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        background: linear-gradient(135deg, #ffffff, #f3f4ff);
         color: var(--card-text);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+    }
+
+    .stat-card .card-body {
+        padding: 18px 20px;
     }
 
     .stat-card:hover {
-        transform: translateY(-2px);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
     }
 
-    .stat-card.pending { border-left-color: #ffc107; }
-    .stat-card.sent { border-left-color: #0d6efd; }
-    .stat-card.resolved { border-left-color: #198754; }
-    .stat-card.critical { border-left-color: #dc3545; }
+    .stat-card.pending {
+        background: linear-gradient(135deg, #fff7e6 0%, #ffe3b3 100%);
+    }
+    .stat-card.sent {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    }
+    .stat-card.critical {
+        background: linear-gradient(135deg, #ffe5e9 0%, #ffb3c0 100%);
+    }
+    .stat-card.resolved {
+        background: linear-gradient(135deg, #e3f9e5 0%, #b2f2bb 100%);
+    }
 
     .table {
         color: var(--table-cell-text);
         background-color: var(--table-bg);
+        border-collapse: separate;
+        border-spacing: 0 6px;
     }
 
     .table thead th {
-        background-color: var(--table-header-bg);
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
         color: var(--table-header-text);
-        border-bottom: 2px solid var(--border-color);
+        border-bottom: none;
+        border-top: none;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .table tbody tr {
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+    }
+
+    .table tbody tr td:first-child {
+        border-top-left-radius: 12px;
+        border-bottom-left-radius: 12px;
+    }
+
+    .table tbody tr td:last-child {
+        border-top-right-radius: 12px;
+        border-bottom-right-radius: 12px;
     }
 
     .table td, .table th {
         background-color: var(--table-bg);
-        border-color: var(--border-color);
+        border-color: transparent;
         color: var(--table-cell-text);
+        vertical-align: middle;
+    }
+
+    /* Row accents based on status */
+    .notice-row-pending {
+        border-left: 4px solid #ffc107;
+    }
+    .notice-row-sent {
+        border-left: 4px solid #0d6efd;
+    }
+    .notice-row-resolved {
+        border-left: 4px solid #198754;
+    }
+    .notice-row-expired {
+        border-left: 4px solid #6c757d;
     }
 
     /* Dark mode table improvements */
@@ -533,6 +585,21 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
 
     [data-theme="light"] .btn-close {
         filter: none;
+    }
+
+    /* Filters card */
+    .filters-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+
+    .filters-card .form-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted-text);
     }
 
     /* Responsive */
@@ -867,7 +934,7 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
     </div>
 
     <!-- Filters -->
-    <div class="card card-soft mb-4">
+    <div class="card card-soft filters-card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -910,10 +977,10 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary me-2">
-                        <i class="fas fa-search me-1"></i>Filter
+                        <i class="fas fa-search me-1"></i>Apply Filters
                     </button>
                     <a href="disconnection_notices.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i>
+                        <i class="fas fa-sync-alt me-1"></i>Reset
                     </a>
                 </div>
             </form>
@@ -945,7 +1012,11 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
                     <tbody>
                         <?php if ($notices && $notices->num_rows > 0): ?>
                             <?php while ($notice = $notices->fetch_assoc()): ?>
-                            <tr>
+                            <tr class="<?php 
+                                    echo $notice['status'] === 'pending' ? 'notice-row-pending' : 
+                                        ($notice['status'] === 'sent' ? 'notice-row-sent' : 
+                                        ($notice['status'] === 'resolved' ? 'notice-row-resolved' : 'notice-row-expired'));
+                                ?>">
                                 <td>
                                     <div>
                                         <strong><?php echo htmlspecialchars($notice['firstname'] . ' ' . $notice['lastname']); ?></strong>
