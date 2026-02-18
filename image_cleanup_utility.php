@@ -79,5 +79,3 @@ function deleteImageAfterProcessing($reading_id, $conn) {
         return false;
     }
 }
-?>
-

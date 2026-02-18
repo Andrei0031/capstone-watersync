@@ -2982,17 +2982,7 @@ if (!$failed_result) {
                                                         <small class="text-muted">Optional: Add notes explaining why the reading was corrected.</small>
                                                     </div>
                                                     
-                                                    <!-- Extracted Text (if available) -->
-                                                    ${reading.extracted_text ? `
-                                                    <div class="mb-3">
-                                                        <label class="form-label text-muted">OCR Extracted Text</label>
-                                                        <div class="card bg-light">
-                                                            <div class="card-body p-2">
-                                                                <small class="text-muted" style="font-family: monospace;">${reading.extracted_text}</small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    ` : ''}
+                                                    <!-- OCR Extracted Text intentionally hidden in UI (still available in backend for auditing) -->
                                                 </div>
                                             </div>
                                             
