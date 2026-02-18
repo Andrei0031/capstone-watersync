@@ -231,6 +231,59 @@ elseif ($report_type === 'overdue') {
     ];
 }
 
+// Collectible (Unpaid) Accounts Report - within selected period
+elseif ($report_type === 'collectibles') {
+    // Unpaid bills (including not yet overdue) within the selected date range
+    $collectibles_sql = "SELECT 
+            cl.firstname, cl.lastname, cl.contact, cl.meter_code,
+            bl.id as bill_id, bl.reading_date, bl.due_date, bl.total,
+            COALESCE(SUM(pl.amount), 0) as amount_paid,
+            (bl.total - COALESCE(SUM(pl.amount), 0)) as balance_due
+        FROM billing_list bl
+        JOIN client_list cl ON bl.client_id = cl.id
+        LEFT JOIN payment_list pl ON bl.id = pl.billing_id AND pl.status = 1
+        WHERE bl.status = 0
+          AND DATE(bl.reading_date) BETWEEN ? AND ?
+        GROUP BY bl.id
+        HAVING balance_due > 0
+        ORDER BY bl.reading_date DESC, balance_due DESC";
+    $stmt = $conn->prepare($collectibles_sql);
+    $stmt->bind_param("ss", $date_from, $date_to);
+    $stmt->execute();
+    $collectible_bills = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    // Monthly collectible summary (historical log for the period)
+    $collectibles_summary_sql = "SELECT 
+            YEAR(reading_date) as year,
+            MONTH(reading_date) as month,
+            MONTHNAME(reading_date) as month_name,
+            COUNT(*) as bills_unpaid,
+            SUM(balance_due) as total_collectible
+        FROM (
+            SELECT 
+                bl.id,
+                bl.reading_date,
+                (bl.total - COALESCE(SUM(pl.amount), 0)) as balance_due
+            FROM billing_list bl
+            LEFT JOIN payment_list pl ON bl.id = pl.billing_id AND pl.status = 1
+            WHERE bl.status = 0
+              AND DATE(bl.reading_date) BETWEEN ? AND ?
+            GROUP BY bl.id, bl.reading_date, bl.total
+            HAVING balance_due > 0
+        ) as unpaid
+        GROUP BY YEAR(reading_date), MONTH(reading_date)
+        ORDER BY year DESC, month DESC";
+    $stmt2 = $conn->prepare($collectibles_summary_sql);
+    $stmt2->bind_param("ss", $date_from, $date_to);
+    $stmt2->execute();
+    $collectibles_monthly = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $report_data = [
+        'collectible_bills' => $collectible_bills,
+        'collectibles_monthly' => $collectibles_monthly
+    ];
+}
+
 // Billing Summary Report
 elseif ($report_type === 'billing') {
     // Monthly billing summary
@@ -313,6 +366,48 @@ elseif ($report_type === 'fees') {
     $report_data = [
         'fees_breakdown' => $fees_breakdown,
         'recent_fees' => $recent_fees
+    ];
+}
+
+// Disconnection Tracking Report
+elseif ($report_type === 'disconnections') {
+    // Overall statistics
+    $disco_stats_sql = "SELECT 
+            COUNT(*) as total_notices,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_notices,
+            SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent_notices,
+            SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_notices,
+            SUM(amount_due) as total_amount_flagged
+        FROM disconnection_notices";
+    $disco_stats = $conn->query($disco_stats_sql)->fetch_assoc();
+
+    // Clients scheduled for disconnection (pending or sent)
+    $scheduled_sql = "SELECT 
+            dn.*, 
+            cl.firstname, cl.lastname, cl.meter_code, cl.contact, cl.address
+        FROM disconnection_notices dn
+        JOIN client_list cl ON dn.client_id = cl.id
+        WHERE dn.status IN ('pending','sent')
+        ORDER BY dn.created_at DESC";
+    $scheduled = $conn->query($scheduled_sql)->fetch_all(MYSQLI_ASSOC);
+
+    // Historical logs of notices within selected period
+    $logs_sql = "SELECT 
+            dn.*, 
+            cl.firstname, cl.lastname, cl.meter_code, cl.contact
+        FROM disconnection_notices dn
+        JOIN client_list cl ON dn.client_id = cl.id
+        WHERE DATE(dn.created_at) BETWEEN ? AND ?
+        ORDER BY dn.created_at DESC";
+    $stmt = $conn->prepare($logs_sql);
+    $stmt->bind_param("ss", $date_from, $date_to);
+    $stmt->execute();
+    $logs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $report_data = [
+        'disco_stats' => $disco_stats,
+        'scheduled_notices' => $scheduled,
+        'logs' => $logs
     ];
 }
 ?>
@@ -986,9 +1081,23 @@ elseif ($report_type === 'fees') {
                             </div>
                             <div class="report-nav-content">
                                 <h6 class="mb-0">Overdue Accounts</h6>
-                                <small>Unpaid bills & aging</small>
+                                <small>Unpaid & aging balances</small>
                             </div>
                             <?php if ($report_type === 'overdue'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
+
+                        <a href="?type=collectibles&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'collectibles' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
+                                <i class="fas fa-hand-holding-usd"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Collectibles</h6>
+                                <small>Unpaid bills this period</small>
+                            </div>
+                            <?php if ($report_type === 'collectibles'): ?>
                             <i class="fas fa-check-circle text-success ms-auto"></i>
                             <?php endif; ?>
                         </a>
@@ -1020,6 +1129,20 @@ elseif ($report_type === 'fees') {
                             <i class="fas fa-check-circle text-success ms-auto"></i>
                             <?php endif; ?>
                         </a>
+
+                        <a href="?type=disconnections&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>" 
+                           class="report-nav-item <?php echo $report_type === 'disconnections' ? 'active' : ''; ?>">
+                            <div class="report-nav-icon" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
+                                <i class="fas fa-plug-circle-bolt"></i>
+                            </div>
+                            <div class="report-nav-content">
+                                <h6 class="mb-0">Disconnections</h6>
+                                <small>Scheduled & historical notices</small>
+                            </div>
+                            <?php if ($report_type === 'disconnections'): ?>
+                            <i class="fas fa-check-circle text-success ms-auto"></i>
+                            <?php endif; ?>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -1039,16 +1162,20 @@ elseif ($report_type === 'fees') {
                                     'collections' => 'Collections Report',
                                     'clients' => 'Clients Report',
                                     'overdue' => 'Overdue Accounts Report',
+                                    'collectibles' => 'Collectibles (Unpaid Bills)',
                                     'billing' => 'Billing Summary Report',
-                                    'fees' => 'Additional Fees Report'
+                                    'fees' => 'Additional Fees Report',
+                                    'disconnections' => 'Disconnection Tracking Report'
                                 ];
                                 $icons = [
                                     'dashboard' => 'fa-tachometer-alt',
                                     'collections' => 'fa-money-bill-wave',
                                     'clients' => 'fa-users',
                                     'overdue' => 'fa-exclamation-triangle',
+                                    'collectibles' => 'fa-hand-holding-usd',
                                     'billing' => 'fa-file-invoice',
-                                    'fees' => 'fa-tags'
+                                    'fees' => 'fa-tags',
+                                    'disconnections' => 'fa-plug-circle-bolt'
                                 ];
                                 ?>
                                 <i class="fas <?php echo $icons[$report_type] ?? 'fa-chart-line'; ?> me-2 text-primary"></i>

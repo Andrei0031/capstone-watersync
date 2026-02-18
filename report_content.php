@@ -534,6 +534,110 @@ elseif ($report_type === 'clients') {
 <?php
 }
 
+// Collectibles (Unpaid Bills) Report
+elseif ($report_type === 'collectibles') {
+    $collectible_bills = $report_data['collectible_bills'] ?? [];
+    $collectibles_monthly = $report_data['collectibles_monthly'] ?? [];
+?>
+    <!-- Collectibles Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-warning">
+                <h4>₱<?php echo number_format(array_sum(array_column($collectible_bills, 'balance_due')), 2); ?></h4>
+                <p class="mb-0">Total Collectible Amount</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-danger text-white">
+                <h4><?php echo count($collectible_bills); ?></h4>
+                <p class="mb-0">Unpaid Bills (This Period)</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card report-card p-3 text-center bg-primary text-white">
+                <h4><?php echo count(array_unique(array_map(function($b) { return $b['meter_code'] ?? ''; }, $collectible_bills))); ?></h4>
+                <p class="mb-0">Affected Clients</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Collectibles Log -->
+    <div class="card report-card mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-calendar-alt me-2"></i>Monthly Collectibles Log</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Unpaid Bills</th>
+                        <th>Total Collectible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($collectibles_monthly as $row): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['month_name'] . ' ' . $row['year']); ?></td>
+                        <td><?php echo $row['bills_unpaid']; ?></td>
+                        <td>₱<?php echo number_format($row['total_collectible'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($collectibles_monthly)): ?>
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">No collectible history found for the selected period.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Collectible Bills Detail -->
+    <div class="card report-card">
+        <div class="card-header">
+            <h5><i class="fas fa-hand-holding-usd me-2"></i>Unpaid Bills Detail (Clients Not Yet Paid)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Meter Code</th>
+                        <th>Contact</th>
+                        <th>Reading Date</th>
+                        <th>Due Date</th>
+                        <th>Total Bill</th>
+                        <th>Amount Paid</th>
+                        <th>Balance (Collectible)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($collectible_bills as $bill): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($bill['firstname'] . ' ' . $bill['lastname']); ?></td>
+                        <td><?php echo htmlspecialchars($bill['meter_code']); ?></td>
+                        <td><?php echo htmlspecialchars($bill['contact']); ?></td>
+                        <td><?php echo date('M d, Y', strtotime($bill['reading_date'])); ?></td>
+                        <td><?php echo date('M d, Y', strtotime($bill['due_date'])); ?></td>
+                        <td>₱<?php echo number_format($bill['total'], 2); ?></td>
+                        <td class="text-success">₱<?php echo number_format($bill['amount_paid'], 2); ?></td>
+                        <td class="text-danger fw-bold">₱<?php echo number_format($bill['balance_due'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($collectible_bills)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">No unpaid bills found for the selected period.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<?php
+}
+
 // Overdue Accounts Report
 elseif ($report_type === 'overdue') {
 ?>
@@ -896,4 +1000,141 @@ elseif ($report_type === 'fees') {
 
 <?php
 }
-?> 
+
+// Disconnection Tracking Report
+elseif ($report_type === 'disconnections') {
+    $stats = $report_data['disco_stats'] ?? [];
+    $scheduled = $report_data['scheduled_notices'] ?? [];
+    $logs = $report_data['logs'] ?? [];
+?>
+    <!-- Disconnection Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card report-card p-3 text-center bg-danger text-white">
+                <h4><?php echo $stats['pending_notices'] ?? 0; ?></h4>
+                <p class="mb-0">Pending Notices</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card report-card p-3 text-center bg-warning">
+                <h4><?php echo $stats['sent_notices'] ?? 0; ?></h4>
+                <p class="mb-0">Sent Notices</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card report-card p-3 text-center bg-success text-white">
+                <h4><?php echo $stats['resolved_notices'] ?? 0; ?></h4>
+                <p class="mb-0">Resolved Notices</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card report-card p-3 text-center bg-primary text-white">
+                <h4>₱<?php echo number_format($stats['total_amount_flagged'] ?? 0, 2); ?></h4>
+                <p class="mb-0">Total Amount Flagged</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients Scheduled for Disconnection -->
+    <div class="card report-card mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-plug-circle-bolt me-2"></i>Clients Scheduled for Disconnection</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Meter Code</th>
+                        <th>Contact</th>
+                        <th>Address</th>
+                        <th>Notice Type</th>
+                        <th>Status</th>
+                        <th>Amount Due</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($scheduled as $row): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?></td>
+                        <td><?php echo htmlspecialchars($row['meter_code']); ?></td>
+                        <td><?php echo htmlspecialchars($row['contact']); ?></td>
+                        <td><?php echo htmlspecialchars($row['address']); ?></td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                <?php echo htmlspecialchars(str_replace('_', ' ', ucfirst($row['notice_type']))); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if ($row['status'] === 'pending'): ?>
+                                <span class="badge bg-danger">Pending</span>
+                            <?php elseif ($row['status'] === 'sent'): ?>
+                                <span class="badge bg-warning text-dark">Sent</span>
+                            <?php else: ?>
+                                <span class="badge bg-success">Resolved</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>₱<?php echo number_format($row['amount_due'], 2); ?></td>
+                        <td><?php echo date('M d, Y H:i', strtotime($row['created_at'])); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($scheduled)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">No clients are currently scheduled for disconnection.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Historical Logs of Disconnection Notices -->
+    <div class="card report-card">
+        <div class="card-header">
+            <h5><i class="fas fa-history me-2"></i>Disconnection Notices History (Selected Period)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Created At</th>
+                        <th>Client</th>
+                        <th>Meter Code</th>
+                        <th>Notice Type</th>
+                        <th>Status</th>
+                        <th>Amount Due</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($logs as $log): ?>
+                    <tr>
+                        <td><?php echo date('M d, Y H:i', strtotime($log['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($log['firstname'] . ' ' . $log['lastname']); ?></td>
+                        <td><?php echo htmlspecialchars($log['meter_code']); ?></td>
+                        <td><?php echo htmlspecialchars(str_replace('_', ' ', ucfirst($log['notice_type']))); ?></td>
+                        <td>
+                            <?php if ($log['status'] === 'pending'): ?>
+                                <span class="badge bg-danger">Pending</span>
+                            <?php elseif ($log['status'] === 'sent'): ?>
+                                <span class="badge bg-warning text-dark">Sent</span>
+                            <?php else: ?>
+                                <span class="badge bg-success">Resolved</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>₱<?php echo number_format($log['amount_due'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($logs)): ?>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">No disconnection notices found for the selected period.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<?php
+}
+?>
