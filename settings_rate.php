@@ -1519,6 +1519,40 @@ if ($mobile_users_result) {
             color: #fff !important;
         }
 
+        /* Dark mode styling for modals (e.g., Create Billing Cycle) */
+        html[data-theme="dark"] .modal-content,
+        [data-theme="dark"] .modal-content {
+            background-color: #2d2f34;
+            color: #e4e6eb;
+            border: 1px solid #393b40;
+        }
+
+        html[data-theme="dark"] .modal-header,
+        [data-theme="dark"] .modal-header {
+            background-color: #242529;
+            border-bottom: 1px solid #393b40;
+        }
+
+        html[data-theme="dark"] .modal-footer,
+        [data-theme="dark"] .modal-footer {
+            background-color: #242529;
+            border-top: 1px solid #393b40;
+        }
+
+        html[data-theme="dark"] .modal .form-control,
+        html[data-theme="dark"] .modal .form-select,
+        [data-theme="dark"] .modal .form-control,
+        [data-theme="dark"] .modal .form-select {
+            background-color: #242529;
+            color: #e4e6eb;
+            border-color: #393b40;
+        }
+
+        html[data-theme="dark"] .modal .form-control::placeholder,
+        [data-theme="dark"] .modal .form-control::placeholder {
+            color: #9ca3af;
+        }
+
         /* QR Code Generator - ensure dropdown text is visible in dark mode */
         #qrClientDropdown {
             background-color: #ffffff !important;
