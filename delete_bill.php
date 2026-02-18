@@ -10,13 +10,48 @@ include 'db.php';
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if delete actions are enabled in settings
-    $settings_result = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'delete_enabled'");
-    $delete_enabled = false;
-    if ($settings_result && $row = $settings_result->fetch_assoc()) {
-        $delete_enabled = ($row['setting_value'] === '1');
+// Support both form-encoded and JSON requests
+$rawInput = file_get_contents('php://input');
+$jsonData = [];
+if (!empty($rawInput)) {
+    $decoded = json_decode($rawInput, true);
+    if (is_array($decoded)) {
+        $jsonData = $decoded;
     }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Extract bill_id from POST or JSON
+    $bill_id = null;
+    if (isset($_POST['bill_id'])) {
+        $bill_id = $_POST['bill_id'];
+    } elseif (isset($jsonData['bill_id'])) {
+        $bill_id = $jsonData['bill_id'];
+    }
+
+    // Extract password from request
+    $provided_password = null;
+    if (isset($_POST['password'])) {
+        $provided_password = $_POST['password'];
+    } elseif (isset($jsonData['password'])) {
+        $provided_password = $jsonData['password'];
+    }
+
+    // Check if delete actions are enabled and password is configured
+    $settings_result = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('delete_enabled', 'delete_password')");
+    $delete_enabled = false;
+    $stored_hash = null;
+    if ($settings_result) {
+        while ($row = $settings_result->fetch_assoc()) {
+            if ($row['setting_key'] === 'delete_enabled' && $row['setting_value'] === '1') {
+                $delete_enabled = true;
+            }
+            if ($row['setting_key'] === 'delete_password' && !empty($row['setting_value'])) {
+                $stored_hash = $row['setting_value'];
+            }
+        }
+    }
+
     if (!$delete_enabled) {
         echo json_encode([
             'success' => false,
@@ -25,31 +60,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Check if password verification is required and was done
-    if (!isset($_SESSION['delete_verified']) || $_SESSION['delete_verified'] !== true) {
+    if (!$stored_hash) {
         echo json_encode([
             'success' => false,
-            'message' => 'Password verification required'
-        ]);
-        exit();
-    }
-    
-    // Clear verification after use (one-time use)
-    unset($_SESSION['delete_verified']);
-    // Debug log
-    error_log("Delete bill request received: " . print_r($_POST, true));
-    
-    if (!isset($_POST['bill_id'])) {
-        echo json_encode([
-            'success' => false,
-            'message' => 'Bill ID not provided',
-            'debug' => ['post_data' => $_POST]
+            'message' => 'Delete password not configured. Please set it in Settings > Additional Fees.'
         ]);
         exit();
     }
 
-    $bill_id = $_POST['bill_id'];
-    
+    if ($provided_password === null || $provided_password === '') {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Delete password is required.'
+        ]);
+        exit();
+    }
+
+    if (!password_verify($provided_password, $stored_hash)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Incorrect delete password. Please try again.'
+        ]);
+        exit();
+    }
+
+    if ($bill_id === null) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Bill ID not provided'
+        ]);
+        exit();
+    }
+
     // Validate bill_id is numeric
     if (!is_numeric($bill_id)) {
         echo json_encode([
@@ -59,7 +101,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         exit();
     }
-    
+
+    $bill_id = (int)$bill_id;
+
     // Start transaction
     $conn->begin_transaction();
     

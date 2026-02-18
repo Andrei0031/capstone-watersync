@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Delete bill with password verification
+    // Delete bill with password verification (single-step: password + delete)
     window.deleteBillWithPassword = function(billId) {
         // Show password verification modal
         const passwordModalId = 'deletePasswordModal';
@@ -322,41 +322,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorDiv.style.display = 'block';
                 return;
             }
-            
-            // Verify password
-            fetch('verify_delete_password.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ password: password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    passwordModal.hide();
-                    // Now proceed with deletion
-                    if (typeof showConfirm !== 'undefined') {
-                        showConfirm('Are you sure you want to delete this bill? This action cannot be undone.', function() {
-                            deleteBill(billId);
-                        });
-                    } else {
-                        if (confirm('Are you sure you want to delete this bill? This action cannot be undone.')) {
-                            deleteBill(billId);
-                        }
-                    }
-                } else {
-                    errorDiv.textContent = data.message || 'Incorrect password';
-                    errorDiv.style.display = 'block';
-                    document.getElementById('deletePasswordInput').value = '';
-                    document.getElementById('deletePasswordInput').focus();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                errorDiv.textContent = 'Error verifying password';
-                errorDiv.style.display = 'block';
-            });
+
+            // Hide modal and confirm deletion, password is sent to server
+            passwordModal.hide();
+
+            const confirmMessage = 'Are you sure you want to delete this bill? This will remove the bill, its payments, notices, and notifications. This action cannot be undone.';
+
+            if (typeof showConfirm !== 'undefined') {
+                showConfirm(confirmMessage, function() {
+                    deleteBill(billId, password);
+                });
+            } else if (confirm(confirmMessage)) {
+                deleteBill(billId, password);
+            }
         });
         
         passwordModalElement.addEventListener('hidden.bs.modal', function() {
@@ -367,13 +345,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('deletePasswordInput').focus();
     };
 
-    function deleteBill(billId) {
-        const formData = new FormData();
-        formData.append('bill_id', billId);
-        
+    function deleteBill(billId, password) {
         fetch('delete_bill.php', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bill_id: billId, password: password })
         })
         .then(response => response.json())
         .then(data => {
