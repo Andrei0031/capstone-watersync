@@ -32,6 +32,63 @@ if (!$conn->query($createMobileUsersTableSql)) {
 $message = '';
 $messageClass = '';
 
+// Additional Fees historical overview data
+$feeSummary = [
+    'total_fees' => 0,
+    'active_fees' => 0,
+    'inactive_fees' => 0,
+    'applications' => 0,
+    'total_collected' => 0,
+];
+$recentFeeApplications = [];
+
+try {
+    // Summary of fee definitions
+    $summarySql = "SELECT 
+            COUNT(*) AS total_fees,
+            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_fees,
+            SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive_fees
+        FROM additional_fees";
+    if ($res = $conn->query($summarySql)) {
+        $row = $res->fetch_assoc();
+        $feeSummary['total_fees'] = (int)($row['total_fees'] ?? 0);
+        $feeSummary['active_fees'] = (int)($row['active_fees'] ?? 0);
+        $feeSummary['inactive_fees'] = (int)($row['inactive_fees'] ?? 0);
+    }
+
+    // Summary of historical applications
+    $usageSql = "SELECT 
+            COUNT(*) AS applications,
+            SUM(fee_amount) AS total_collected
+        FROM bill_additional_fees";
+    if ($res = $conn->query($usageSql)) {
+        $row = $res->fetch_assoc();
+        $feeSummary['applications'] = (int)($row['applications'] ?? 0);
+        $feeSummary['total_collected'] = (float)($row['total_collected'] ?? 0);
+    }
+
+    // Recent applications history (last 10)
+    $recentSql = "SELECT 
+            baf.*,
+            af.fee_name,
+            bl.reading_date,
+            cl.firstname,
+            cl.lastname
+        FROM bill_additional_fees baf
+        JOIN additional_fees af ON baf.fee_id = af.id
+        JOIN billing_list bl ON baf.bill_id = bl.id
+        JOIN client_list cl ON bl.client_id = cl.id
+        ORDER BY baf.applied_at DESC
+        LIMIT 10";
+    if ($res = $conn->query($recentSql)) {
+        while ($row = $res->fetch_assoc()) {
+            $recentFeeApplications[] = $row;
+        }
+    }
+} catch (Exception $e) {
+    // Fail silently; settings page should still work even if history query fails
+}
+
 // Check for messages from redirect (to prevent form resubmission)
 if (isset($_GET['cycle_status']) && isset($_GET['message'])) {
     $cycle_status = $_GET['cycle_status'];
@@ -1808,6 +1865,104 @@ if ($mobile_users_result) {
                                     <td colspan="7" class="text-center text-muted">
                                         <i class="fas fa-calendar-times fa-2x mb-2"></i>
                                         <p>No billing cycles found. Create your first billing cycle to get started.</p>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Fees History Overview (statistical data) -->
+        <div class="card card-soft mt-4" id="additional-fees-history">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>Additional Fees History
+                    </h5>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#additionalFeesModal">
+                        <i class="fas fa-cog me-1"></i>Manage Fees
+                    </button>
+                </div>
+
+                <p class="text-muted mb-3">
+                    Historical records of how additional fees are configured and applied to bills. This helps audit
+                    surcharge policies over time.
+                </p>
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-primary">
+                                <i class="fas fa-list"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $feeSummary['total_fees']; ?></h3>
+                                <p>Total Fee Types</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-success">
+                                <i class="fas fa-play"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $feeSummary['active_fees']; ?></h3>
+                                <p>Active Fees</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-secondary">
+                                <i class="fas fa-pause"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $feeSummary['inactive_fees']; ?></h3>
+                                <p>Inactive Fees</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-warning">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>₱<?php echo number_format($feeSummary['total_collected'], 2); ?></h3>
+                                <p>Total Collected</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="mb-2"><i class="fas fa-history me-2"></i>Recent Fee Applications</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date Applied</th>
+                                <th>Fee Name</th>
+                                <th>Client</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($recentFeeApplications)): ?>
+                                <?php foreach ($recentFeeApplications as $row): ?>
+                                    <tr>
+                                        <td><?php echo date('M d, Y H:i', strtotime($row['applied_at'])); ?></td>
+                                        <td><?php echo htmlspecialchars($row['fee_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?></td>
+                                        <td class="text-end">₱<?php echo number_format($row['fee_amount'], 2); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        No historical fee applications recorded yet.
                                     </td>
                                 </tr>
                             <?php endif; ?>
