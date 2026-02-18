@@ -515,6 +515,27 @@ elseif ($report_type === 'logs') {
         transition: background-color 0.3s, color 0.3s;
     }
 
+    /* Dark mode helpers to keep text/UI readable */
+    html[data-theme="dark"] .text-muted,
+    [data-theme="dark"] .text-muted {
+        color: #cbd5f5 !important;
+    }
+
+    html[data-theme="dark"] .bg-light,
+    [data-theme="dark"] .bg-light {
+        background-color: #111827 !important;
+        color: var(--text-color) !important;
+    }
+
+    /* Period summary box inside date range card */
+    html[data-theme="dark"] .report-card .form-control.bg-light,
+    [data-theme="dark"] .report-card .form-control.bg-light {
+        background-color: #111827 !important;
+        color: var(--text-color) !important;
+        border-color: var(--border-color) !important;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+    }
+
     .sidebar {
         height: 100vh;
         background-color: var(--sidebar-bg);
