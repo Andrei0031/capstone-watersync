@@ -818,6 +818,69 @@ $disconnection_notices = $stmt->get_result();
             font-weight: 600;
             line-height: 1;
         }
+
+        /* Enhanced dashboard tabs */
+        .dashboard-tab-button {
+            border-radius: 999px;
+            box-shadow: 0 6px 16px rgba(25, 118, 210, 0.18);
+            transition: all 0.25s ease;
+            overflow: hidden;
+        }
+
+        .dashboard-tab-button .tab-icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2px;
+            font-size: 1.1rem;
+        }
+
+        .dashboard-tab-button .tab-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .dashboard-tab-bubble {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 0;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+
+        .dashboard-tab-bubble-dot {
+            width: 10px;
+            height: 10px;
+            background: linear-gradient(135deg, #4dabf7, #1e88e5);
+            box-shadow: 0 0 0 3px rgba(144, 202, 249, 0.7);
+        }
+
+        .dashboard-tab-bubble-count {
+            min-width: 20px;
+            height: 20px;
+            padding: 0 4px;
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: #ffffff;
+            font-size: 0.7rem;
+            font-weight: 700;
+            box-shadow: 0 0 0 3px rgba(255, 205, 210, 0.7);
+        }
+
+        @media (max-width: 576px) {
+            .dashboard-tab-button {
+                max-width: 48% !important;
+                flex: 0 0 48% !important;
+                padding: 10px 14px !important;
+            }
+        }
         #navbar-notification-link {
             cursor: pointer;
             transition: transform 0.2s ease;
@@ -936,27 +999,44 @@ $disconnection_notices = $stmt->get_result();
         <!-- Tab Navigation -->
         <div style="margin: 0; padding: 0;">
             <nav style="margin: 0; padding: 0;">
-                <div class="nav nav-tabs" id="nav-tab" role="tablist" style="background-color: #ffffff; border-bottom: none; margin: 0; padding: 0; display: flex !important; justify-content: center !important; flex-wrap: wrap !important; gap: 5px !important;">
-                        <button class="nav-link tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true" 
-                                style="color: #ffffff !important; font-weight: bold !important; background-color: #007bff !important; border: 2px solid #007bff !important; border-bottom: 3px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
-                            <i class="fas fa-tachometer-alt me-2" style="display: inline !important; visibility: visible !important; color: #ffffff !important;"></i>Dashboard Overview
+                <div class="nav nav-tabs" id="nav-tab" role="tablist" style="background-color: #ffffff; border-bottom: none; margin: 0; padding: 0; display: flex !important; justify-content: center !important; flex-wrap: wrap !important; gap: 10px !important;">
+                        <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true" 
+                                style="color: #ffffff !important; font-weight: bold !important; background: linear-gradient(135deg, #1e88e5, #42a5f5) !important; border: 0 !important; padding: 14px 22px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 220px !important; min-width: 150px !important; text-align: center !important;">
+                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                            <span class="tab-icon">
+                                <i class="fas fa-tachometer-alt" style="color: #ffffff !important;"></i>
+                            </span>
+                            <span class="tab-label">Dashboard Overview</span>
                         </button>
-                        <button class="nav-link tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false"
-                                style="color: #007bff !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #007bff !important; border-bottom: 2px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
-                            <i class="fas fa-bell me-2" style="display: inline !important; visibility: visible !important; color: #007bff !important;"></i>Notifications
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false"
+                                style="color: #1e88e5 !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #1e88e5 !important; padding: 14px 22px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 220px !important; min-width: 150px !important; text-align: center !important;">
                             <?php if ($notification_count > 0): ?>
-                                <span class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: -5px; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);">
+                                <span class="dashboard-tab-bubble dashboard-tab-bubble-count">
                                     <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
                                 </span>
+                            <?php else: ?>
+                                <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
                             <?php endif; ?>
+                            <span class="tab-icon">
+                                <i class="fas fa-bell" style="color: #1e88e5 !important;"></i>
+                            </span>
+                            <span class="tab-label">Notifications</span>
                         </button>
-                        <button class="nav-link tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false"
-                                style="color: #007bff !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #007bff !important; border-bottom: 2px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
-                            <i class="fas fa-file-invoice-dollar me-2" style="display: inline !important; visibility: visible !important; color: #007bff !important;"></i>Billing Information
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false"
+                                style="color: #1e88e5 !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #1e88e5 !important; padding: 14px 22px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 220px !important; min-width: 150px !important; text-align: center !important;">
+                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                            <span class="tab-icon">
+                                <i class="fas fa-file-invoice-dollar" style="color: #1e88e5 !important;"></i>
+                            </span>
+                            <span class="tab-label">Billing Information</span>
                         </button>
-                        <button class="nav-link tab-button" id="nav-reports-tab" data-bs-toggle="tab" data-bs-target="#nav-reports" type="button" role="tab" aria-controls="nav-reports" aria-selected="false"
-                                style="color: #007bff !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #007bff !important; border-bottom: 2px solid #007bff !important; padding: 12px 20px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 200px !important; min-width: 150px !important; text-align: center !important;">
-                            <i class="fas fa-exclamation-triangle me-2" style="display: inline !important; visibility: visible !important; color: #007bff !important;"></i>Water Reports
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-reports-tab" data-bs-toggle="tab" data-bs-target="#nav-reports" type="button" role="tab" aria-controls="nav-reports" aria-selected="false"
+                                style="color: #1e88e5 !important; font-weight: bold !important; background-color: #ffffff !important; border: 2px solid #1e88e5 !important; padding: 14px 22px !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 10 !important; flex: 1 !important; max-width: 220px !important; min-width: 150px !important; text-align: center !important;">
+                            <span class="dashboard-tab-bubble dashboard-tab-bubble-dot"></span>
+                            <span class="tab-icon">
+                                <i class="fas fa-exclamation-triangle" style="color: #1e88e5 !important;"></i>
+                            </span>
+                            <span class="tab-label">Water Reports</span>
                         </button>
                 </div>
             </nav>
@@ -2196,42 +2276,46 @@ $disconnection_notices = $stmt->get_result();
                 // Remove active from all tab buttons and content
                 document.querySelectorAll('.tab-button').forEach(t => {
                     t.classList.remove('active');
-                    // Force remove all active styling - including the Dashboard Overview tab
-                    t.style.setProperty('color', '#007bff', 'important');
+                    // Reset to inactive styling
+                    t.style.setProperty('color', '#1e88e5', 'important');
                     t.style.setProperty('background-color', '#ffffff', 'important');
-                    t.style.setProperty('border', '2px solid #007bff', 'important');
-                    t.style.setProperty('border-bottom', '2px solid #007bff', 'important');
+                    t.style.setProperty('border', '2px solid #1e88e5', 'important');
                     t.style.setProperty('font-weight', 'bold', 'important');
-                    t.style.setProperty('padding', '12px 20px', 'important');
-                    t.style.setProperty('margin-right', '5px', 'important');
+                    t.style.setProperty('padding', '14px 22px', 'important');
+                    t.style.setProperty('margin-right', '0', 'important');
                     t.style.setProperty('display', 'inline-block', 'important');
                     t.style.setProperty('visibility', 'visible', 'important');
                     t.style.setProperty('opacity', '1', 'important');
                     t.style.setProperty('position', 'relative', 'important');
                     t.style.setProperty('z-index', '10', 'important');
+                    t.style.setProperty('border-radius', '999px', 'important');
+                    t.style.setProperty('box-shadow', '0 6px 16px rgba(25, 118, 210, 0.18)', 'important');
+                    t.style.setProperty('transform', 'translateY(0)', 'important');
                     // Update icon color
                     const icon = t.querySelector('i');
                     if (icon) {
-                        icon.style.setProperty('color', '#007bff', 'important');
+                        icon.style.setProperty('color', '#1e88e5', 'important');
                     }
                 });
                 document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
                 
                 // Add active to clicked tab
                 this.classList.add('active');
-                // Style active tab (white text on blue background)
+                // Style active tab (gradient pill with stronger shadow)
                 this.style.setProperty('color', '#ffffff', 'important');
-                this.style.setProperty('background-color', '#007bff', 'important');
-                this.style.setProperty('border', '2px solid #007bff', 'important');
-                this.style.setProperty('border-bottom', '3px solid #007bff', 'important');
+                this.style.setProperty('background', 'linear-gradient(135deg, #1e88e5, #42a5f5)', 'important');
+                this.style.setProperty('border', '0', 'important');
                 this.style.setProperty('font-weight', 'bold', 'important');
-                this.style.setProperty('padding', '12px 20px', 'important');
-                this.style.setProperty('margin-right', '5px', 'important');
+                this.style.setProperty('padding', '14px 22px', 'important');
+                this.style.setProperty('margin-right', '0', 'important');
                 this.style.setProperty('display', 'inline-block', 'important');
                 this.style.setProperty('visibility', 'visible', 'important');
                 this.style.setProperty('opacity', '1', 'important');
                 this.style.setProperty('position', 'relative', 'important');
                 this.style.setProperty('z-index', '10', 'important');
+                this.style.setProperty('border-radius', '999px', 'important');
+                this.style.setProperty('box-shadow', '0 10px 24px rgba(25, 118, 210, 0.35)', 'important');
+                this.style.setProperty('transform', 'translateY(-2px)', 'important');
                 // Update icon color for active tab
                 const activeIcon = this.querySelector('i');
                 if (activeIcon) {
