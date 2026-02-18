@@ -1052,6 +1052,9 @@ elseif ($report_type === 'logs') {
                 <p class="text-muted mb-0">Comprehensive insights and data analysis for your water billing system</p>
             </div>
             <div class="header-actions">
+                <button type="button" onclick="window.print()" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-print me-1"></i> Print / Save as PDF
+                </button>
                 <button type="button" onclick="exportReport('csv', this)" class="btn btn-success">
                     <i class="fas fa-download me-1"></i> Export CSV
                 </button>
