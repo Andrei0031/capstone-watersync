@@ -865,23 +865,11 @@ $disconnection_notices = $stmt->get_result();
         }
 
         .nav-tabs .dashboard-tab-button.active {
-            color: #ffffff !important;
+            color: #e91e63 !important; /* pink accent for active tab */
         }
 
         .nav-tabs .dashboard-tab-button.active .tab-icon i {
-            color: #ffffff !important;
-        }
-
-        /* Small red dot for notifications when there are new items */
-        .nav-tabs .dashboard-tab-button .notif-dot {
-            position: absolute;
-            top: 4px;
-            right: 6px;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ff1744;
-            box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.4);
+            color: #e91e63 !important;
         }
 
         @media (max-width: 576px) {
@@ -1024,9 +1012,13 @@ $disconnection_notices = $stmt->get_result();
                             </span>
                             <span class="tab-label">Dashboard Overview</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false">
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false" style="position: relative;">
                             <?php if ($notification_count > 0): ?>
-                                <span class="notif-dot"></span>
+                                <span class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: 12px; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px;">
+                                    <?php echo $notification_count > 99 ? '99+' : $notification_count; ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: 12px; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; display: none;"></span>
                             <?php endif; ?>
                             <span class="tab-icon">
                                 <i class="fas fa-bell"></i>
