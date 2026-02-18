@@ -9,13 +9,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const savedTheme = localStorage.getItem('theme') || 'light';
     html.setAttribute('data-theme', savedTheme);
-    themeToggle.checked = savedTheme === 'dark';
-
-    themeToggle.addEventListener('change', function() {
-        const theme = this.checked ? 'dark' : 'light';
-        html.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-    });
+    if (themeToggle) {
+        themeToggle.checked = savedTheme === 'dark';
+        themeToggle.addEventListener('change', function() {
+            const theme = this.checked ? 'dark' : 'light';
+            html.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        });
+    }
 
     // Listen for theme changes from other pages
     window.addEventListener('storage', function(e) {
@@ -76,8 +77,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Edit Bill Modal Functionality
-    const editModal = new bootstrap.Modal(document.getElementById('editBillModal'));
+    // Edit Bill Modal Functionality (only if modal exists on this page)
+    const editBillModalElement = document.getElementById('editBillModal');
+    if (editBillModalElement) {
+        const editModal = new bootstrap.Modal(editBillModalElement);
     document.querySelectorAll('.edit-btn').forEach(button => {
         button.addEventListener('click', function() {
             const billId = this.getAttribute('data-id');
@@ -256,6 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.innerHTML = originalText;
             });
         });
+    }
     }
 
     // Delete bill with password verification (single-step: password + delete)
