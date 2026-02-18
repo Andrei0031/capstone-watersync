@@ -839,7 +839,7 @@ $disconnection_notices = $stmt->get_result();
             position: relative;
             border: none;
             background: transparent !important;
-            color: #9e9e9e !important;
+            color: #90caf9 !important; /* light blue to match system palette */
             font-weight: 500 !important;
             padding: 8px 16px !important;
             min-width: 90px;
@@ -861,15 +861,15 @@ $disconnection_notices = $stmt->get_result();
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon i {
-            color: #9e9e9e !important;
+            color: #90caf9 !important;
         }
 
         .nav-tabs .dashboard-tab-button.active {
-            color: #e91e63 !important;
+            color: #ffffff !important;
         }
 
         .nav-tabs .dashboard-tab-button.active .tab-icon i {
-            color: #e91e63 !important;
+            color: #ffffff !important;
         }
 
         /* Small red dot for notifications when there are new items */
