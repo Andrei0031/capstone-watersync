@@ -839,8 +839,8 @@ $disconnection_notices = $stmt->get_result();
             position: relative;
             border: none;
             background: transparent !important;
-            color: #1976d2 !important; /* stronger blue so text is clearly visible */
-            font-weight: 500 !important;
+            color: #0D47A1 !important; /* deep blue for maximum readability */
+            font-weight: 600 !important;
             padding: 8px 16px !important;
             min-width: 90px;
             text-align: center !important;
@@ -861,7 +861,7 @@ $disconnection_notices = $stmt->get_result();
         }
 
         .nav-tabs .dashboard-tab-button .tab-icon i {
-            color: #1976d2 !important;
+            color: #0D47A1 !important;
         }
 
         .nav-tabs .dashboard-tab-button.active {
