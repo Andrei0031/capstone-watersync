@@ -1518,6 +1518,21 @@ if ($mobile_users_result) {
             background-color: #6c757d !important;
             color: #fff !important;
         }
+
+        /* QR Code Generator - ensure dropdown text is visible in dark mode */
+        #qrClientDropdown {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
+
+        #qrClientDropdown .qr-client-option {
+            background-color: #ffffff;
+            color: #111827;
+        }
+
+        #qrClientDropdown .qr-client-option:hover {
+            background-color: #e5e7eb;
+        }
     </style>
 </head>
 <body>
