@@ -102,13 +102,14 @@ while ($bill = $result->fetch_assoc()) {
     $customer_name = $bill['firstname'] . ' ' . $bill['lastname'];
     $amount = number_format($bill['total'], 2);
     $due_date = date('M d, Y', strtotime($bill['due_date']));
+    $due_short = date('M d', strtotime($bill['due_date'])); // Short for SMS
     
     // Send payment deadline reminder (3 days before due date)
     if ($days_until_due == 3 && !$is_overdue) {
         $sent_any = false;
         // SMS
         if ($sms_enabled && $sms_bill_schedule_ok && !empty($bill['phone'])) {
-            $sms_message = "Hi $customer_name! Reminder: Your water bill of ₱$amount is due in 3 days ($due_date). Please pay on time! - WaterSync";
+            $sms_message = "Hi {$bill['firstname']}! Bill ₱$amount due in 3 days ($due_short). - WS";
             sendDummySMS($bill['phone'], $sms_message, [
                 'first_name' => $bill['firstname'],
                 'last_name' => $bill['lastname']
@@ -139,7 +140,7 @@ while ($bill = $result->fetch_assoc()) {
         $sent_any_overdue = false;
         // SMS
         if ($sms_enabled && $sms_overdue_schedule_ok && !empty($bill['phone'])) {
-            $sms_message = "Hi $customer_name! Your water bill of ₱$amount is OVERDUE by $days_overdue day(s). Due: $due_date. Please pay immediately to avoid disconnection! - WaterSync";
+            $sms_message = "Hi {$bill['firstname']}! Bill ₱$amount OVERDUE. Pay now to avoid disconnect. - WS";
             sendDummySMS($bill['phone'], $sms_message, [
                 'first_name' => $bill['firstname'],
                 'last_name' => $bill['lastname']

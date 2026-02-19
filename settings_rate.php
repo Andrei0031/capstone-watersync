@@ -824,7 +824,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (!empty($test_phone)) {
             include 'simple_notifications.php';
             $due_date = date('M d, Y', strtotime("-{$test_days_overdue} days"));
-            $sms_message = "Hi $test_name! Your water bill of ₱$test_amount is OVERDUE by $test_days_overdue day(s). Due: $due_date. Please pay immediately to avoid disconnection! - WaterSync";
+            $sms_message = "Hi $test_name! Bill ₱$test_amount OVERDUE. Pay now to avoid disconnect. - WS";
             $sms_result = sendDummySMS($test_phone, $sms_message, [
                 'first_name' => $test_name,
                 'last_name' => ''

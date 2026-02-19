@@ -624,7 +624,8 @@ class NotificationManager {
         $due_date = date('M d, Y', strtotime($bill['due_date']));
         $consumption = $bill['reading'] - $bill['previous'];
         
-        return "Hi $name! Your water bill has been approved. Amount: ₱$amount. Due: $due_date. Consumption: {$consumption} cubic meters. Thank you! - WaterSync";
+        $due_short = date('M d', strtotime($bill['due_date']));
+        return "Hi {$client['firstname']}! Bill approved: ₱$amount. Due $due_short. {$consumption} m³ - WS";
     }
     
     private function generateBillingEmail($client, $bill, $event_type) {
@@ -673,10 +674,11 @@ class NotificationManager {
         $name = $client['firstname'] . ' ' . $client['lastname'];
         $amount = number_format($bill['total'], 2);
         
+        $due_short = date('M d', strtotime($bill['due_date']));
         if ($days_overdue > 0) {
-            return "REMINDER: Hi $name! Your water bill of ₱$amount is $days_overdue days overdue. Please pay immediately to avoid disconnection. - WaterSync";
+            return "Hi {$client['firstname']}! Bill ₱$amount overdue. Pay now to avoid disconnect. - WS";
         } else {
-            return "REMINDER: Hi $name! Your water bill of ₱$amount is due soon. Please pay to avoid late fees. - WaterSync";
+            return "Hi {$client['firstname']}! Bill ₱$amount due $due_short. - WS";
         }
     }
     
