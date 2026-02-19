@@ -1163,7 +1163,7 @@ $result = $conn->query($sql);
                             <input type="date" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Rate (per cu.m)</label>
+                            <label class="form-label">Rate (per m3)</label>
                             <input type="number" class="form-control" step="0.01" required>
                         </div>
                     </div>
@@ -1244,7 +1244,7 @@ $result = $conn->query($sql);
                 <div class="modal-card mt-3">
                     <h6 class="card-subtitle">Payment Summary</h6>
                     <div class="payment-summary-row">
-                        <span class="payment-summary-label">Base Charge (First 6 cu.m)</span>
+                        <span class="payment-summary-label">Base Charge (First 6 m3)</span>
                         <span class="payment-summary-value" id="viewBaseCharge"></span>
                     </div>
                     <div class="payment-summary-row">
@@ -1312,7 +1312,7 @@ $result = $conn->query($sql);
                                     <input type="number" class="form-control form-control-sm" id="editCurrentReading" name="reading" step="0.01" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="bill-detail-label">Rate (per cu.m)</label>
+                                    <label class="bill-detail-label">Rate (per m3)</label>
                                     <input type="number" class="form-control form-control-sm" id="editRate" name="rate" step="0.01" required>
                                 </div>
                             </div>
@@ -1326,7 +1326,7 @@ $result = $conn->query($sql);
                             <span class="payment-summary-value" id="editConsumption">0</span>
                         </div>
                         <div class="payment-summary-row">
-                            <span class="payment-summary-label">Base Charge (First 6 cu.m)</span>
+                            <span class="payment-summary-label">Base Charge (First 6 m3)</span>
                             <span class="payment-summary-value" id="editBaseCharge">₱0.00</span>
                         </div>
                         <div class="payment-summary-row">

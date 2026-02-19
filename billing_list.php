@@ -1742,7 +1742,7 @@ if ($params) {
                             <label class="form-label">Current Reading</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="reading" step="0.01" required>
-                                <span class="input-group-text">cu.m</span>
+                                <span class="input-group-text">m3</span>
                             </div>
                         </div>
                     </div>
@@ -1828,8 +1828,8 @@ if ($params) {
                             <div class="info-section">
                                 <div class="bill-detail-label">Rate Information</div>
                                 <div class="bill-detail-value">
-                                    <small class="text-muted">Base Rate (up to 6 cu.m):</small> <span id="viewBaseRate"></span><br>
-                                    <small class="text-muted">Excess Rate (per cu.m):</small> <span id="viewExcessRate"></span>
+                                    <small class="text-muted">Base Rate (up to 6 m3):</small> <span id="viewBaseRate"></span><br>
+                                    <small class="text-muted">Excess Rate (per m3):</small> <span id="viewExcessRate"></span>
                                 </div>
                             </div>
                         </div>
@@ -1839,7 +1839,7 @@ if ($params) {
                 <div class="modal-card mt-3">
                     <h6 class="card-subtitle">Payment Summary</h6>
                     <div class="payment-summary-row">
-                        <span class="payment-summary-label">Base Charge (First 6 cu.m)</span>
+                        <span class="payment-summary-label">Base Charge (First 6 m3)</span>
                         <span class="payment-summary-value" id="viewBaseCharge"></span>
                     </div>
                     <div class="payment-summary-row">
@@ -2477,7 +2477,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td>${bill.billing_month || 'N/A'}</td>
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
-                                    <td>${parseFloat(bill.consumption).toFixed(2)} cu.m</td>
+                                    <td>${parseFloat(bill.consumption).toFixed(2)} m3</td>
                                     <td class="text-end"><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
                                     <td class="text-end">₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
                                     <td class="text-end"><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
