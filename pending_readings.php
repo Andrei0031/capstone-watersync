@@ -108,16 +108,15 @@ function isTesseractAvailable() {
     return $testReturn === 0;
 }
 
-// Get current active billing cycle first (so stats can be scoped to it; also used later for UI)
+// Get current active billing cycle (for UI display)
 $active_cycle = null;
 $active_cycle_sql = "SELECT * FROM billing_cycles WHERE status = 'active' LIMIT 1";
 $active_cycle_result = $conn->query($active_cycle_sql);
 if ($active_cycle_result && $active_cycle_result->num_rows > 0) {
     $active_cycle = $active_cycle_result->fetch_assoc();
 }
-$active_cycle_for_stats = $active_cycle;
 
-// Calculate statistics (optionally scoped to active billing cycle for accuracy)
+// Calculate statistics (count ALL readings to match what's displayed in lists)
 $total_readings = 0;
 $pending_count = 0;
 $needs_review_count = 0;
@@ -126,30 +125,17 @@ $processed_count = 0;
 $failed_count = 0;
 $ocr_processed_count = 0;
 
-$cycle_where = '';
-$cycle_param = null;
-if ($active_cycle_for_stats && isset($active_cycle_for_stats['id'])) {
-    $cycle_where = " WHERE billing_cycle_id = ?";
-    $cycle_param = (int) $active_cycle_for_stats['id'];
-}
-
-// Get counts for each status (for active cycle when available)
+// Get counts for each status (all readings, not filtered by cycle)
 $stats_sql = "SELECT 
     COUNT(*) as total,
     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN status = 'needs_review' THEN 1 ELSE 0 END) as needs_review,
     SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) as verified,
     SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as processed,
-    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
-    FROM pending_meter_readings" . $cycle_where;
-if ($cycle_param !== null) {
-    $stmt = $conn->prepare($stats_sql);
-    $stmt->bind_param('i', $cycle_param);
-    $stmt->execute();
-    $stats_result = $stmt->get_result();
-} else {
-    $stats_result = $conn->query($stats_sql);
-}
+    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+    SUM(CASE WHEN status IN ('processed', 'verified') THEN 1 ELSE 0 END) as processed_and_verified
+    FROM pending_meter_readings";
+$stats_result = $conn->query($stats_sql);
 if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $total_readings = (int) ($row['total'] ?? 0);
     $pending_count = (int) ($row['pending'] ?? 0);
@@ -157,21 +143,16 @@ if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $verified_count = (int) ($row['verified'] ?? 0);
     $processed_count = (int) ($row['processed'] ?? 0);
     $failed_count = (int) ($row['failed'] ?? 0);
+    // Combined count for "Processed Readings" tab (processed + verified)
+    $processed_and_verified_count = (int) ($row['processed_and_verified'] ?? 0);
 }
 
 // OCR Processed = only readings that actually went through OCR (have ocr_reading or extracted_text).
 // Excludes pending and manually added readings that never had OCR run.
 $ocr_attempts_sql = "SELECT COUNT(*) as cnt FROM pending_meter_readings 
     WHERE status IN ('needs_review','verified','processed') 
-    AND (ocr_reading IS NOT NULL OR (extracted_text IS NOT NULL AND TRIM(COALESCE(extracted_text,'')) != ''))" . ($cycle_param !== null ? " AND billing_cycle_id = ?" : "");
-if ($cycle_param !== null) {
-    $stmt_ocr = $conn->prepare($ocr_attempts_sql);
-    $stmt_ocr->bind_param('i', $cycle_param);
-    $stmt_ocr->execute();
-    $ocr_attempts_result = $stmt_ocr->get_result();
-} else {
-    $ocr_attempts_result = $conn->query($ocr_attempts_sql);
-}
+    AND (ocr_reading IS NOT NULL OR (extracted_text IS NOT NULL AND TRIM(COALESCE(extracted_text,'')) != ''))";
+$ocr_attempts_result = $conn->query($ocr_attempts_sql);
 if ($ocr_attempts_result && $ocr_row = $ocr_attempts_result->fetch_assoc()) {
     $ocr_processed_count = (int) ($ocr_row['cnt'] ?? 0);
 }
@@ -180,17 +161,10 @@ if ($ocr_attempts_result && $ocr_row = $ocr_attempts_result->fetch_assoc()) {
 $attempts = $ocr_processed_count + $failed_count;
 $success_rate = $attempts > 0 ? round(($ocr_processed_count / $attempts) * 100) : 0;
 
-// Get readings uploaded today (optionally for active cycle)
+// Get readings uploaded today (all readings)
 $today_sql = "SELECT COUNT(*) as today_count FROM pending_meter_readings 
-              WHERE DATE(upload_date) = CURRENT_DATE()" . ($cycle_param !== null ? " AND billing_cycle_id = ?" : "");
-if ($cycle_param !== null) {
-    $stmt_today = $conn->prepare($today_sql);
-    $stmt_today->bind_param('i', $cycle_param);
-    $stmt_today->execute();
-    $today_result = $stmt_today->get_result();
-} else {
-    $today_result = $conn->query($today_sql);
-}
+              WHERE DATE(upload_date) = CURRENT_DATE()";
+$today_result = $conn->query($today_sql);
 $today_count = 0;
 if ($today_result && $row = $today_result->fetch_assoc()) {
     $today_count = $row['today_count'];
@@ -1478,6 +1452,9 @@ if (!$failed_result) {
         <!-- Header Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Meter Reading Management</h2>
+            <a href="view_mobile_upload_logs.php" class="btn btn-outline-info btn-sm" target="_blank" title="See if mobile uploads are reaching the server">
+                <i class="fas fa-file-alt me-1"></i>View Mobile Upload Logs
+            </a>
         </div>
 
         <!-- Current Billing Cycle Info -->

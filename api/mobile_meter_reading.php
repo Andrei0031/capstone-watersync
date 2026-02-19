@@ -1,6 +1,21 @@
 <?php
 require_once 'config.php';
 
+/**
+ * Log mobile upload activity to logs/mobile_uploads.log (viewable at view_mobile_upload_logs.php)
+ */
+function mobileUploadLog($msg, $type = 'INFO') {
+    $logDir = __DIR__ . '/../logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $logFile = $logDir . '/mobile_uploads.log';
+    $ts = date('Y-m-d H:i:s');
+    $line = "[$ts] [$type] $msg\n";
+    @file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+    error_log("MobileUpload: $msg");
+}
+
 // Headers for mobile app compatibility
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -9,13 +24,45 @@ header('Content-Type: application/json');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    mobileUploadLog("OPTIONS preflight from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
     http_response_code(200);
     exit();
 }
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    mobileUploadLog("Rejected: method=" . $_SERVER['REQUEST_METHOD'] . " from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 'REJECT');
     sendResponse(false, 'Only POST method allowed', null, 405);
+}
+
+// Read raw input FIRST so we can log before any validation
+$raw_input = file_get_contents('php://input');
+$input_len = $raw_input ? strlen($raw_input) : 0;
+$client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+$content_type = $_SERVER['CONTENT_TYPE'] ?? 'not set';
+
+mobileUploadLog("REQUEST RECEIVED from $client_ip | Content-Type: $content_type | Body size: {$input_len} bytes", 'RECV');
+
+$input = json_decode($raw_input, true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    $err = json_last_error_msg();
+    mobileUploadLog("Invalid JSON: $err | First 200 chars: " . substr($raw_input, 0, 200), 'ERROR');
+    sendResponse(false, 'Invalid JSON data', null, 400);
+}
+
+$input_keys = $input ? array_keys($input) : [];
+$has_client = isset($input['client_id']);
+$has_image = isset($input['image_data']);
+$img_len = isset($input['image_data']) ? strlen($input['image_data']) : 0;
+mobileUploadLog("Parsed OK | Keys: " . implode(', ', $input_keys) . " | client_id: " . ($has_client ? $input['client_id'] : 'MISSING') . " | image_data: " . ($has_image ? "{$img_len} chars" : 'MISSING'), 'RECV');
+
+if (!$has_client || empty($input['client_id'])) {
+    mobileUploadLog("Rejected: Missing client_id", 'ERROR');
+    sendResponse(false, 'Missing required field: client_id', null, 400);
+}
+if (!$has_image || empty($input['image_data'])) {
+    mobileUploadLog("Rejected: Missing or empty image_data", 'ERROR');
+    sendResponse(false, 'Missing required field: image_data', null, 400);
 }
 
 // Validate API key or allow local network access
@@ -23,9 +70,7 @@ $is_local_network = isLocalNetworkRequest();
 if (!$is_local_network) {
     validateApiKey();
 }
-
-$input = getInputData();
-validateRequiredFields($input, ['client_id', 'image_data']);
+mobileUploadLog("Auth OK (local=" . ($is_local_network ? 'yes' : 'no') . ") | client_id={$input['client_id']}", 'AUTH');
 
 // Include OCR functions for auto-processing
 require_once __DIR__ . '/ocr_functions.php';
@@ -43,8 +88,10 @@ try {
     $current_cycle = $cycle_stmt->get_result()->fetch_assoc();
     
     if (!$current_cycle) {
+        mobileUploadLog("Rejected: No active billing cycle", 'ERROR');
         sendResponse(false, 'No active billing cycle found. Please contact administrator.', null, 400);
     }
+    mobileUploadLog("Cycle OK: {$current_cycle['cycle_name']} (id={$current_cycle['id']})", 'OK');
     
     // Validate client exists and get client info
     $client_stmt = $conn->prepare("
@@ -59,8 +106,10 @@ try {
     $client = $client_stmt->get_result()->fetch_assoc();
     
     if (!$client) {
+        mobileUploadLog("Rejected: Invalid or inactive client_id={$input['client_id']}", 'ERROR');
         sendResponse(false, 'Invalid or inactive client ID', null, 404);
     }
+    mobileUploadLog("Client OK: {$client['meter_code']} ({$client['firstname']} {$client['lastname']})", 'OK');
     
     // Check for duplicate reading in current cycle
     $duplicate_stmt = $conn->prepare("
@@ -72,6 +121,7 @@ try {
     $duplicate = $duplicate_stmt->get_result()->fetch_assoc();
     
     if ($duplicate) {
+        mobileUploadLog("Rejected: Duplicate reading for client {$input['client_id']} in cycle (existing id={$duplicate['id']})", 'ERROR');
         sendResponse(false, 'Reading already submitted for this billing cycle', [
             'cycle_name' => $current_cycle['cycle_name'],
             'existing_reading_id' => $duplicate['id']
@@ -81,8 +131,10 @@ try {
     // Process and save image
     $image_data = base64_decode($input['image_data']);
     if (!$image_data) {
+        mobileUploadLog("Rejected: Invalid base64 image_data (decode failed)", 'ERROR');
         sendResponse(false, 'Invalid image data', null, 400);
     }
+    mobileUploadLog("Image decoded OK: " . strlen($image_data) . " bytes", 'OK');
     
     // Create directory structure
     $upload_dir = '../uploads/meter_readings/' . date('Y/m') . '/';
@@ -97,55 +149,52 @@ try {
     
     // Save image
     if (!file_put_contents($filepath, $image_data)) {
+        mobileUploadLog("Rejected: Failed to save image to $filepath", 'ERROR');
         sendResponse(false, 'Failed to save meter image', null, 500);
     }
+    mobileUploadLog("Image saved: $relative_path", 'OK');
     
-    // AUTO-PROCESS OCR IMMEDIATELY
+    // Mobile uploads ALWAYS go to 'pending' for manual OCR/verification from web (like batch upload).
+    // OCR may run to pre-fill values, but status stays 'pending' so it shows in Pending tab.
     $ocrReading = null;
     $extractedText = '';
     $ocrProcessed = false;
     $ocrError = null;
-    $status = 'pending'; // Default to pending - will change to 'processed' if OCR succeeds, stays 'pending' if OCR fails (for manual processing)
+    $status = 'pending'; // Always 'pending' - admin processes OCR from web interface
     
     try {
-        // Try Roboflow digit detection first (preferred method)
+        // Try Roboflow digit detection (optional pre-fill; admin can re-run from web)
         if (function_exists('processImageWithRoboflowDigits')) {
             $ocrResult = processImageWithRoboflowDigits($filepath);
             if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
                 $ocrReading = $ocrResult['meter_reading'];
                 $extractedText = $ocrResult['extracted_text'] ?? '';
                 $ocrProcessed = true;
-                $status = 'processed';
-                error_log("✓ Auto-OCR SUCCESS (Roboflow): Reading ID will be created with value: $ocrReading");
+                error_log("✓ Mobile upload: Roboflow pre-filled value: $ocrReading (status: pending for verification)");
             } else {
                 $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
             }
         }
         
-        // Roboflow YOLOv8 only - no Tesseract fallback
-        
-        // If both OCR methods failed, use manual reading if provided
+        // Use manual reading if provided (pre-fill; admin verifies from web)
         if (!$ocrProcessed && isset($input['meter_reading'])) {
             $meter_reading = floatval($input['meter_reading']);
             if ($meter_reading > 0) {
                 $ocrReading = $meter_reading;
-                $extractedText = 'Manual reading from mobile app';
+                $extractedText = 'Manual reading from mobile app - pending verification';
                 $ocrProcessed = true;
-                $status = 'processed';
-                error_log("✓ Using manual reading from mobile app: $meter_reading");
+                error_log("✓ Mobile upload: Manual reading provided: $meter_reading (status: pending for verification)");
             }
         }
         
         if (!$ocrProcessed) {
             $ocrError = $ocrError ?? 'OCR processing failed and no manual reading provided';
-            error_log("✗ Auto-OCR FAILED: $ocrError");
-            // Set status to 'pending' instead of 'failed' so it can be manually processed from web interface
-            $status = 'pending';
+            error_log("✗ Mobile upload: $ocrError - reading saved as pending for manual processing");
         }
         
     } catch (Exception $e) {
         $ocrError = 'OCR processing exception: ' . $e->getMessage();
-        error_log("✗ Auto-OCR EXCEPTION: $ocrError");
+        error_log("✗ Mobile upload OCR exception: $ocrError");
     }
     
     // Get mobile device info if provided
@@ -185,6 +234,7 @@ try {
         
         // Log the submission
         $client_name = ($client['firstname'] ?? '') . ' ' . ($client['lastname'] ?? '');
+        mobileUploadLog("SUCCESS - Reading saved! id=$reading_id | client=$client_name | status=$status | cycle={$current_cycle['cycle_name']} | ocr=" . ($ocrReading ?? 'N/A'), 'SUCCESS');
         error_log("Mobile meter reading submitted - Client: $client_name, Reading: " . ($ocrReading ?? 'N/A') . ", Status: $status, Cycle: {$current_cycle['cycle_name']}");
         
         sendResponse(true, $ocrProcessed ? 'Meter reading uploaded and OCR processed successfully' : 'Meter reading uploaded but OCR processing failed', [
@@ -209,13 +259,16 @@ try {
         ]);
     } else {
         // Delete uploaded image if database insert failed
+        $db_err = $conn->error ?? 'unknown';
+        mobileUploadLog("DB INSERT FAILED: $db_err", 'ERROR');
         if (file_exists($filepath)) {
             unlink($filepath);
         }
-        sendResponse(false, 'Failed to save meter reading: ' . $conn->error, null, 500);
+        sendResponse(false, 'Failed to save meter reading: ' . $db_err, null, 500);
     }
     
 } catch (Exception $e) {
+    mobileUploadLog("EXCEPTION: " . $e->getMessage(), 'ERROR');
     error_log("Mobile meter reading API error: " . $e->getMessage());
     sendResponse(false, 'Server error occurred', null, 500);
 }

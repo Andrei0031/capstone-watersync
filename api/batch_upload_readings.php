@@ -31,6 +31,14 @@ register_shutdown_function(function() {
 
 require_once 'config.php';
 
+function mobileUploadLog($msg, $type = 'INFO') {
+    $logDir = __DIR__ . '/../logs';
+    if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+    $logFile = $logDir . '/mobile_uploads.log';
+    $line = "[" . date('Y-m-d H:i:s') . "] [BATCH] [$type] $msg\n";
+    @file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+}
+
 // Headers for mobile app compatibility
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -39,6 +47,7 @@ header('Content-Type: application/json');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    mobileUploadLog("OPTIONS preflight from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
     http_response_code(200);
     exit();
 }
@@ -102,9 +111,8 @@ if (!$is_local_network) {
 require_once __DIR__ . '/ocr_functions.php';
 
 // Log incoming request for debugging
-error_log("Batch Upload API: Request received from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-error_log("Batch Upload API: Request method: " . $_SERVER['REQUEST_METHOD']);
-error_log("Batch Upload API: Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+$client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+mobileUploadLog("REQUEST RECEIVED from $client_ip | Method=" . $_SERVER['REQUEST_METHOD'] . " | Content-Type=" . ($_SERVER['CONTENT_TYPE'] ?? 'not set'), 'RECV');
 
 /**
  * Get input data for batch upload (custom version to avoid sendResponse conflict)
@@ -131,10 +139,10 @@ function getBatchInputData() {
 
 // Get input data with better error handling
 $raw_input = file_get_contents('php://input');
-error_log("Batch Upload API: Raw input length: " . strlen($raw_input) . " bytes");
+mobileUploadLog("Raw body size: " . strlen($raw_input) . " bytes", 'RECV');
 
 if (empty($raw_input)) {
-    error_log("Batch Upload API: No input data received");
+    mobileUploadLog("Rejected: No input data received", 'ERROR');
     sendBatchResponse(false, 'No data received. Please send JSON data in request body.', null, 400);
 }
 
@@ -162,7 +170,7 @@ if (isset($logInput['readings']) && is_array($logInput['readings'])) {
         }
     }
 }
-error_log("Batch Upload API: Input data structure: " . json_encode($logInput));
+mobileUploadLog("Parsed OK | readings count: " . (isset($input['readings']) ? count($input['readings']) : 0), 'RECV');
 
 // Validate batch data structure
 if (!isset($input['readings']) || !is_array($input['readings'])) {
@@ -521,6 +529,7 @@ try {
     // Log final results
     error_log("Batch Upload API: Completed - Success: $success_count, Failed: $failed_count, Total: " . count($input['readings']));
     
+    mobileUploadLog("SUCCESS - Batch complete: $success_count succeeded, $failed_count failed", 'SUCCESS');
     // Return batch results
     sendBatchResponse(true, "Batch upload completed: $success_count succeeded, $failed_count failed", [
         'total' => count($input['readings']),
