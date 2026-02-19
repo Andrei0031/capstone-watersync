@@ -515,9 +515,12 @@ try {
             error_log("Batch Upload: Successfully inserted reading ID $reading_id for client $client_id");
             
         } catch (Exception $e) {
-            $reading_result['error'] = $e->getMessage();
+            $err = $e->getMessage();
+            $reading_result['error'] = $err;
             $failed_count++;
-            error_log("Batch upload error for reading index $index: " . $e->getMessage());
+            $client_id_val = $reading_data['client_id'] ?? '?';
+            mobileUploadLog("FAILED index=$index client_id=$client_id_val: $err", 'ERROR');
+            error_log("Batch upload error for reading index $index: " . $err);
         }
         
         $results[] = $reading_result;
@@ -529,7 +532,12 @@ try {
     // Log final results
     error_log("Batch Upload API: Completed - Success: $success_count, Failed: $failed_count, Total: " . count($input['readings']));
     
-    mobileUploadLog("SUCCESS - Batch complete: $success_count succeeded, $failed_count failed", 'SUCCESS');
+    if ($failed_count > 0) {
+        $fail_msgs = array_filter(array_map(function($r) { return $r['error'] ?? null; }, $results));
+        mobileUploadLog("Batch complete: $success_count succeeded, $failed_count failed. Errors: " . implode('; ', array_slice($fail_msgs, 0, 3)), 'ERROR');
+    } else {
+        mobileUploadLog("SUCCESS - Batch complete: $success_count succeeded, 0 failed", 'SUCCESS');
+    }
     // Return batch results
     sendBatchResponse(true, "Batch upload completed: $success_count succeeded, $failed_count failed", [
         'total' => count($input['readings']),
