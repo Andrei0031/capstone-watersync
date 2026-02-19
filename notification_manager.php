@@ -624,8 +624,9 @@ class NotificationManager {
         $due_date = date('M d, Y', strtotime($bill['due_date']));
         $consumption = $bill['reading'] - $bill['previous'];
         
-        $due_short = date('M d', strtotime($bill['due_date']));
-        return "Hi {$client['firstname']}! Bill approved: ₱$amount. Due $due_short. {$consumption} m³ - WS";
+        $due_date = date('M d, Y', strtotime($bill['due_date']));
+        $billing_month = date('M Y', strtotime($bill['reading_date'] ?? $bill['due_date']));
+        return "Hi {$client['firstname']}! $billing_month bill ₱$amount | {$consumption} m³. Due $due_date. Pay on time to avoid disconnection. Thank you!";
     }
     
     private function generateBillingEmail($client, $bill, $event_type) {
@@ -674,11 +675,11 @@ class NotificationManager {
         $name = $client['firstname'] . ' ' . $client['lastname'];
         $amount = number_format($bill['total'], 2);
         
-        $due_short = date('M d', strtotime($bill['due_date']));
+        $due_date = date('M d, Y', strtotime($bill['due_date']));
         if ($days_overdue > 0) {
-            return "Hi {$client['firstname']}! Bill ₱$amount overdue. Pay now to avoid disconnect. - WS";
+            return "Hi {$client['firstname']}! Bill ₱$amount OVERDUE! Pay now to avoid disconnection. Thank you!";
         } else {
-            return "Hi {$client['firstname']}! Bill ₱$amount due $due_short. - WS";
+            return "Hi {$client['firstname']}! Bill ₱$amount due $due_date. Pay on time to avoid disconnection. Thank you!";
         }
     }
     

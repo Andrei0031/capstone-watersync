@@ -283,7 +283,6 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         $first_name = $client['firstname'];
         $amount = number_format($bill['total'], 2);
         $due_date = date('M d, Y', strtotime($bill['due_date']));
-        $due_date_short = date('M d', strtotime($bill['due_date'])); // "Mar 15" for SMS
         $reading_date = isset($bill['reading_date']) ? $bill['reading_date'] : date('Y-m-d');
         $billing_month = date('F Y', strtotime($reading_date)); // e.g., "November 2025"
         $billing_month_short = date('M Y', strtotime($reading_date)); // e.g., "Feb 2026" for SMS
@@ -307,8 +306,8 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         
         // Send SMS if phone number exists
         if (!empty($client['phone'])) {
-            $sms_overdue = $is_overdue ? " OVERDUE!" : "";
-            $sms_message = "Hi $first_name! Bill $billing_month_short: ₱$amount. Due $due_date_short.$sms_overdue {$consumption} m³ - WS";
+            $sms_overdue = $is_overdue ? "OVERDUE! " : "";
+            $sms_message = "Hi $first_name! $billing_month_short bill ₱$amount | {$consumption} m³. Due $due_date. {$sms_overdue}Pay on time to avoid disconnection. Thank you!";
             $sms_result = sendDummySMS($client['phone'], $sms_message, [
                 'first_name' => $client['firstname'],
                 'last_name' => $client['lastname']
@@ -401,7 +400,7 @@ function sendDummyEmail($email, $subject, $message) {
     $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'brgymalitbog-watersync.site';
     // Use a real email address that exists on your domain, not noreply@
     $from_email = 'brgymali@brgymalitbog-watersync.site'; // Use your actual working email address
-    $from_name = 'New Malitbog WaterSync';
+    $from_name = 'New Malitbog WaterSync'; // Email only; SMS sender configured in Settings
     
     // Prepare headers with proper encoding
     $headers = "From: $from_name <$from_email>\r\n";
