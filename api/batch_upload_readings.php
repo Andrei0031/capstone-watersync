@@ -325,10 +325,11 @@ try {
                 error_log("Batch Upload: Warning - Client ID $client_id is inactive, but allowing upload");
             }
             
-            // Check for duplicate reading in current cycle
+            // Check for duplicate: block only if there's an active (not yet processed) reading.
             $duplicate_stmt = $conn->prepare("
                 SELECT id FROM pending_meter_readings 
-                WHERE client_id = ? AND billing_cycle_id = ? AND status != 'failed'
+                WHERE client_id = ? AND billing_cycle_id = ? 
+                AND status IN ('pending', 'needs_review', 'verified')
             ");
             $duplicate_stmt->bind_param("ii", $client_id, $current_cycle['id']);
             $duplicate_stmt->execute();
@@ -336,6 +337,15 @@ try {
             
             if ($duplicate) {
                 throw new Exception('Reading already submitted for this billing cycle');
+            }
+            
+            // Remove old 'processed' record if exists (e.g. bill was deleted, user re-submitting)
+            $del_stmt = $conn->prepare("DELETE FROM pending_meter_readings 
+                WHERE client_id = ? AND billing_cycle_id = ? AND status = 'processed'");
+            if ($del_stmt) {
+                $del_stmt->bind_param("ii", $client_id, $current_cycle['id']);
+                $del_stmt->execute();
+                $del_stmt->close();
             }
             
             // Process and save image
