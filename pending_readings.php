@@ -3219,6 +3219,51 @@ if (!$failed_result) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
             
+            // Bills created success pop-up
+            const billsCreated = urlParams.get('bills_created');
+            const autoBillsCreated = urlParams.get('auto_bills_created');
+            const autoBillsCount = urlParams.get('count');
+            const autoBillsError = urlParams.get('auto_bills_error');
+            
+            if (billsCreated === 'true') {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.setAttribute('role', 'alert');
+                alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                alertDiv.innerHTML = `
+                    <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> Bills have been created successfully.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                setTimeout(function() { alertDiv.remove(); }, 5000);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (autoBillsCreated === 'true') {
+                const count = autoBillsCount || '0';
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.setAttribute('role', 'alert');
+                alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                alertDiv.innerHTML = `
+                    <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> ${count} bill(s) have been created automatically.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                setTimeout(function() { alertDiv.remove(); }, 5000);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (autoBillsError) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                alertDiv.setAttribute('role', 'alert');
+                alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                alertDiv.innerHTML = `
+                    <strong><i class="fas fa-exclamation-circle me-2"></i>Error!</strong> ${decodeURIComponent(autoBillsError)}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                setTimeout(function() { alertDiv.remove(); }, 6000);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
             // Sidebar toggle for mobile
             var sidebar = document.querySelector('.sidebar');
             var sidebarToggle = document.getElementById('sidebarToggle');
