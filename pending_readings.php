@@ -694,6 +694,19 @@ if (!$failed_result) {
     $failed_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'failed' LIMIT 0");
 }
 
+// Format datetime in Philippine time for consistent display across all tabs
+function pendingFormatDT($dt) {
+    if (empty($dt)) return 'N/A';
+    try {
+        $tz = new DateTimeZone('Asia/Manila');
+        $d = DateTime::createFromFormat('Y-m-d H:i:s', substr($dt, 0, 19), $tz);
+        if (!$d) $d = new DateTime($dt, $tz);
+        return $d->format('M d, Y g:i A');
+    } catch (Exception $e) {
+        return is_string($dt) ? $dt : 'N/A';
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -1702,7 +1715,7 @@ if (!$failed_result) {
                                                      data-bs-target="#imageModal"
                                                      data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
                                             </td>
-                                            <td><?php echo date('M d, Y H:i', strtotime($row['upload_date'])); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-pending">
                                                     <i class="fas fa-clock"></i>
@@ -1815,14 +1828,7 @@ if (!$failed_result) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php 
-                                                    $processedDate = $row['processed_at'] ?? null;
-                                                    if ($processedDate) {
-                                                        echo date('M d, Y H:i', strtotime($processedDate));
-                                                    } else {
-                                                        echo 'N/A';
-                                                    }
-                                                ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? $row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
@@ -1964,14 +1970,7 @@ if (!$failed_result) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php 
-                                                    $processedDate = $row['processed_at'] ?? null;
-                                                    if ($processedDate) {
-                                                        echo date('M d, Y H:i', strtotime($processedDate));
-                                                    } else {
-                                                        echo 'N/A';
-                                                    }
-                                                ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? $row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-info">
@@ -2097,16 +2096,7 @@ if (!$failed_result) {
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <td>
-                                                <?php 
-                                                    $processedDate = $row['processed_at'] ?? $row['processed_date'] ?? null;
-                                                    if ($processedDate) {
-                                                        echo date('M d, Y H:i', strtotime($processedDate));
-                                                    } else {
-                                                        echo 'N/A';
-                                                    }
-                                                ?>
-                                            </td>
+                                            <td><?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? $row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-processed">
                                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -2218,7 +2208,7 @@ if (!$failed_result) {
                                                     <span class="text-muted">No error details</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo $row['processed_at'] ? date('M d, Y H:i', strtotime($row['processed_at'])) : 'N/A'; ?></td>
+                                            <td><?php echo pendingFormatDT($row['processed_at'] ?? $row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-failed">
                                                     <i class="fas fa-exclamation-circle"></i>
