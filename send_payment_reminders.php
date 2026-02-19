@@ -108,7 +108,7 @@ while ($bill = $result->fetch_assoc()) {
         $sent_any = false;
         // SMS
         if ($sms_enabled && $sms_bill_schedule_ok && !empty($bill['phone'])) {
-            $sms_message = "Hi {$bill['firstname']}! Bill ₱$amount due in 3 days ($due_date). Pay on time to avoid disconnection. Thank you!";
+            $sms_message = "Hi {$bill['firstname']}! Bill $amount pesos due in 3 days ($due_date). Pay on time to avoid disconnection. Thank you!";
             sendDummySMS($bill['phone'], $sms_message, [
                 'first_name' => $bill['firstname'],
                 'last_name' => $bill['lastname']
@@ -139,7 +139,7 @@ while ($bill = $result->fetch_assoc()) {
         $sent_any_overdue = false;
         // SMS
         if ($sms_enabled && $sms_overdue_schedule_ok && !empty($bill['phone'])) {
-            $sms_message = "Hi {$bill['firstname']}! Bill ₱$amount OVERDUE! Pay now to avoid disconnection. Thank you!";
+            $sms_message = "Hi {$bill['firstname']}! Bill $amount pesos OVERDUE! Pay now to avoid disconnection. Thank you!";
             sendDummySMS($bill['phone'], $sms_message, [
                 'first_name' => $bill['firstname'],
                 'last_name' => $bill['lastname']

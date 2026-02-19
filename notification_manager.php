@@ -626,7 +626,8 @@ class NotificationManager {
         
         $due_date = date('M d, Y', strtotime($bill['due_date']));
         $billing_month = date('M Y', strtotime($bill['reading_date'] ?? $bill['due_date']));
-        return "Hi {$client['firstname']}! $billing_month bill ₱$amount | {$consumption} m³. Due $due_date. Pay on time to avoid disconnection. Thank you!";
+        // Avoid ₱ symbol for SMS gateways that don't support it
+        return "Hi {$client['firstname']}! $billing_month bill $amount pesos | {$consumption} m³. Due $due_date. Pay on time to avoid disconnection. Thank you!";
     }
     
     private function generateBillingEmail($client, $bill, $event_type) {
@@ -677,9 +678,9 @@ class NotificationManager {
         
         $due_date = date('M d, Y', strtotime($bill['due_date']));
         if ($days_overdue > 0) {
-            return "Hi {$client['firstname']}! Bill ₱$amount OVERDUE! Pay now to avoid disconnection. Thank you!";
+            return "Hi {$client['firstname']}! Bill $amount pesos OVERDUE! Pay now to avoid disconnection. Thank you!";
         } else {
-            return "Hi {$client['firstname']}! Bill ₱$amount due $due_date. Pay on time to avoid disconnection. Thank you!";
+            return "Hi {$client['firstname']}! Bill $amount pesos due $due_date. Pay on time to avoid disconnection. Thank you!";
         }
     }
     
