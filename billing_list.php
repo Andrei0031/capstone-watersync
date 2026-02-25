@@ -266,22 +266,63 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             foreach ($selected_ids as $bill_id) {
                 $bill_id = intval($bill_id);
                 if ($bill_id > 0) {
-                    // Delete associated payments first
+                    $canDeleteBill = true;
+
+                    // Delete related records first (same order as delete_bill.php)
+                    $delete_notifications = $conn->prepare("DELETE FROM notification_logs WHERE bill_id = ?");
+                    if ($delete_notifications) {
+                        $delete_notifications->bind_param("i", $bill_id);
+                        if (!$delete_notifications->execute()) {
+                            $canDeleteBill = false;
+                            $errors[] = "Failed to delete notifications for bill ID {$bill_id}: " . $delete_notifications->error;
+                        }
+                        $delete_notifications->close();
+                    }
+
+                    $delete_notices = $conn->prepare("DELETE FROM disconnection_notices WHERE billing_id = ?");
+                    if ($delete_notices) {
+                        $delete_notices->bind_param("i", $bill_id);
+                        if (!$delete_notices->execute()) {
+                            $canDeleteBill = false;
+                            $errors[] = "Failed to delete disconnection notices for bill ID {$bill_id}: " . $delete_notices->error;
+                        }
+                        $delete_notices->close();
+                    }
+
+                    $delete_fees = $conn->prepare("DELETE FROM bill_additional_fees WHERE bill_id = ?");
+                    if ($delete_fees) {
+                        $delete_fees->bind_param("i", $bill_id);
+                        if (!$delete_fees->execute()) {
+                            $canDeleteBill = false;
+                            $errors[] = "Failed to delete additional fees for bill ID {$bill_id}: " . $delete_fees->error;
+                        }
+                        $delete_fees->close();
+                    }
+
                     $delete_payments = $conn->prepare("DELETE FROM payment_list WHERE billing_id = ?");
-                    $delete_payments->bind_param("i", $bill_id);
-                    $delete_payments->execute();
-                    $delete_payments->close();
+                    if ($delete_payments) {
+                        $delete_payments->bind_param("i", $bill_id);
+                        if (!$delete_payments->execute()) {
+                            $canDeleteBill = false;
+                            $errors[] = "Failed to delete payments for bill ID {$bill_id}: " . $delete_payments->error;
+                        }
+                        $delete_payments->close();
+                    }
                     
                     // Delete the bill
-                    $stmt = $conn->prepare("DELETE FROM billing_list WHERE id = ?");
-                    $stmt->bind_param("i", $bill_id);
-                    if ($stmt->execute()) {
-                        $success_count++;
+                    if ($canDeleteBill) {
+                        $stmt = $conn->prepare("DELETE FROM billing_list WHERE id = ?");
+                        $stmt->bind_param("i", $bill_id);
+                        if ($stmt->execute()) {
+                            $success_count++;
+                        } else {
+                            $error_count++;
+                            $errors[] = "Failed to delete bill ID {$bill_id}: " . $stmt->error;
+                        }
+                        $stmt->close();
                     } else {
                         $error_count++;
-                        $errors[] = "Failed to delete bill ID {$bill_id}: " . $stmt->error;
                     }
-                    $stmt->close();
                 }
             }
             
