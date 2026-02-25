@@ -365,11 +365,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         continue;
                     }
 
-                    // Check CSV format: new format has 11 columns (with Reading Date and Status)
-                    // Old format has 9 columns (Previous Reading, Current Reading)
+                    // CSV format: 11 columns min (Reading Date, Status); 15 columns full (Consumption, Amount, Paid, Balance)
                     $has_reading_date = count($data) >= 11;
+                    $has_extended = count($data) >= 15;
                     
-                    // Parse CSV data
                     $category_name = trim($data[0] ?? '');
                     $firstname = trim($data[1] ?? '');
                     $middlename = trim($data[2] ?? '');
@@ -379,17 +378,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $meter_code = trim($data[6] ?? '');
                     
                     if ($has_reading_date) {
-                        // New format: Reading Date, Previous Reading, Current Reading, Status
                         $reading_date = trim($data[7] ?? '');
                         $previous_reading = !empty($data[8]) ? floatval(trim($data[8])) : null;
                         $current_reading = !empty($data[9]) ? floatval(trim($data[9])) : null;
                         $bill_status = strtolower(trim($data[10] ?? 'pending'));
+                        $consumption_csv = $has_extended && isset($data[11]) && $data[11] !== '' ? floatval(trim($data[11])) : null;
+                        $amount_csv = $has_extended && isset($data[12]) && $data[12] !== '' ? floatval(trim($data[12])) : null;
+                        $paid_csv = $has_extended && isset($data[13]) && $data[13] !== '' ? floatval(trim($data[13])) : null;
+                        $balance_csv = $has_extended && isset($data[14]) && $data[14] !== '' ? floatval(trim($data[14])) : null;
                     } else {
-                        // Old format: Previous Reading, Current Reading (backward compatibility)
-                        $reading_date = date('Y-m-d'); // Use current date for old format
+                        $reading_date = date('Y-m-d');
                         $previous_reading = !empty($data[7]) ? floatval(trim($data[7])) : null;
                         $current_reading = !empty($data[8]) ? floatval(trim($data[8])) : null;
-                        $bill_status = 'pending'; // Default to pending for old format
+                        $bill_status = 'pending';
+                        $consumption_csv = null;
+                        $amount_csv = null;
+                        $paid_csv = null;
+                        $balance_csv = null;
                     }
                     
                     // Validate required fields
@@ -437,7 +442,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             'previous_reading' => $previous_reading,
                             'current_reading' => $current_reading,
                             'status' => $bill_status,
-                            'row_number' => $row_number
+                            'row_number' => $row_number,
+                            'consumption' => $consumption_csv,
+                            'amount' => $amount_csv,
+                            'paid' => $paid_csv,
+                            'balance' => $balance_csv
                         ];
                     }
                 }
@@ -544,27 +553,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     continue;
                                 }
                                 
-                                // Calculate consumption
-                                $consumption = max(0, $current_reading - $prev_reading);
-                                
-                                // Calculate total
-                                if ($consumption <= 6) {
-                                    $base_total = $rate_data['rate'];
-                                } else {
-                                    $excess = $consumption - 6;
-                                    $base_total = $rate_data['rate'] + ($excess * $rate_data['excess_rate']);
-                                }
-                                
-                                // Get applicable fees (only for recent bills, not historical)
-                                $additional_fees = 0;
                                 $is_old_bill = strtotime($reading_date) < strtotime('-30 days');
-                                
-                                if (!$is_old_bill && function_exists('getApplicableFees')) {
-                                    $fees_result = getApplicableFees($client_id, $conn, 'regular_bill', $base_total);
-                                    $additional_fees = $fees_result['success'] ? $fees_result['total_fees'] : 0;
+                                // Calculate consumption (use CSV value if provided and valid, else compute)
+                                $consumption = max(0, $current_reading - $prev_reading);
+                                if (isset($bill_record['consumption']) && $bill_record['consumption'] !== null && $bill_record['consumption'] >= 0) {
+                                    $consumption = floatval($bill_record['consumption']);
                                 }
                                 
-                                $final_total = $base_total + $additional_fees;
+                                // Total: use CSV Amount if provided and > 0, else calculate from rates
+                                if (isset($bill_record['amount']) && $bill_record['amount'] !== null && $bill_record['amount'] > 0) {
+                                    $base_total = floatval($bill_record['amount']);
+                                    $final_total = $base_total;
+                                } else {
+                                    if ($consumption <= 6) {
+                                        $base_total = $rate_data['rate'];
+                                    } else {
+                                        $excess = $consumption - 6;
+                                        $base_total = $rate_data['rate'] + ($excess * $rate_data['excess_rate']);
+                                    }
+                                    $additional_fees = 0;
+                                    $is_old_bill = strtotime($reading_date) < strtotime('-30 days');
+                                    if (!$is_old_bill && function_exists('getApplicableFees')) {
+                                        $fees_result = getApplicableFees($client_id, $conn, 'regular_bill', $base_total);
+                                        $additional_fees = $fees_result['success'] ? $fees_result['total_fees'] : 0;
+                                    }
+                                    $final_total = $base_total + $additional_fees;
+                                }
                                 
                                 // Determine bill status
                                 // Old bills (more than 30 days) are automatically marked as paid
@@ -583,10 +597,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 
                                 if ($bill_stmt->execute()) {
                                     $billing_count++;
+                                    $billing_id = $conn->insert_id;
+                                    $bill_stmt->close();
+                                    // If CSV has Paid amount, add payment record
+                                    $paid_amt = isset($bill_record['paid']) && $bill_record['paid'] !== null && $bill_record['paid'] > 0 ? floatval($bill_record['paid']) : 0;
+                                    if ($paid_amt > 0) {
+                                        $pay_stmt = $conn->prepare("INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) VALUES (?, ?, ?, ?, 'csv_import', '', 1)");
+                                        $pay_stmt->bind_param("iisd", $client_id, $billing_id, $reading_date, $paid_amt);
+                                        if ($pay_stmt->execute()) {
+                                            // Optionally mark bill as paid if paid >= total
+                                            if ($paid_amt >= $final_total) {
+                                                $conn->query("UPDATE billing_list SET status = 1 WHERE id = " . intval($billing_id));
+                                            }
+                                        }
+                                        $pay_stmt->close();
+                                    }
                                 } else {
                                     $errors[] = "Meter Code {$meter_code}, Row {$bill_record['row_number']}: Failed to create billing record - " . $bill_stmt->error;
+                                    $bill_stmt->close();
                                 }
-                                $bill_stmt->close();
                             }
                         }
                     } else {
@@ -1992,12 +2021,12 @@ $result = $conn->query($sql);
                 <strong>Bulk Import Instructions:</strong>
                 <ul class="mb-0 mt-2">
                   <li>Upload a CSV file with customer data</li>
-                  <li>Required columns: Category, Firstname, Lastname, Contact, Address, Meter Code</li>
-                  <li>Optional columns: Middlename, Previous Reading, Current Reading</li>
+                  <li><strong>Required columns:</strong> Category, Firstname, Lastname, Contact, Address, Meter Code</li>
+                  <li><strong>Optional columns:</strong> Middlename, Reading Date, Previous Reading, Current Reading, Status, Consumption, Amount, Paid, Balance</li>
                   <li><strong>Contact:</strong> Must be 11 digits starting with 09 (e.g., 09123456789)</li>
                   <li><strong>Address:</strong> Use standard puroks (Purok 1-A, Purok 1-B, Purok 1-C, Purok 2, Purok 3, Purok 4, Purok 5) or custom addresses</li>
-                  <li><strong>Meter Readings:</strong> If provided, Previous Reading and Current Reading will create an initial billing record</li>
-                  <li>Download the template below to see the correct format</li>
+                  <li><strong>Meter Readings:</strong> If provided, Previous Reading and Current Reading create billing records. Use Amount for bill total, Paid for payment amount; Balance is informational.</li>
+                  <li>Download the template below for the correct column order and format</li>
                 </ul>
               </div>
 
@@ -2014,69 +2043,85 @@ $result = $conn->query($sql);
               </div>
 
               <div class="card bg-light p-3 mb-3 csv-format-card">
-                <h6 class="mb-3" style="font-size: 1rem; font-weight: 600;">CSV Format Example:</h6>
-                <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
-                  <table class="table table-sm table-bordered mb-3 csv-example-table" style="font-size: 0.875rem; margin-bottom: 1rem !important;">
+                <h6 class="mb-3" style="font-size: 1rem; font-weight: 600;">CSV Format Example (columns in order):</h6>
+                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                  <table class="table table-sm table-bordered mb-3 csv-example-table" style="font-size: 0.8rem; margin-bottom: 1rem !important;">
                     <thead>
                       <tr>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Category</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Firstname</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Middlename</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Lastname</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Contact</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Address</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Meter Code</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Reading Date</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Previous Reading</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Current Reading</th>
-                        <th style="padding: 8px 10px !important; font-size: 0.875rem; font-weight: 600;">Status</th>
+                        <th>Category</th>
+                        <th>Firstname</th>
+                        <th>Middlename</th>
+                        <th>Lastname</th>
+                        <th>Contact</th>
+                        <th>Address</th>
+                        <th>Meter Code</th>
+                        <th>Reading Date</th>
+                        <th>Previous Reading</th>
+                        <th>Current Reading</th>
+                        <th>Status</th>
+                        <th>Consumption</th>
+                        <th>Amount</th>
+                        <th>Paid</th>
+                        <th>Balance</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td style="padding: 8px 10px !important;">Residential</td>
-                        <td style="padding: 8px 10px !important;">Juan</td>
-                        <td style="padding: 8px 10px !important;">Dela</td>
-                        <td style="padding: 8px 10px !important;">Cruz</td>
-                        <td style="padding: 8px 10px !important;">09123456789</td>
-                        <td style="padding: 8px 10px !important;">Purok 1-A</td>
-                        <td style="padding: 8px 10px !important;">1001</td>
-                        <td style="padding: 8px 10px !important;">2024-01-15</td>
-                        <td style="padding: 8px 10px !important;">0</td>
-                        <td style="padding: 8px 10px !important;">50.5</td>
-                        <td style="padding: 8px 10px !important;">Paid</td>
+                        <td>Residential</td>
+                        <td>Juan</td>
+                        <td>Dela</td>
+                        <td>Cruz</td>
+                        <td>09123456789</td>
+                        <td>Purok 1-A</td>
+                        <td>1001</td>
+                        <td>2024-01-15</td>
+                        <td>0</td>
+                        <td>50.5</td>
+                        <td>Paid</td>
+                        <td>50.5</td>
+                        <td>100</td>
+                        <td>100</td>
+                        <td>0</td>
                       </tr>
                       <tr>
-                        <td style="padding: 8px 10px !important;">Residential</td>
-                        <td style="padding: 8px 10px !important;">Juan</td>
-                        <td style="padding: 8px 10px !important;">Dela</td>
-                        <td style="padding: 8px 10px !important;">Cruz</td>
-                        <td style="padding: 8px 10px !important;">09123456789</td>
-                        <td style="padding: 8px 10px !important;">Purok 1-A</td>
-                        <td style="padding: 8px 10px !important;">1001</td>
-                        <td style="padding: 8px 10px !important;">2024-02-15</td>
-                        <td style="padding: 8px 10px !important;">50.5</td>
-                        <td style="padding: 8px 10px !important;">125.5</td>
-                        <td style="padding: 8px 10px !important;">Paid</td>
+                        <td>Residential</td>
+                        <td>Juan</td>
+                        <td>Dela</td>
+                        <td>Cruz</td>
+                        <td>09123456789</td>
+                        <td>Purok 1-A</td>
+                        <td>1001</td>
+                        <td>2024-02-15</td>
+                        <td>50.5</td>
+                        <td>125.5</td>
+                        <td>Paid</td>
+                        <td>75</td>
+                        <td>198</td>
+                        <td>198</td>
+                        <td>0</td>
                       </tr>
                       <tr>
-                        <td style="padding: 8px 10px !important;">Residential</td>
-                        <td style="padding: 8px 10px !important;">Juan</td>
-                        <td style="padding: 8px 10px !important;">Dela</td>
-                        <td style="padding: 8px 10px !important;">Cruz</td>
-                        <td style="padding: 8px 10px !important;">09123456789</td>
-                        <td style="padding: 8px 10px !important;">Purok 1-A</td>
-                        <td style="padding: 8px 10px !important;">1001</td>
-                        <td style="padding: 8px 10px !important;">2024-03-15</td>
-                        <td style="padding: 8px 10px !important;">125.5</td>
-                        <td style="padding: 8px 10px !important;">200.25</td>
-                        <td style="padding: 8px 10px !important;">Pending</td>
+                        <td>Residential</td>
+                        <td>Juan</td>
+                        <td>Dela</td>
+                        <td>Cruz</td>
+                        <td>09123456789</td>
+                        <td>Purok 1-A</td>
+                        <td>1001</td>
+                        <td>2024-03-15</td>
+                        <td>125.5</td>
+                        <td>200.25</td>
+                        <td>Pending</td>
+                        <td>74.75</td>
+                        <td>249.50</td>
+                        <td>0</td>
+                        <td>249.50</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <small class="text-muted csv-format-note" style="font-size: 0.875rem; line-height: 1.5;">
-                  <strong>Note:</strong> Multiple rows with the same Meter Code will create multiple billing records. Records are processed chronologically by Reading Date. Old bills (30+ days) are automatically marked as Paid. Only the latest reading becomes the "previous reading" for future bills.
+                  <strong>Note:</strong> Multiple rows with the same Meter Code create multiple billing records (processed by Reading Date). Amount = bill total (used when provided); Paid = payment to record; Balance is informational. Old bills (30+ days) can be marked Paid automatically.
                 </small>
               </div>
 

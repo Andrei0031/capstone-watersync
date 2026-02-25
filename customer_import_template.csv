@@ -1,11 +1,8 @@
-Category,Firstname,Middlename,Lastname,Contact,Address,Meter Code,Reading Date,Previous Reading,Current Reading,Status
-Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-01-15,0,50.5,Paid
-Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-02-15,50.5,125.5,Paid
-Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-03-15,125.5,200.25,Paid
-Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-04-15,200.25,275.75,Pending
-Residential,Maria,Santos,Reyes,09187654321,Purok 2,1002,2024-01-15,0,100,Paid
-Residential,Maria,Santos,Reyes,09187654321,Purok 2,1002,2024-02-15,100,230.75,Paid
-Residential,Maria,Santos,Reyes,09187654321,Purok 2,1002,2024-03-15,230.75,350.5,Pending
-Commercial,Jose,,Garcia,09234567890,Purok 1-B,1003,2024-01-15,0,150,Paid
-Commercial,Jose,,Garcia,09234567890,Purok 1-B,1003,2024-02-15,150,300,Paid
-Commercial,Jose,,Garcia,09234567890,Purok 1-B,1003,2024-03-15,300,450.25,Pending
+Category,Firstname,Middlename,Lastname,Contact,Address,Meter Code,Reading Date,Previous Reading,Current Reading,Status,Consumption,Amount,Paid,Balance
+Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-01-15,0,50.5,Paid,50.5,100,100,0
+Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-02-15,50.5,125.5,Paid,75,198,198,0
+Residential,Juan,Dela,Cruz,09123456789,Purok 1-A,1001,2024-03-15,125.5,200.25,Pending,74.75,249.50,0,249.50
+Residential,Maria,Santos,Reyes,09187654321,Purok 2,1002,2024-01-15,0,100,Paid,100,220,220,0
+Residential,Maria,Santos,Reyes,09187654321,Purok 2,1002,2024-02-15,100,230.75,Paid,130.75,311.50,311.50,0
+Commercial,Jose,,Garcia,09234567890,Purok 1-B,1003,2024-01-15,0,150,Paid,150,400,400,0
+Commercial,Jose,,Garcia,09234567890,Purok 1-B,1003,2024-02-15,150,300,Paid,150,400,200,200
