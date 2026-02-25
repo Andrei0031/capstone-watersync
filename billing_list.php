@@ -1891,6 +1891,8 @@ if ($params) {
 #customerDetailsModal .customer-details-compact .stat-card .h4, #customerDetailsModal .customer-details-compact .stat-card .h5 { font-size: 1rem; margin-bottom: 0!important; }
 #customerDetailsModal .customer-details-compact .billing-table th, #customerDetailsModal .customer-details-compact .billing-table td { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
 #customerDetailsModal .customer-details-compact .table-responsive { max-height: 220px; overflow-y: auto; }
+#customerDetailsModal .customer-bill-row.selected { background-color: rgba(13, 110, 253, 0.15); }
+#customerDetailsModal .customer-bill-row.selected td { border-color: rgba(13, 110, 253, 0.3); }
 html[data-theme="dark"] #customerDetailsModal .modal-content { background: var(--bs-body-bg); }
 html[data-theme="dark"] #customerDetailsModal .card-header { background: rgba(33, 150, 243, 0.2) !important; }
 html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-body-bg) !important; }
@@ -1936,12 +1938,26 @@ html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-
                     </div>
                     <!-- Billing History Table (scrollable) -->
                     <div class="card border-0 shadow-sm">
-                        <div class="card-header py-1"><h6 class="mb-0 fw-bold text-primary" style="font-size:0.85rem;"><i class="fas fa-history me-1"></i>Billing History</h6></div>
+                        <div class="card-header py-1 d-flex justify-content-between align-items-center flex-wrap gap-1">
+                            <h6 class="mb-0 fw-bold text-primary" style="font-size:0.85rem;"><i class="fas fa-history me-1"></i>Billing History</h6>
+                            <div class="d-flex gap-1 align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="customerModalSelectAll" title="Select all bills">
+                                    <i class="fas fa-check-square me-1"></i>Select All
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="customerModalDeselectAll" title="Deselect all" style="display:none;">
+                                    <i class="fas fa-square me-1"></i>Deselect All
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" id="customerModalDeleteSelected" title="Delete selected bills">
+                                    <i class="fas fa-trash-alt me-1"></i>Delete Selected
+                                </button>
+                            </div>
+                        </div>
                         <div class="card-body p-0">
                             <div class="table-responsive billing-table">
-                                <table class="table table-hover table-sm mb-0 align-middle">
+                                <table class="table table-hover table-sm mb-0 align-middle" id="customerBillingHistoryTable">
                                     <thead class="table-light">
                                         <tr>
+                                            <th style="width:36px;"><input type="checkbox" id="customerModalSelectAllCheckbox" title="Select all"></th>
                                             <th>Month</th>
                                             <th>Reading</th>
                                             <th>Due</th>
@@ -1953,7 +1969,7 @@ html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-
                                         </tr>
                                     </thead>
                                     <tbody id="billingHistoryTableBody">
-                                        <tr><td colspan="8" class="text-center text-muted py-2 small">Loading...</td></tr>
+                                        <tr><td colspan="9" class="text-center text-muted py-2 small">Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -2466,7 +2482,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('statTotalBilled').textContent = parseFloat(data.statistics.total_billed || 0).toFixed(2);
                     document.getElementById('statTotalOutstanding').textContent = parseFloat(data.statistics.total_outstanding || 0).toFixed(2);
                     
-                    // Populate billing history
+                    // Store client id for delete-selected (used when submitting form)
+                    window._customerDetailsClientId = clientId;
+                    
+                    // Populate billing history with checkboxes
                     const tbody = document.getElementById('billingHistoryTableBody');
                     if (data.bills && data.bills.length > 0) {
                         tbody.innerHTML = data.bills.map(bill => {
@@ -2476,7 +2495,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 `<span class="badge bg-danger ms-2">${bill.days_overdue} day(s) overdue</span>` : '';
                             
                             return `
-                                <tr>
+                                <tr class="customer-bill-row" data-bill-id="${bill.id}">
+                                    <td><input type="checkbox" class="form-check-input customer-bill-checkbox" value="${bill.id}" data-bill-id="${bill.id}"></td>
                                     <td>${bill.billing_month || 'N/A'}</td>
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
@@ -2488,8 +2508,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </tr>
                             `;
                         }).join('');
+                        attachCustomerModalBillingHandlers();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No billing history found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No billing history found</td></tr>';
                     }
                     
                     // Hide loading, show content
@@ -2506,6 +2527,85 @@ document.addEventListener('DOMContentLoaded', function() {
                 modal.hide();
             });
     };
+
+    function updateCustomerModalBillingSelectionUI() {
+        const table = document.getElementById('customerBillingHistoryTable');
+        if (!table) return;
+        const checkboxes = table.querySelectorAll('tbody .customer-bill-checkbox');
+        const checked = table.querySelectorAll('tbody .customer-bill-checkbox:checked');
+        const headerCb = document.getElementById('customerModalSelectAllCheckbox');
+        const selectAllBtn = document.getElementById('customerModalSelectAll');
+        const deselectAllBtn = document.getElementById('customerModalDeselectAll');
+        if (headerCb) headerCb.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+        if (selectAllBtn) selectAllBtn.style.display = checked.length > 0 ? 'none' : 'inline-block';
+        if (deselectAllBtn) deselectAllBtn.style.display = checked.length > 0 ? 'inline-block' : 'none';
+        table.querySelectorAll('tbody tr.customer-bill-row').forEach(tr => {
+            const cb = tr.querySelector('.customer-bill-checkbox');
+            if (cb && cb.checked) tr.classList.add('selected'); else tr.classList.remove('selected');
+        });
+    }
+
+    function attachCustomerModalBillingHandlers() {
+        const table = document.getElementById('customerBillingHistoryTable');
+        const headerCb = document.getElementById('customerModalSelectAllCheckbox');
+        const selectAllBtn = document.getElementById('customerModalSelectAll');
+        const deselectAllBtn = document.getElementById('customerModalDeselectAll');
+        const deleteBtn = document.getElementById('customerModalDeleteSelected');
+        if (!table) return;
+
+        table.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('customer-bill-checkbox')) {
+                updateCustomerModalBillingSelectionUI();
+            }
+        });
+
+        function setAll(checked) {
+            table.querySelectorAll('tbody .customer-bill-checkbox').forEach(cb => { cb.checked = checked; });
+            if (headerCb) headerCb.checked = checked;
+            updateCustomerModalBillingSelectionUI();
+        }
+
+        if (headerCb) {
+            headerCb.addEventListener('click', function(e) {
+                e.preventDefault();
+                this.checked = !this.checked;
+                setAll(this.checked);
+            });
+        }
+        if (selectAllBtn) selectAllBtn.addEventListener('click', () => setAll(true));
+        if (deselectAllBtn) deselectAllBtn.addEventListener('click', () => setAll(false));
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                const selected = table.querySelectorAll('tbody .customer-bill-checkbox:checked');
+                if (selected.length === 0) {
+                    showWarning('Please select at least one bill to delete.');
+                    return;
+                }
+                const billIds = Array.from(selected).map(cb => cb.value);
+                const msg = `Delete ${selected.length} selected bill(s)? This will remove the billing records and cannot be undone.`;
+                if (!confirm(msg)) return;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'billing_list.php';
+                billIds.forEach(id => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_bills[]';
+                    input.value = id;
+                    form.appendChild(input);
+                });
+                const submitInput = document.createElement('input');
+                submitInput.type = 'hidden';
+                submitInput.name = 'bulk_delete_bills';
+                submitInput.value = '1';
+                form.appendChild(submitInput);
+                document.body.appendChild(form);
+                form.submit();
+            });
+        }
+        updateCustomerModalBillingSelectionUI();
+    }
     
     // Delete button functionality removed - bills should not be deleted
     /* document.querySelectorAll('.delete-btn').forEach(button => {
@@ -2660,13 +2760,12 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBulkDeleteButtons();
     }
 
-    // Select All Checkbox - run after browser toggles so we read correct state
+    // Select All Checkbox - control toggle ourselves so all row checkboxes and highlights always sync
     if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
+        selectAllCheckbox.addEventListener('click', function(e) {
+            e.preventDefault();
+            this.checked = !this.checked;
             syncAllRowCheckboxesFromHeader();
-        });
-        selectAllCheckbox.addEventListener('click', function() {
-            setTimeout(syncAllRowCheckboxesFromHeader, 0);
         });
     }
 
