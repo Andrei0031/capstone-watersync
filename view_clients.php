@@ -30,6 +30,22 @@ function appendSystemImportLog($level, $message, $context = []) {
     error_log($line . PHP_EOL, 3, $logFile);
 }
 
+function normalizeCsvNumber($rawValue) {
+    if ($rawValue === null) {
+        return null;
+    }
+    $value = trim((string)$rawValue);
+    if ($value === '') {
+        return null;
+    }
+    // Accept values like "₱1,234.50", "1,234.50", "1234.50"
+    $value = preg_replace('/[^0-9.\-]/', '', $value);
+    if ($value === '' || $value === '-' || $value === '.' || $value === '-.') {
+        return null;
+    }
+    return floatval($value);
+}
+
 $notification = '';
 $notificationClass = '';
 $showNotificationModal = false;
@@ -405,18 +421,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     
                     if ($has_reading_date) {
                         $reading_date = trim($data[7] ?? '');
-                        $previous_reading = !empty($data[8]) ? floatval(trim($data[8])) : null;
-                        $current_reading = !empty($data[9]) ? floatval(trim($data[9])) : null;
-                        $bill_status = strtolower(trim($data[10] ?? 'pending'));
-                        $consumption_csv = $has_extended && isset($data[11]) && $data[11] !== '' ? floatval(trim($data[11])) : null;
-                        $amount_csv = $has_extended && isset($data[12]) && $data[12] !== '' ? floatval(trim($data[12])) : null;
-                        $paid_csv = $has_extended && isset($data[13]) && $data[13] !== '' ? floatval(trim($data[13])) : null;
-                        $balance_csv = $has_extended && isset($data[14]) && $data[14] !== '' ? floatval(trim($data[14])) : null;
+                        $previous_reading = normalizeCsvNumber($data[8] ?? null);
+                        $current_reading = normalizeCsvNumber($data[9] ?? null);
+                        $bill_status_raw = strtolower(trim((string)($data[10] ?? 'pending')));
+                        $consumption_csv = $has_extended ? normalizeCsvNumber($data[11] ?? null) : null;
+                        $amount_csv = $has_extended ? normalizeCsvNumber($data[12] ?? null) : null;
+                        $paid_csv = $has_extended ? normalizeCsvNumber($data[13] ?? null) : null;
+                        $balance_csv = $has_extended ? normalizeCsvNumber($data[14] ?? null) : null;
                     } else {
                         $reading_date = date('Y-m-d');
-                        $previous_reading = !empty($data[7]) ? floatval(trim($data[7])) : null;
-                        $current_reading = !empty($data[8]) ? floatval(trim($data[8])) : null;
-                        $bill_status = 'pending';
+                        $previous_reading = normalizeCsvNumber($data[7] ?? null);
+                        $current_reading = normalizeCsvNumber($data[8] ?? null);
+                        $bill_status_raw = 'pending';
                         $consumption_csv = null;
                         $amount_csv = null;
                         $paid_csv = null;
@@ -440,9 +456,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                     }
                     
-                    // Validate bill status
-                    if (!in_array($bill_status, ['paid', 'pending'])) {
-                        $bill_status = 'pending'; // Default to pending if invalid
+                    // Normalize bill status
+                    if (in_array($bill_status_raw, ['paid', '1', 'true', 'yes', 'fully paid'])) {
+                        $bill_status = 'paid';
+                    } elseif (in_array($bill_status_raw, ['pending', 'unpaid', '0', 'false', 'no'])) {
+                        $bill_status = 'pending';
+                    } else {
+                        $bill_status = 'pending';
+                    }
+
+                    // If status is Paid and Paid is empty, assume full payment equals amount
+                    if ($bill_status === 'paid' && $paid_csv === null && $amount_csv !== null) {
+                        $paid_csv = $amount_csv;
                     }
                     
                     // Group by meter code
