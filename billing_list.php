@@ -1252,21 +1252,22 @@ if ($params) {
         </div>
     </div>
     
-    <!-- Bulk Action Controls -->
+    <!-- Bulk Action Controls (shown when any bill is selected) -->
     <div class="card card-soft mb-3" id="bulkActionControls" style="display: none;">
         <div class="card-body py-2">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <button id="selectAllBtn" class="btn btn-sm btn-outline-primary me-2">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button id="selectAllBtn" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-check-square me-1"></i>Select All
                     </button>
                     <button id="deselectAllBtn" class="btn btn-sm btn-outline-secondary" style="display: none;">
                         <i class="fas fa-square me-1"></i>Deselect All
                     </button>
+                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i>Delete Selected
+                    </button>
                 </div>
-                <div>
-                    <span id="selectedBillsCount" class="text-muted me-3">0 bills selected</span>
-                </div>
+                <span id="selectedBillsCount" class="text-muted">0 bills selected</span>
             </div>
         </div>
     </div>
@@ -2730,17 +2731,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const selected = table ? table.querySelectorAll('.bulk-delete-checkbox:checked') : [];
         const count = selected.length;
         
-        // Bulk delete functionality removed - hide controls
-        bulkActionControls.style.display = 'none';
-        if (bulkDeleteBtn) bulkDeleteBtn.style.display = 'none';
-        if (bulkDeleteBtn2) bulkDeleteBtn2.style.display = 'none';
+        if (bulkActionControls) {
+            bulkActionControls.style.display = count > 0 ? 'block' : 'none';
+        }
+        if (bulkDeleteBtn) bulkDeleteBtn.style.display = count > 0 ? 'inline-block' : 'none';
+        if (bulkDeleteBtn2) bulkDeleteBtn2.style.display = count > 0 ? 'inline-block' : 'none';
+        if (selectedBillsCount) selectedBillsCount.textContent = count + ' bill(s) selected';
         
-        // Update select all checkbox
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = count === billCheckboxes.length && billCheckboxes.length > 0;
         }
-        
-        // Update select/deselect all buttons
         if (selectAllBtn && deselectAllBtn) {
             if (count > 0) {
                 selectAllBtn.style.display = 'none';
@@ -2764,12 +2764,13 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBulkDeleteButtons();
     }
 
-    // Select All Checkbox - control toggle ourselves so all row checkboxes and highlights always sync
+    // Select All Checkbox - sync row checkboxes and highlights when header is toggled
     if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('click', function(e) {
-            e.preventDefault();
-            this.checked = !this.checked;
+        selectAllCheckbox.addEventListener('change', function() {
             syncAllRowCheckboxesFromHeader();
+        });
+        selectAllCheckbox.addEventListener('click', function() {
+            setTimeout(syncAllRowCheckboxesFromHeader, 0);
         });
     }
 
@@ -2806,10 +2807,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Bulk Delete Selected (main billing table)
+    function handleBulkDeleteMainList() {
+        const table = getBillingTable();
+        if (!table) return;
+        const selected = table.querySelectorAll('.bulk-delete-checkbox:checked');
+        if (selected.length === 0) {
+            showWarning('Please select at least one bill to delete.');
+            return;
+        }
+        const billIds = Array.from(selected).map(function(cb) { return cb.value; });
+        const msg = 'Delete ' + selected.length + ' selected bill(s)? This will permanently remove the billing records and cannot be undone.';
+        if (!confirm(msg)) return;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.pathname || 'billing_list.php';
+        billIds.forEach(function(id) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_bills[]';
+            input.value = id;
+            form.appendChild(input);
+        });
+        const submitInput = document.createElement('input');
+        submitInput.type = 'hidden';
+        submitInput.name = 'bulk_delete_bills';
+        submitInput.value = '1';
+        form.appendChild(submitInput);
+        document.body.appendChild(form);
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = true;
+            bulkDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+        }
+        form.submit();
+    }
+    if (bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', handleBulkDeleteMainList);
+    if (bulkDeleteBtn2) bulkDeleteBtn2.addEventListener('click', handleBulkDeleteMainList);
+
     // Initial row highlight state
     updateRowHighlights();
 
-    // Bulk Delete Button Handler - REMOVED
+    // Legacy comment - bulk delete is now enabled above
     /* function handleBulkDelete() {
         const selected = document.querySelectorAll('.bulk-delete-checkbox:checked');
         if (selected.length === 0) {
