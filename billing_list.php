@@ -245,6 +245,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (isset($_POST['bulk_delete_bills'])) {
         // Handle bulk delete of bills - clear any buffered output so redirect works
         if (ob_get_level()) ob_end_clean();
+        if (!$delete_password_configured) {
+            header("Location: billing_list.php?bulk_delete_status=error&message=" . urlencode('Delete is disabled in Settings > Additional Fees.'));
+            exit();
+        }
         $selected_ids = $_POST['selected_bills'] ?? [];
         
         if (empty($selected_ids)) {
@@ -1336,9 +1340,11 @@ if ($params) {
     <div class="card card-soft mb-2" id="bulkActionControls">
         <div class="card-body py-2">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <?php if ($delete_password_configured): ?>
                 <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled>
                     <i class="fas fa-trash-alt me-1"></i>Delete Selected
                 </button>
+                <?php endif; ?>
                 <span id="selectedBillsCount" class="text-muted">0 bills selected</span>
             </div>
         </div>
