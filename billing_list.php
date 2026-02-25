@@ -1252,26 +1252,6 @@ if ($params) {
         </div>
     </div>
     
-    <!-- Bulk Action Controls: Select All always visible; Delete when any selected -->
-    <div class="card card-soft mb-3" id="bulkActionControls">
-        <div class="card-body py-2">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <button id="selectAllBtn" type="button" class="btn btn-sm btn-outline-primary" title="Select all bills in the list (current filter)">
-                        <i class="fas fa-check-double me-1"></i>Select All Bills
-                    </button>
-                    <button id="deselectAllBtn" class="btn btn-sm btn-outline-secondary" style="display: none;">
-                        <i class="fas fa-square me-1"></i>Deselect All
-                    </button>
-                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" style="display: none;">
-                        <i class="fas fa-trash-alt me-1"></i>Delete Selected
-                    </button>
-                </div>
-                <span id="selectedBillsCount" class="text-muted">0 bills selected</span>
-            </div>
-        </div>
-    </div>
-
     <!-- Stats Row -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -1349,6 +1329,26 @@ if ($params) {
                     <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">Reset</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Bulk actions for table below: Select All + Delete Selected -->
+    <div class="card card-soft mb-2" id="bulkActionControls">
+        <div class="card-body py-2">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button id="selectAllBtn" type="button" class="btn btn-sm btn-outline-primary" title="Select all bills in the table">
+                        <i class="fas fa-check-double me-1"></i>Select All
+                    </button>
+                    <button id="deselectAllBtn" type="button" class="btn btn-sm btn-outline-secondary" style="display: none;">
+                        <i class="fas fa-square me-1"></i>Deselect All
+                    </button>
+                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled>
+                        <i class="fas fa-trash-alt me-1"></i>Delete Selected
+                    </button>
+                </div>
+                <span id="selectedBillsCount" class="text-muted">0 bills selected</span>
+            </div>
         </div>
     </div>
 
@@ -2714,14 +2714,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function selectAllBillsInTable() {
         const table = document.getElementById('billingTable');
-        if (!table) return;
-        const rowCheckboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
-        rowCheckboxes.forEach(function(cb) {
-            cb.checked = true;
-        });
+        if (!table) {
+            if (typeof showWarning === 'function') showWarning('Billing table not found.');
+            return;
+        }
+        const tbody = table.querySelector('tbody');
+        const rowCheckboxes = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
+        if (!rowCheckboxes.length) {
+            if (typeof showWarning === 'function') showWarning('No bills in the list to select. Change filters or add bills.');
+            return;
+        }
+        for (let i = 0; i < rowCheckboxes.length; i++) {
+            rowCheckboxes[i].checked = true;
+        }
         const headerCb = document.getElementById('selectAllCheckbox');
         if (headerCb) headerCb.checked = true;
         updateBulkDeleteButtons();
+        if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(updateRowHighlights);
+        }
     }
 
     function deselectAllBillsInTable() {
@@ -2755,8 +2766,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const selected = table ? table.querySelectorAll('tbody input.bulk-delete-checkbox:checked') : [];
         const count = selected.length;
         
-        if (bulkDeleteBtn) bulkDeleteBtn.style.display = count > 0 ? 'inline-block' : 'none';
-        if (bulkDeleteBtn2) bulkDeleteBtn2.style.display = count > 0 ? 'inline-block' : 'none';
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = count === 0;
+            bulkDeleteBtn.style.display = 'inline-block';
+        }
+        if (bulkDeleteBtn2) {
+            bulkDeleteBtn2.disabled = count === 0;
+            bulkDeleteBtn2.style.display = count > 0 ? 'inline-block' : 'none';
+        }
         if (selectedBillsCount) selectedBillsCount.textContent = count + ' bill(s) selected';
         
         if (selectAllCheckbox) {
@@ -2812,9 +2829,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Select All Button - select every bill in the table (all visible rows, e.g. current filter/month)
+    // Select All Button - select every bill in the table (all visible rows)
     if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function() {
+        selectAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             selectAllBillsInTable();
         });
     }
@@ -2828,11 +2847,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Bulk Delete Selected (main billing table)
     function handleBulkDeleteMainList() {
+        if (bulkDeleteBtn && bulkDeleteBtn.disabled) return;
         const table = getBillingTable();
         if (!table) return;
         const selected = table.querySelectorAll('tbody input.bulk-delete-checkbox:checked');
         if (selected.length === 0) {
-            showWarning('Please select at least one bill to delete.');
+            if (typeof showWarning === 'function') showWarning('Please select at least one bill to delete.');
             return;
         }
         const billIds = Array.from(selected).map(function(cb) { return cb.value; });
