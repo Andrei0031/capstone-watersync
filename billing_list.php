@@ -2737,26 +2737,37 @@ document.addEventListener('DOMContentLoaded', function() {
         updateRowHighlights();
     }
 
-    // Header checkbox beside Customer: when toggled, sync all row checkboxes (use change - fires after browser toggles)
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            var checked = this.checked;
-            var table = document.getElementById('billingTable');
-            if (!table) return;
-            var tbody = table.querySelector('tbody');
-            var rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
-            for (var i = 0; i < rowCbs.length; i++) {
-                rowCbs[i].checked = checked;
+    // Table: handle header checkbox (select all) and row checkboxes via delegation
+    if (billingTable) {
+        billingTable.addEventListener('change', function(e) {
+            var target = e.target;
+            if (!target) return;
+            // Header "select all" checkbox: sync all row checkboxes to its state
+            if (target.id === 'selectAllCheckbox') {
+                var checked = target.checked;
+                var tbody = this.querySelector('tbody');
+                var rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : this.querySelectorAll('input.bulk-delete-checkbox');
+                for (var i = 0; i < rowCbs.length; i++) {
+                    rowCbs[i].checked = checked;
+                }
             }
             updateBulkDeleteButtons();
         });
-    }
-
-    // Individual checkboxes - use event delegation so all current and future checkboxes work
-    if (billingTable) {
-        billingTable.addEventListener('change', function(e) {
-            if (e.target && e.target.classList && e.target.classList.contains('bulk-delete-checkbox')) {
-                updateBulkDeleteButtons();
+        // Also handle header checkbox via click (backup - some browsers delay change)
+        billingTable.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'selectAllCheckbox') {
+                var cb = e.target;
+                setTimeout(function() {
+                    var checked = cb.checked;
+                    var table = document.getElementById('billingTable');
+                    if (!table) return;
+                    var tbody = table.querySelector('tbody');
+                    var rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
+                    for (var i = 0; i < rowCbs.length; i++) {
+                        rowCbs[i].checked = checked;
+                    }
+                    updateBulkDeleteButtons();
+                }, 0);
             }
         });
     }
