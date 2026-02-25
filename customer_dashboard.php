@@ -936,6 +936,23 @@ $disconnection_notices = $stmt->get_result();
         .customer-dashboard-nav .nav-link.active i {
             color: #0D47A1 !important;
         }
+
+        /* Compact notices tab layout */
+        #nav-notifications .card {
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        #nav-notifications .card-header {
+            padding: 12px 16px;
+        }
+        #nav-notifications .card-body {
+            padding: 14px 16px;
+        }
+        #nav-notifications .table th,
+        #nav-notifications .table td {
+            padding: 0.55rem 0.65rem;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -953,6 +970,12 @@ $disconnection_notices = $stmt->get_result();
                     <li class="nav-item">
                         <a class="nav-link active" href="customer_dashboard.php">
                             <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="client_notices.php" style="position: relative;">
+                            <i class="fas fa-bell"></i> Notices
+                            <span id="navbar-notification-badge" class="badge bg-danger" style="display: none; position: absolute; top: -4px; right: -8px; font-size: 0.65rem; border-radius: 10px; padding: 2px 6px;"></span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -1047,7 +1070,7 @@ $disconnection_notices = $stmt->get_result();
                             <span class="tab-icon">
                                 <i class="fas fa-bell"></i>
                             </span>
-                            <span class="tab-label">Notifications</span>
+                            <span class="tab-label">Notices</span>
                         </button>
                         <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false">
                             <span class="tab-icon">
