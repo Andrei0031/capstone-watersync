@@ -2737,17 +2737,16 @@ document.addEventListener('DOMContentLoaded', function() {
         updateRowHighlights();
     }
 
-    // Header checkbox beside Customer: click to select/deselect all row checkboxes (we control toggle)
+    // Header checkbox beside Customer: when toggled, sync all row checkboxes (use change - fires after browser toggles)
     if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('click', function(e) {
-            e.preventDefault();
-            this.checked = !this.checked;
-            const table = document.getElementById('billingTable');
+        selectAllCheckbox.addEventListener('change', function() {
+            var checked = this.checked;
+            var table = document.getElementById('billingTable');
             if (!table) return;
-            const tbody = table.querySelector('tbody');
-            const rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
-            for (let i = 0; i < rowCbs.length; i++) {
-                rowCbs[i].checked = this.checked;
+            var tbody = table.querySelector('tbody');
+            var rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
+            for (var i = 0; i < rowCbs.length; i++) {
+                rowCbs[i].checked = checked;
             }
             updateBulkDeleteButtons();
         });
