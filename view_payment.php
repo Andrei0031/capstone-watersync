@@ -404,15 +404,15 @@ if (!$payment) {
                         </div>
                         <div class="mb-3">
                             <div class="detail-label">Current Reading</div>
-                            <div class="detail-value"><?php echo number_format($payment['reading'], 2); ?></div>
+                            <div class="detail-value"><?php echo number_format($payment['reading'], 0); ?></div>
                         </div>
                         <div class="mb-3">
                             <div class="detail-label">Previous Reading</div>
-                            <div class="detail-value"><?php echo number_format($payment['previous'], 2); ?></div>
+                            <div class="detail-value"><?php echo number_format($payment['previous'], 0); ?></div>
                         </div>
                         <div class="mb-3">
                             <div class="detail-label">Consumption</div>
-                            <div class="detail-value"><?php echo number_format($payment['reading'] - $payment['previous'], 2); ?></div>
+                            <div class="detail-value"><?php echo number_format($payment['reading'] - $payment['previous'], 0); ?></div>
                         </div>
                         <div>
                             <div class="detail-label">Total Amount</div>
