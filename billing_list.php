@@ -546,6 +546,7 @@ $sql = "WITH LatestBills AS (
                COALESCE(cl.lastname, 'Client') as lastname, 
                COALESCE(cl.meter_code, 'N/A') as meter_code,
                CASE WHEN cl.id IS NULL THEN true ELSE false END as is_deleted_client,
+               COALESCE((SELECT SUM(p.amount) FROM payment_list p WHERE p.billing_id = b.id AND p.status = 1), 0) as total_paid,
                (SELECT reading FROM billing_list prev 
                 WHERE prev.client_id = b.client_id 
                 AND prev.reading_date < b.reading_date 
@@ -1548,6 +1549,9 @@ if ($params) {
                                         $status_class = '';
                                         $status_text = 'Unpaid';
                                         $status = $row['status'] ?? 0;
+                                        $total_paid = floatval($row['total_paid'] ?? 0);
+                                        $bill_total = floatval($row['total'] ?? 0);
+                                        $computed_remaining = $bill_total - $total_paid;
 
                                         // Recalculate total based on current rates if status is not paid
                                         if ($status == 0) {
@@ -1577,24 +1581,32 @@ if ($params) {
                                             }
                                         }
 
-                                        // Determine status class and text
-                                        switch($status) {
-                                            case 1:
-                                                $status_class = 'status-paid';
-                                                $status_text = 'Paid';
-                                                break;
-                                            case 0:
-                                                if (strtotime($row['due_date']) < time()) {
-                                                    $status_class = 'status-overdue';
-                                                    $status_text = 'Overdue';
-                                                } else {
-                                                    $status_class = 'status-unpaid';
-                                                    $status_text = 'Unpaid';
-                                                }
-                                                break;
-                                            default:
+                                        // Normalize status using actual payment totals.
+                                        // This prevents stale "unpaid" status when a bill is already fully paid.
+                                        if ($computed_remaining <= 0.0001) {
+                                            $status = 1;
+                                            $status_class = 'status-paid';
+                                            $status_text = 'Paid';
+                                        } else {
+                                            $status = 0;
+                                            if (strtotime($row['due_date']) < time()) {
+                                                $status_class = 'status-overdue';
+                                                $status_text = 'Overdue';
+                                            } else {
                                                 $status_class = 'status-unpaid';
                                                 $status_text = 'Unpaid';
+                                            }
+                                        }
+
+                                        // Sync mismatched status back to DB so Billing List and Payments stay consistent.
+                                        if (intval($row['status'] ?? 0) !== $status) {
+                                            $sync_status_stmt = $conn->prepare("UPDATE billing_list SET status = ? WHERE id = ?");
+                                            if ($sync_status_stmt) {
+                                                $bill_id_to_sync = intval($row['id'] ?? 0);
+                                                $sync_status_stmt->bind_param("ii", $status, $bill_id_to_sync);
+                                                $sync_status_stmt->execute();
+                                                $sync_status_stmt->close();
+                                            }
                                         }
                                     ?>
                                     <span class="status-badge <?php echo $status_class; ?>">
