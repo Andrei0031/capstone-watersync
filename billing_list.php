@@ -1520,7 +1520,7 @@ if ($params) {
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="fw-bold"><?php echo number_format($consumption, 2); ?></span>
+                                        <span class="fw-bold"><?php echo number_format($consumption, 0); ?></span>
                                         <small class="text-muted">(Used)</small>
                                     </div>
                                 </td>
@@ -1842,7 +1842,7 @@ if ($params) {
                             <td><?php echo date('M d, Y', strtotime($row['reading_date'])); ?></td>
                             <td>
                                 <div class="d-flex flex-column">
-                                    <span class="fw-bold"><?php echo number_format($consumption, 2); ?></span>
+                                    <span class="fw-bold"><?php echo number_format($consumption, 0); ?></span>
                                     <small class="text-muted">
                                         Previous: <?php echo number_format($row['previous'], 0); ?><br>
                                         Current: <?php echo number_format($row['reading'], 0); ?>
@@ -2402,7 +2402,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateElement('viewDueDate', dueDate);
                 updateElement('viewPreviousReading', `${Math.round(previous)}`);
                 updateElement('viewCurrentReading', `${Math.round(reading)}`);
-                updateElement('viewConsumption', `${consumption.toFixed(2)}`); // Consumption keeps decimals
+                updateElement('viewConsumption', `${Math.round(consumption)}`);
                 updateElement('viewBaseRate', `₱${baseRate.toFixed(2)}`);
                 updateElement('viewExcessRate', `₱${excessRate.toFixed(2)}`);
                 updateElement('viewBaseCharge', `₱${baseCharge.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
@@ -2534,7 +2534,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             </td>
                             <td>${new Date(bill.reading_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                            <td>${consumption.toFixed(2)}</td>
+                            <td>${Math.round(consumption)}</td>
                             <td>₱${parseFloat(bill.total).toFixed(2)}</td>
                             <td>${new Date(bill.updated_at || bill.reading_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                             <td>
@@ -2629,7 +2629,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Update the display
-            document.getElementById('editConsumption').textContent = `${consumption.toFixed(2)}`;
+            document.getElementById('editConsumption').textContent = `${Math.round(consumption)}`;
             document.getElementById('editBaseCharge').textContent = `₱${baseCharge.toFixed(2)}`;
             document.getElementById('editExcessCharge').textContent = `₱${excessCharge.toFixed(2)}`;
             document.getElementById('editTotalAmount').textContent = `₱${total.toFixed(2)}`;
@@ -2702,7 +2702,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td>${bill.billing_month || 'N/A'}</td>
                                     <td>${bill.reading_date_formatted}</td>
                                     <td>${bill.due_date_formatted}${overdueBadge}</td>
-                                    <td>${parseFloat(bill.consumption).toFixed(2)} m3</td>
+                                    <td>${Math.round(parseFloat(bill.consumption) || 0)} m3</td>
                                     <td class="text-end"><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
                                     <td class="text-end">₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
                                     <td class="text-end"><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
