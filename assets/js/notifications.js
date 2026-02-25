@@ -421,10 +421,17 @@ function initAdminNotificationCenter() {
                 box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
                 z-index: 10000;
                 overflow: hidden;
-                display: none;
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transform: translateY(12px) scale(0.98);
+                transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
             }
             .ws-admin-notif-panel.open {
-                display: block;
+                opacity: 1;
+                visibility: visible;
+                pointer-events: auto;
+                transform: translateY(0) scale(1);
             }
             .ws-admin-notif-header {
                 padding: 12px 14px;
@@ -433,6 +440,11 @@ function initAdminNotificationCenter() {
                 align-items: center;
                 justify-content: space-between;
                 font-weight: 600;
+                background: #ffffff;
+                color: #0f172a !important;
+            }
+            .ws-admin-notif-header span {
+                color: #0f172a !important;
             }
             .ws-admin-notif-clear {
                 border: none;
@@ -444,6 +456,7 @@ function initAdminNotificationCenter() {
             .ws-admin-notif-list {
                 max-height: 400px;
                 overflow-y: auto;
+                background: #ffffff;
             }
             .ws-admin-notif-item {
                 border-bottom: 1px solid #f1f5f9;
@@ -457,23 +470,35 @@ function initAdminNotificationCenter() {
             .ws-admin-notif-title {
                 font-size: 0.88rem;
                 font-weight: 600;
-                color: #111827;
+                color: #111827 !important;
                 margin-bottom: 3px;
             }
             .ws-admin-notif-desc {
                 font-size: 0.8rem;
-                color: #4b5563;
+                color: #374151 !important;
                 margin-bottom: 4px;
             }
             .ws-admin-notif-time {
                 font-size: 0.74rem;
-                color: #6b7280;
+                color: #4b5563 !important;
             }
             .ws-admin-notif-empty {
                 padding: 20px 14px;
                 font-size: 0.85rem;
-                color: #6b7280;
+                color: #334155 !important;
                 text-align: center;
+                background: #ffffff;
+            }
+            .ws-admin-notif-fab.ring i {
+                animation: ws-bell-ring 0.5s ease;
+            }
+            @keyframes ws-bell-ring {
+                0% { transform: rotate(0deg); }
+                20% { transform: rotate(15deg); }
+                40% { transform: rotate(-12deg); }
+                60% { transform: rotate(8deg); }
+                80% { transform: rotate(-6deg); }
+                100% { transform: rotate(0deg); }
             }
         `;
         document.head.appendChild(style);
@@ -623,6 +648,8 @@ function initAdminNotificationCenter() {
                 });
                 saveUnreadState();
                 renderUnread();
+                fab.classList.add('ring');
+                setTimeout(() => fab.classList.remove('ring'), 550);
                 saveSeenState();
             }
         } catch (e) {
