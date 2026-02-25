@@ -1065,13 +1065,6 @@ $disconnection_notices = $stmt->get_result();
                             </span>
                             <span class="tab-label">Dashboard Overview</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false" style="position: relative;">
-                            <span class="badge bg-danger notification-badge" style="position: absolute; top: -5px; right: 12px; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; display: none;"></span>
-                            <span class="tab-icon">
-                                <i class="fas fa-bell"></i>
-                            </span>
-                            <span class="tab-label">Notices</span>
-                        </button>
                         <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false">
                             <span class="tab-icon">
                                 <i class="fas fa-file-invoice-dollar"></i>
@@ -1432,7 +1425,7 @@ $disconnection_notices = $stmt->get_result();
                                     <h5 style="margin: 0; color: white; font-weight: 600;">
                                         <i class="fas fa-bell me-2" style="color: white;"></i>Water Service Notices
                                     </h5>
-                                    <a href="#" onclick="document.querySelector('#nav-notifications-tab').click();" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.3s ease;"
+                                    <a href="client_notices.php" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.3s ease;"
                                        onmouseover="this.style.background='rgba(255,255,255,0.3)'"
                                        onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                                         View All
@@ -2265,63 +2258,19 @@ $disconnection_notices = $stmt->get_result();
     <script src="assets/js/notifications.js"></script>
     <script>
     // Initialize tab functionality
-    // Update notification badge (unread-style: vanishes when Notifications tab is opened)
-    const clientId = <?php echo intval($_SESSION['client_id'] ?? 0); ?>;
-    const clientNotifSeenKey = `ws_client_notif_seen_event_key_${clientId}`;
-    let latestNotifTotalCount = 0;
-    let latestNotifEventKey = '';
-
-    function getSeenNotifEventKey() {
-        return localStorage.getItem(clientNotifSeenKey) || '';
-    }
-
-    function markNotificationsAsSeen() {
-        if (latestNotifEventKey) {
-            localStorage.setItem(clientNotifSeenKey, latestNotifEventKey);
-        }
-        const tabBadge = document.querySelector('#nav-notifications-tab .notification-badge');
-        if (tabBadge) {
-            tabBadge.style.display = 'none';
-        }
-    }
 
     function updateNotificationBadge() {
         fetch('get_notification_count.php')
             .then(response => response.json())
             .then(data => {
                 if (!data.success) return;
-                latestNotifTotalCount = parseInt(data.count || 0, 10);
-                latestNotifEventKey = (data.event_key || `count-${latestNotifTotalCount}`);
-                const seenEventKey = getSeenNotifEventKey();
-                const hasUnread = latestNotifTotalCount > 0 && latestNotifEventKey !== seenEventKey;
-                const unreadCount = hasUnread ? latestNotifTotalCount : 0;
-
-                // Update tab badge
-                const tabBadge = document.querySelector('#nav-notifications-tab .notification-badge');
-                if (tabBadge) {
-                    if (unreadCount > 0) {
-                        tabBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-                        tabBadge.style.display = 'block';
-                    } else {
-                        tabBadge.style.display = 'none';
-                    }
-                } else if (unreadCount > 0) {
-                    // Create tab badge if it doesn't exist
-                    const tab = document.getElementById('nav-notifications-tab');
-                    if (tab && !tabBadge) {
-                        const newBadge = document.createElement('span');
-                        newBadge.className = 'badge bg-danger notification-badge';
-                        newBadge.style.cssText = 'position: absolute; top: -5px; right: -5px; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; animation: pulse 2s infinite; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);';
-                        newBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-                        tab.appendChild(newBadge);
-                    }
-                }
+                const count = parseInt(data.count || 0, 10);
                 
                 // Update navbar bubble badge
                 const navbarBadge = document.getElementById('navbar-notification-badge');
                 if (navbarBadge) {
-                    if (unreadCount > 0) {
-                        navbarBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                    if (count > 0) {
+                        navbarBadge.textContent = count > 99 ? '99+' : count;
                         navbarBadge.style.display = 'flex';
                     } else {
                         navbarBadge.style.display = 'none';
@@ -2332,17 +2281,6 @@ $disconnection_notices = $stmt->get_result();
     }
     
     document.addEventListener('DOMContentLoaded', function() {
-        // If user lands directly on Notifications tab, consider current notifications as seen.
-        const notifTabBtn = document.getElementById('nav-notifications-tab');
-        if (notifTabBtn) {
-            notifTabBtn.addEventListener('shown.bs.tab', function () {
-                markNotificationsAsSeen();
-            });
-            notifTabBtn.addEventListener('click', function () {
-                markNotificationsAsSeen();
-            });
-        }
-
         // Update notification badge on load and every 30 seconds
         updateNotificationBadge();
         setInterval(updateNotificationBadge, 30000);

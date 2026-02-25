@@ -86,6 +86,12 @@ usort($all_notices, function($a, $b) {
     $dateB = isset($b['start_date']) ? strtotime($b['start_date']) : strtotime($b['created_at']);
     return $dateB - $dateA;
 });
+
+$active_notices = array_values(array_filter($all_notices, function($notice) {
+    $status = strtolower((string)($notice['status'] ?? ''));
+    return in_array($status, ['ongoing', 'scheduled'], true);
+}));
+$recent_notices = array_slice($all_notices, 0, 12);
 ?>
 
 <!DOCTYPE html>
@@ -119,105 +125,135 @@ usort($all_notices, function($a, $b) {
             top: 1rem;
             right: 1rem;
         }
+        .notice-table th, .notice-table td {
+            font-size: 0.9rem;
+            padding: 0.6rem 0.7rem;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body class="bg-light">
     <?php include 'client_navbar.php'; ?>
 
     <div class="container py-5">
-        <div class="row mb-4">
-            <div class="col">
-                <h2><i class="fas fa-bell me-2"></i>Water Service Notices</h2>
-                <p class="text-muted">Stay informed about water service interruptions, maintenance, and important announcements.</p>
+        <div class="card border-primary shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Service Notices & Announcements</h5>
+            </div>
+            <div class="card-body">
+                <?php if (count($active_notices) > 0): ?>
+                    <div class="row">
+                        <?php foreach ($active_notices as $notice): ?>
+                            <?php
+                            $icon_class = 'fa-info-circle text-info';
+                            if (($notice['type'] ?? '') === 'interruption') {
+                                $icon_class = 'fa-tint-slash text-danger';
+                            } elseif (($notice['type'] ?? '') === 'maintenance') {
+                                $icon_class = 'fa-wrench text-warning';
+                            }
+                            $status_class = 'bg-secondary';
+                            if (($notice['status'] ?? '') === 'ongoing') {
+                                $status_class = 'bg-warning text-dark';
+                            } elseif (($notice['status'] ?? '') === 'scheduled') {
+                                $status_class = 'bg-info text-white';
+                            } elseif (($notice['status'] ?? '') === 'completed') {
+                                $status_class = 'bg-success text-white';
+                            }
+                            $affected_areas = $notice['affected_areas'] ?? '';
+                            if (is_string($affected_areas)) {
+                                $decoded = json_decode($affected_areas, true);
+                                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                    $affected_areas = implode(', ', $decoded);
+                                }
+                            }
+                            $anchor = ($notice['source_type'] ?? 'notice') . '-' . (int)($notice['id'] ?? 0);
+                            ?>
+                            <div class="col-12 col-md-6 mb-3">
+                                <div class="card notice-card h-100 border-0 shadow-sm" id="notice-<?php echo $anchor; ?>">
+                                    <div class="card-body position-relative">
+                                        <i class="fas <?php echo $icon_class; ?> notice-icon"></i>
+                                        <span class="badge <?php echo $status_class; ?> priority-badge"><?php echo ucfirst($notice['status'] ?? 'notice'); ?></span>
+                                        <h5 class="card-title mt-1"><?php echo htmlspecialchars($notice['title'] ?? 'Notice'); ?></h5>
+                                        <p class="card-text mb-2"><?php echo nl2br(htmlspecialchars($notice['description'] ?? '')); ?></p>
+                                        <p class="mb-1"><strong><i class="fas fa-map-marker-alt me-2"></i>Affected Areas:</strong> <?php echo htmlspecialchars((string)$affected_areas); ?></p>
+                                        <p class="mb-2"><strong><i class="fas fa-clock me-2"></i>Duration:</strong>
+                                            <?php
+                                            echo date('M d, Y h:i A', strtotime($notice['start_date']));
+                                            if (!empty($notice['end_date'])) {
+                                                echo ' to ' . date('M d, Y h:i A', strtotime($notice['end_date']));
+                                            }
+                                            ?>
+                                        </p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-user me-1"></i>Posted by <?php echo htmlspecialchars($notice['admin_name'] ?? 'admin'); ?>
+                                            on <?php echo date('M d, Y', strtotime($notice['created_at'] ?? $notice['start_date'])); ?>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                        <p class="text-muted mb-0">No active service notices right now.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
-        <?php if (count($all_notices) > 0): ?>
-            <div class="row">
-                <?php foreach ($all_notices as $notice): ?>
-                    <div class="col-md-6 mb-4">
-                        <div class="card notice-card h-100 border-0 shadow-sm">
-                            <?php
-                            $card_class = '';
-                            $icon_class = '';
-                            switch($notice['type']) {
-                                case 'interruption':
-                                    $card_class = 'border-danger';
-                                    $icon_class = 'fa-tint-slash text-danger';
-                                    break;
-                                case 'maintenance':
-                                    $card_class = 'border-warning';
-                                    $icon_class = 'fa-wrench text-warning';
-                                    break;
-                                case 'announcement':
-                                    $card_class = 'border-info';
-                                    $icon_class = 'fa-info-circle text-info';
-                                    break;
-                            }
-                            ?>
-                            <div class="card-body position-relative">
-                                <i class="fas <?php echo $icon_class; ?> notice-icon"></i>
-                                
-                                <span class="badge <?php 
-                                    $status_class = 'bg-secondary';
-                                    if ($notice['status'] === 'ongoing') {
-                                        $status_class = 'bg-warning';
-                                    } elseif ($notice['status'] === 'scheduled') {
-                                        $status_class = 'bg-info';
-                                    } elseif ($notice['status'] === 'completed') {
-                                        $status_class = 'bg-success';
-                                    }
-                                    echo $status_class;
-                                ?> priority-badge">
-                                    <?php echo ucfirst($notice['status']); ?></span>
-
-                                <h4 class="card-title mt-2"><?php echo htmlspecialchars($notice['title']); ?></h4>
-                                <p class="card-text"><?php echo nl2br(htmlspecialchars($notice['description'])); ?></p>
-                                
-                                <div class="mt-3">
-                                    <p class="mb-2">
-                                        <strong><i class="fas fa-map-marker-alt me-2"></i>Affected Areas:</strong><br>
-                                        <?php 
-                                        $affected_areas = $notice['affected_areas'];
-                                        if (is_string($affected_areas)) {
-                                            $decoded = json_decode($affected_areas, true);
-                                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                                                $affected_areas = implode(', ', $decoded);
-                                            }
-                                        }
-                                        echo htmlspecialchars($affected_areas); 
-                                        ?>
-                                    </p>
-                                    
-                                    <p class="mb-2">
-                                        <strong><i class="fas fa-clock me-2"></i>Duration:</strong><br>
-                                        <?php 
-                                        echo date('M d, Y h:i A', strtotime($notice['start_date']));
-                                        if ($notice['end_date']) {
-                                            echo ' to ' . date('M d, Y h:i A', strtotime($notice['end_date']));
-                                        }
-                                        ?>
-                                    </p>
-
-                                    <small class="text-muted">
-                                        <i class="fas fa-user me-1"></i>Posted by <?php echo htmlspecialchars($notice['admin_name']); ?>
-                                        on <?php echo date('M d, Y', strtotime($notice['created_at'])); ?>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Notice History</h5>
             </div>
-        <?php else: ?>
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
-                    <h4>No Active Notices</h4>
-                    <p class="text-muted mb-0">There are currently no water service interruptions or important announcements.</p>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 notice-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Title</th>
+                                <th class="d-none d-md-table-cell">Type</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (count($recent_notices) > 0): ?>
+                                <?php foreach ($recent_notices as $notice): ?>
+                                    <?php
+                                    $status_class = 'bg-secondary';
+                                    if (($notice['status'] ?? '') === 'ongoing') {
+                                        $status_class = 'bg-warning text-dark';
+                                    } elseif (($notice['status'] ?? '') === 'scheduled') {
+                                        $status_class = 'bg-info text-white';
+                                    } elseif (($notice['status'] ?? '') === 'completed') {
+                                        $status_class = 'bg-success text-white';
+                                    }
+                                    $anchor = ($notice['source_type'] ?? 'notice') . '-' . (int)($notice['id'] ?? 0);
+                                    ?>
+                                    <tr>
+                                        <td><?php echo date('M d, Y', strtotime($notice['start_date'] ?? $notice['created_at'])); ?></td>
+                                        <td><?php echo htmlspecialchars($notice['title'] ?? 'Notice'); ?></td>
+                                        <td class="d-none d-md-table-cell"><?php echo ucfirst(htmlspecialchars($notice['type'] ?? 'notice')); ?></td>
+                                        <td><span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($notice['status'] ?? 'notice'); ?></span></td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-primary" href="#notice-<?php echo $anchor; ?>">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No notice history available.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        <?php endif; ?>
+        </div>
     </div>
 
     <!-- Bootstrap JS -->
