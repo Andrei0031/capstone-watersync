@@ -1059,19 +1059,19 @@ $disconnection_notices = $stmt->get_result();
         <div class="dashboard-tabs-container">
             <nav>
                 <div class="nav nav-tabs w-100" id="nav-tab" role="tablist">
-                        <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" data-bs-toggle="tab" data-bs-target="#nav-overview" type="button" role="tab" aria-controls="nav-overview" aria-selected="true">
+                        <button class="nav-link tab-button dashboard-tab-button active" id="nav-overview-tab" type="button">
                             <span class="tab-icon">
                                 <i class="fas fa-tachometer-alt"></i>
                             </span>
                             <span class="tab-label">Dashboard Overview</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" data-bs-toggle="tab" data-bs-target="#nav-billing" type="button" role="tab" aria-controls="nav-billing" aria-selected="false">
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-billing-tab" type="button">
                             <span class="tab-icon">
                                 <i class="fas fa-file-invoice-dollar"></i>
                             </span>
                             <span class="tab-label">Billing Information</span>
                         </button>
-                        <button class="nav-link tab-button dashboard-tab-button" id="nav-reports-tab" data-bs-toggle="tab" data-bs-target="#nav-reports" type="button" role="tab" aria-controls="nav-reports" aria-selected="false">
+                        <button class="nav-link tab-button dashboard-tab-button" id="nav-reports-tab" type="button">
                             <span class="tab-icon">
                                 <i class="fas fa-exclamation-triangle"></i>
                             </span>
@@ -1876,14 +1876,42 @@ $disconnection_notices = $stmt->get_result();
         // Update notification badge on load and every 30 seconds
         updateNotificationBadge();
         setInterval(updateNotificationBadge, 30000);
-        
-        // Force show first tab content
-        const firstTab = document.getElementById('nav-overview');
-        if (firstTab) {
-            firstTab.classList.add('show', 'active');
+
+        // Simple manual tab switching (independent of Bootstrap's tab JS)
+        const tabButtons = document.querySelectorAll('.dashboard-tab-button');
+        const panes = {
+            'nav-overview-tab': document.getElementById('nav-overview'),
+            'nav-billing-tab': document.getElementById('nav-billing'),
+            'nav-reports-tab': document.getElementById('nav-reports'),
+        };
+
+        function activateTab(tabId) {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            const btn = document.getElementById(tabId);
+            if (btn) btn.classList.add('active');
+
+            Object.values(panes).forEach(pane => {
+                if (pane) {
+                    pane.classList.remove('show', 'active');
+                    pane.style.display = 'none';
+                }
+            });
+            const pane = panes[tabId];
+            if (pane) {
+                pane.classList.add('show', 'active');
+                pane.style.display = 'block';
+            }
         }
-        
-        // No custom click styling needed; Bootstrap will handle active classes.
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                activateTab(this.id);
+            });
+        });
+
+        // Initial state
+        activateTab('nav-overview-tab');
     });
 
     // Tab navigation from URL hash - DISABLED (no hash in URL)
