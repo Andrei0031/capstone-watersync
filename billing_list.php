@@ -250,6 +250,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         $selected_ids = $_POST['selected_bills'] ?? [];
+        $selected_client_ids = $_POST['selected_client_ids'] ?? [];
+
+        // If selected clients were posted, delete all bills under those customers
+        if (!empty($selected_client_ids)) {
+            $expanded_ids = [];
+            foreach ($selected_client_ids as $cid) {
+                $cid = intval($cid);
+                if ($cid <= 0) continue;
+                $bill_ids_stmt = $conn->prepare("SELECT id FROM billing_list WHERE client_id = ?");
+                if ($bill_ids_stmt) {
+                    $bill_ids_stmt->bind_param("i", $cid);
+                    $bill_ids_stmt->execute();
+                    $bill_ids_result = $bill_ids_stmt->get_result();
+                    while ($bill_ids_result && ($bill_row = $bill_ids_result->fetch_assoc())) {
+                        $expanded_ids[] = intval($bill_row['id']);
+                    }
+                    $bill_ids_stmt->close();
+                }
+            }
+            if (!empty($expanded_ids)) {
+                $selected_ids = array_unique(array_merge($selected_ids, $expanded_ids));
+            }
+        }
         
         if (empty($selected_ids)) {
             header("Location: billing_list.php?bulk_delete_status=error&message=" . urlencode('No bills selected for deletion.'));
@@ -1443,7 +1466,7 @@ if ($params) {
                             ?>
                             <tr>
                                 <td>
-                                    <input type="checkbox" class="bill-checkbox bulk-delete-checkbox" value="<?php echo $row['id']; ?>" data-customer="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>" data-status="<?php echo $status_text; ?>" onchange="updateBillingTableSelectionSummary()">
+                                    <input type="checkbox" class="bill-checkbox bulk-delete-checkbox" value="<?php echo $row['id']; ?>" data-client-id="<?php echo intval($row['client_id']); ?>" data-customer="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>" data-status="<?php echo $status_text; ?>" onchange="updateBillingTableSelectionSummary()">
                                 </td>
                                 <td>
                                     <div>
@@ -1646,12 +1669,28 @@ if ($params) {
         var form = document.createElement('form');
         form.method = 'POST';
         form.action = window.location.pathname || 'billing_list.php';
+        var uniqueClientIds = {};
         for (var i = 0; i < selected.length; i++) {
             var input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'selected_bills[]';
             input.value = selected[i].value;
             form.appendChild(input);
+
+            var clientId = selected[i].getAttribute('data-client-id');
+            if (clientId) {
+                uniqueClientIds[clientId] = true;
+            }
+        }
+
+        for (var cid in uniqueClientIds) {
+            if (Object.prototype.hasOwnProperty.call(uniqueClientIds, cid)) {
+                var clientInput = document.createElement('input');
+                clientInput.type = 'hidden';
+                clientInput.name = 'selected_client_ids[]';
+                clientInput.value = cid;
+                form.appendChild(clientInput);
+            }
         }
         var submitInput = document.createElement('input');
         submitInput.type = 'hidden';
