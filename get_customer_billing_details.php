@@ -41,12 +41,13 @@ try {
             MAX(payment_date) as last_payment_date
         FROM payment_list
         WHERE billing_id IN (SELECT id FROM billing_list WHERE client_id = ?)
+          AND status = 1
         GROUP BY billing_id
     )
     SELECT 
         b.*,
         COALESCE(pt.total_paid, 0) as amount_paid,
-        COALESCE(b.total - COALESCE(pt.total_paid, 0), b.total) as remaining_balance,
+        GREATEST(COALESCE(b.total - COALESCE(pt.total_paid, 0), b.total), 0) as remaining_balance,
         pt.last_payment_date,
         CASE 
             WHEN b.status = 1 THEN 'Paid'

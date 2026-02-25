@@ -700,7 +700,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     $bill_stmt->close();
                                 }
 
-                                // If CSV has Paid amount, top-up payments to match CSV paid amount
+                                // If CSV has Paid amount, top-up payments to match CSV paid amount.
+                                // Cap at bill total to avoid overpayment/negative remaining balance.
                                 $paid_amt = isset($bill_record['paid']) && $bill_record['paid'] !== null && $bill_record['paid'] > 0 ? floatval($bill_record['paid']) : 0;
                                 if ($billing_id && $paid_amt > 0) {
                                     $paid_sum_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payment_list WHERE billing_id = ? AND status = 1");
@@ -711,7 +712,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     $already_paid = floatval($paid_sum_row['total_paid'] ?? 0);
                                     $paid_sum_stmt->close();
 
-                                    $remaining_to_record = max(0, $paid_amt - $already_paid);
+                                    $target_paid = min($paid_amt, $final_total);
+                                    $remaining_to_record = max(0, $target_paid - $already_paid);
                                     if ($remaining_to_record > 0) {
                                         $pay_stmt = $conn->prepare("INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) VALUES (?, ?, ?, ?, 'csv_import', '', 1)");
                                         $pay_stmt->bind_param("iisd", $client_id, $billing_id, $reading_date, $remaining_to_record);
@@ -719,7 +721,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         $pay_stmt->close();
                                     }
 
-                                    if ($paid_amt >= $final_total) {
+                                    if ($target_paid >= $final_total) {
                                         $conn->query("UPDATE billing_list SET status = 1 WHERE id = " . intval($billing_id));
                                     }
                                 }
