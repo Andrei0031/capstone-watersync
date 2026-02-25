@@ -1081,210 +1081,6 @@ $disconnection_notices = $stmt->get_result();
             </nav>
         </div>
         
-        <!-- Water Reports Form - Positioned at Top (Only visible when Water Reports tab is active) -->
-        <div id="water-reports-form" style="display: none; margin: 20px; padding: 0; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
-            <!-- Form Header -->
-            <div style="background: linear-gradient(135deg, #ff9800, #f57c00); padding: 20px; border-bottom: 1px solid #e0e0e0;">
-                <h5 style="margin: 0; color: white; font-weight: 600;">
-                    <i class="fas fa-exclamation-triangle me-2" style="color: white;"></i>Report Water Outage
-                </h5>
-                <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">Submit your water service issues here for immediate assistance</p>
-            </div>
-            <!-- Form Body -->
-            <div style="padding: 25px;">
-                <form id="outageReportForm">
-                <div class="row">
-                    <div class="col-12 col-md-6">
-                        <div class="mb-3">
-                            <label for="outageLocation" class="form-label">Location <span class="text-danger">*</span></label>
-                            <select class="form-select" id="outageLocation" name="location" required>
-                                <option value="">Select your area</option>
-                                <option value="Purok 1-A">Purok 1-A</option>
-                                <option value="Purok 1-B">Purok 1-B</option>
-                                <option value="Purok 1-C">Purok 1-C</option>
-                                <option value="Purok 2">Purok 2</option>
-                                <option value="Purok 3">Purok 3</option>
-                                <option value="Purok 4">Purok 4</option>
-                                <option value="Purok 5">Purok 5</option>
-                            </select>
-                            <small class="text-muted">Select the area where water outage is occurring</small>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="mb-3">
-                            <label for="outageDescription" class="form-label">Type of Water Issue <span class="text-danger">*</span></label>
-                            <select class="form-select" id="outageDescription" name="description" required>
-                                <option value="">Select the type of water issue</option>
-                                <optgroup label="Water Supply Issues">
-                                    <option value="No water supply for more than 2 hours">No water supply for more than 2 hours (Wala'y tubig sulod sa 2 ka oras)</option>
-                                    <option value="Complete water outage - no water at all">Complete water outage - no water at all (Tanan wala'y tubig)</option>
-                                    <option value="Intermittent water supply - on and off">Intermittent water supply - on and off (Intermittent nga tubig - naa ug wala)</option>
-                                </optgroup>
-                                <optgroup label="Water Pressure Issues">
-                                    <option value="Very low water pressure">Very low water pressure (Ubos kaayo ang pressure sa tubig)</option>
-                                    <option value="No water pressure at all">No water pressure at all (Wala'y pressure sa tubig)</option>
-                                    <option value="Water pressure only during certain times">Water pressure only during certain times (Pressure sa tubig sa pipila lang ka oras)</option>
-                                </optgroup>
-                                <optgroup label="Water Quality Issues">
-                                    <option value="Water quality issues - unusual color">Water quality issues - unusual color (Problema sa kalidad sa tubig - katingad-an nga kolor)</option>
-                                    <option value="Water quality issues - bad taste">Water quality issues - bad taste (Problema sa kalidad sa tubig - dili maayo ang lami)</option>
-                                    <option value="Water quality issues - unusual odor">Water quality issues - unusual odor (Problema sa kalidad sa tubig - katingad-an nga baho)</option>
-                                    <option value="Cloudy or murky water">Cloudy or murky water (Hapon o mabaga ang tubig)</option>
-                                </optgroup>
-                                <optgroup label="Infrastructure Issues">
-                                    <option value="Visible pipe leaks in the area">Visible pipe leaks in the area (Makita nga nag-leak ang tubo sa lugar)</option>
-                                    <option value="Burst pipes causing water loss">Burst pipes causing water loss (Nabuak ang tubo nga naka-cause sa pagkawala sa tubig)</option>
-                                    <option value="Water meter issues or damage">Water meter issues or damage (Problema o kadaot sa water meter)</option>
-                                    <option value="Suspected main line break">Suspected main line break (Gisuspetsahan nga nabuak ang main line)</option>
-                                </optgroup>
-                            </select>
-                            <small class="text-muted">Choose the option that best describes your water issue</small>
-                        </div>
-                        <button type="submit" style="background: linear-gradient(135deg, #ff9800, #f57c00); border: none; color: white; padding: 12px 25px; border-radius: 8px; font-weight: 600; box-shadow: 0 3px 10px rgba(255,152,0,0.3); transition: all 0.3s ease;" 
-                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(255,152,0,0.4)'"
-                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 10px rgba(255,152,0,0.3)'">
-                            <i class="fas fa-paper-plane me-2"></i>Submit Report
-                        </button>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                            <h6 style="color: #1976d2; margin-bottom: 10px; font-weight: 600;">
-                                <i class="fas fa-lightbulb me-2" style="color: #ffc107;"></i>When to Report
-                            </h6>
-                            <ul style="margin: 0; color: #1565c0; font-size: 0.9rem;">
-                                <li>No water supply for more than 2 hours</li>
-                                <li>Very low water pressure</li>
-                                <li>Water quality issues (color, taste, odor)</li>
-                                <li>Visible pipe leaks or burst pipes</li>
-                            </ul>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #fff3e0, #ffe0b2); border: 1px solid #ff9800; border-radius: 8px; padding: 15px;">
-                            <h6 style="color: #f57c00; margin-bottom: 10px; font-weight: 600;">
-                                <i class="fas fa-clock me-2" style="color: #ff9800;"></i>Response Time
-                            </h6>
-                            <p style="margin: 0; color: #e65100; font-size: 0.9rem;">Our team typically responds within <strong>2-4 hours</strong> during business hours and within <strong>24 hours</strong> on weekends.</p>
-                        </div>
-                                         </div>
-                 </div>
-                 </form>
-             </div>
-         </div>
-         
-         <!-- Submitted Outage Reports List - Below the form -->
-         <div id="outage-reports-list" style="display: none; margin: 20px; padding: 0; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
-            <!-- List Header -->
-            <div style="background: linear-gradient(135deg, #2196f3, #1976d2); padding: 20px; border-bottom: 1px solid #e0e0e0;">
-                <h5 style="margin: 0; color: white; font-weight: 600;">
-                    <i class="fas fa-list me-2" style="color: white;"></i>Your Submitted Reports
-                </h5>
-                <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">View all your water outage reports and their status</p>
-            </div>
-            <!-- Reports List Body -->
-            <div style="padding: 25px;">
-                <?php
-                // Fetch all reports for the logged-in client
-                if (isset($_SESSION['client_id'])) {
-                    $client_id = $_SESSION['client_id'];
-                    
-                    // Check if table exists, if not create it
-                    $check_table = $conn->query("SHOW TABLES LIKE 'outage_reports'");
-                    if ($check_table->num_rows == 0) {
-                        $create_table_sql = "CREATE TABLE IF NOT EXISTS outage_reports (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            client_id INT NOT NULL,
-                            location VARCHAR(255) NOT NULL,
-                            description TEXT NOT NULL,
-                            status TINYINT(1) DEFAULT 0,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            resolved_at TIMESTAMP NULL,
-                            resolution_notes TEXT,
-                            FOREIGN KEY (client_id) REFERENCES client_list(id)
-                        )";
-                        $conn->query($create_table_sql);
-                    }
-                    
-                    // Fetch reports for this client, newest first
-                    $reports_query = "SELECT id, location, description, status, created_at, resolved_at, resolution_notes 
-                                     FROM outage_reports 
-                                     WHERE client_id = ? 
-                                     ORDER BY created_at DESC";
-                    $stmt = $conn->prepare($reports_query);
-                    $stmt->bind_param("i", $client_id);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    $reports = $result->fetch_all(MYSQLI_ASSOC);
-                    $stmt->close();
-                    
-                    if (empty($reports)) {
-                        echo '<div style="text-align: center; padding: 40px; color: #666;">
-                                <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
-                                <p style="margin: 0; font-size: 1.1rem;">No reports submitted yet</p>
-                                <p style="margin: 10px 0 0 0; color: #999; font-size: 0.9rem;">Submit a report above to get started</p>
-                              </div>';
-                    } else {
-                        echo '<div style="max-height: 600px; overflow-y: auto;">';
-                        foreach ($reports as $report) {
-                            $is_resolved = $report['status'] == 1;
-                            $status_color = $is_resolved ? '#4caf50' : '#ff9800';
-                            $status_text = $is_resolved ? 'Resolved' : 'Pending';
-                            $status_icon = $is_resolved ? 'fa-check-circle' : 'fa-clock';
-                            
-                            $created_date = date('M d, Y g:i A', strtotime($report['created_at']));
-                            $resolved_date = $report['resolved_at'] ? date('M d, Y g:i A', strtotime($report['resolved_at'])) : null;
-                            
-                            echo '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: ' . ($is_resolved ? '#f1f8f4' : '#fff8e1') . '; transition: all 0.3s ease;">';
-                            echo '    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">';
-                            echo '        <div style="flex: 1;">';
-                            echo '            <div style="display: flex; align-items: center; margin-bottom: 10px;">';
-                            echo '                <span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;">';
-                            echo '                    <i class="fas ' . $status_icon . ' me-1"></i>' . $status_text;
-                            echo '                </span>';
-                            echo '                <span style="color: #666; font-size: 0.9rem;">';
-                            echo '                    <i class="fas fa-calendar me-1"></i>' . $created_date;
-                            echo '                </span>';
-                            echo '            </div>';
-                            echo '            <h6 style="margin: 0 0 8px 0; color: #333; font-weight: 600;">';
-                            echo '                <i class="fas fa-map-marker-alt me-2" style="color: #2196f3;"></i>' . htmlspecialchars($report['location']);
-                            echo '            </h6>';
-                            echo '            <p style="margin: 0; color: #555; line-height: 1.6;">' . htmlspecialchars($report['description']) . '</p>';
-                            echo '        </div>';
-                            echo '    </div>';
-                            
-                            if ($is_resolved && $resolved_date) {
-                                echo '    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
-                                echo '        <div style="display: flex; align-items: center; color: #4caf50; font-size: 0.9rem; margin-bottom: 8px;">';
-                                echo '            <i class="fas fa-check-circle me-2"></i>';
-                                echo '            <strong>Resolved on:</strong> ' . $resolved_date;
-                                echo '        </div>';
-                                if (!empty($report['resolution_notes'])) {
-                                    echo '        <div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #4caf50;">';
-                                    echo '            <strong style="color: #333; font-size: 0.9rem;">Resolution Notes:</strong>';
-                                    echo '            <p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">' . htmlspecialchars($report['resolution_notes']) . '</p>';
-                                    echo '        </div>';
-                                }
-                                echo '    </div>';
-                            } else {
-                                echo '    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
-                                echo '        <div style="display: flex; align-items: center; color: #ff9800; font-size: 0.9rem;">';
-                                echo '            <i class="fas fa-hourglass-half me-2"></i>';
-                                echo '            <strong>Status:</strong> Under review - We will update you once resolved';
-                                echo '        </div>';
-                                echo '    </div>';
-                            }
-                            
-                            echo '</div>';
-                        }
-                        echo '</div>';
-                    }
-                } else {
-                    echo '<div style="text-align: center; padding: 40px; color: #666;">
-                            <p style="margin: 0;">Please log in to view your reports</p>
-                          </div>';
-                }
-                ?>
-            </div>
-         </div>
-        
         <div class="tab-content" id="nav-tabContent" style="padding: 0 !important; margin: 0 !important; border: none !important;">
                 <!-- Dashboard Overview Tab -->
                 <div class="tab-pane fade show active" id="nav-overview" role="tabpanel" aria-labelledby="nav-overview-tab">
@@ -1773,7 +1569,138 @@ $disconnection_notices = $stmt->get_result();
 
                                                 <!-- Water Reports Tab -->
                 <div class="tab-pane fade" id="nav-reports" role="tabpanel" aria-labelledby="nav-reports-tab">
-                    <!-- Empty tab - form will show above -->
+                    <div id="water-reports-form" style="margin: 20px; padding: 0; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, #ff9800, #f57c00); padding: 20px; border-bottom: 1px solid #e0e0e0;">
+                            <h5 style="margin: 0; color: white; font-weight: 600;">
+                                <i class="fas fa-exclamation-triangle me-2" style="color: white;"></i>Report Water Outage
+                            </h5>
+                            <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">Submit your water service issues here for immediate assistance</p>
+                        </div>
+                        <div style="padding: 25px;">
+                            <form id="outageReportForm">
+                            <div class="row">
+                                <div class="col-12 col-md-6">
+                                    <div class="mb-3">
+                                        <label for="outageLocation" class="form-label">Location <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="outageLocation" name="location" required>
+                                            <option value="">Select your area</option>
+                                            <option value="Purok 1-A">Purok 1-A</option>
+                                            <option value="Purok 1-B">Purok 1-B</option>
+                                            <option value="Purok 1-C">Purok 1-C</option>
+                                            <option value="Purok 2">Purok 2</option>
+                                            <option value="Purok 3">Purok 3</option>
+                                            <option value="Purok 4">Purok 4</option>
+                                            <option value="Purok 5">Purok 5</option>
+                                        </select>
+                                        <small class="text-muted">Select the area where water outage is occurring</small>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div class="mb-3">
+                                        <label for="outageDescription" class="form-label">Type of Water Issue <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="outageDescription" name="description" required>
+                                            <option value="">Select the type of water issue</option>
+                                            <optgroup label="Water Supply Issues">
+                                                <option value="No water supply for more than 2 hours">No water supply for more than 2 hours (Wala'y tubig sulod sa 2 ka oras)</option>
+                                                <option value="Complete water outage - no water at all">Complete water outage - no water at all (Tanan wala'y tubig)</option>
+                                                <option value="Intermittent water supply - on and off">Intermittent water supply - on and off (Intermittent nga tubig - naa ug wala)</option>
+                                            </optgroup>
+                                            <optgroup label="Water Pressure Issues">
+                                                <option value="Very low water pressure">Very low water pressure (Ubos kaayo ang pressure sa tubig)</option>
+                                                <option value="No water pressure at all">No water pressure at all (Wala'y pressure sa tubig)</option>
+                                                <option value="Water pressure only during certain times">Water pressure only during certain times (Pressure sa tubig sa pipila lang ka oras)</option>
+                                            </optgroup>
+                                            <optgroup label="Water Quality Issues">
+                                                <option value="Water quality issues - unusual color">Water quality issues - unusual color (Problema sa kalidad sa tubig - katingad-an nga kolor)</option>
+                                                <option value="Water quality issues - bad taste">Water quality issues - bad taste (Problema sa kalidad sa tubig - dili maayo ang lami)</option>
+                                                <option value="Water quality issues - unusual odor">Water quality issues - unusual odor (Problema sa kalidad sa tubig - katingad-an nga baho)</option>
+                                                <option value="Cloudy or murky water">Cloudy or murky water (Hapon o mabaga ang tubig)</option>
+                                            </optgroup>
+                                            <optgroup label="Infrastructure Issues">
+                                                <option value="Visible pipe leaks in the area">Visible pipe leaks in the area (Makita nga nag-leak ang tubo sa lugar)</option>
+                                                <option value="Burst pipes causing water loss">Burst pipes causing water loss (Nabuak ang tubo nga naka-cause sa pagkawala sa tubig)</option>
+                                                <option value="Water meter issues or damage">Water meter issues or damage (Problema o kadaot sa water meter)</option>
+                                                <option value="Suspected main line break">Suspected main line break (Gisuspetsahan nga nabuak ang main line)</option>
+                                            </optgroup>
+                                        </select>
+                                        <small class="text-muted">Choose the option that best describes your water issue</small>
+                                    </div>
+                                    <button type="submit" style="background: linear-gradient(135deg, #ff9800, #f57c00); border: none; color: white; padding: 12px 25px; border-radius: 8px; font-weight: 600; box-shadow: 0 3px 10px rgba(255,152,0,0.3); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(255,152,0,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 10px rgba(255,152,0,0.3)'">
+                                        <i class="fas fa-paper-plane me-2"></i>Submit Report
+                                    </button>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                                        <h6 style="color: #1976d2; margin-bottom: 10px; font-weight: 600;"><i class="fas fa-lightbulb me-2" style="color: #ffc107;"></i>When to Report</h6>
+                                        <ul style="margin: 0; color: #1565c0; font-size: 0.9rem;">
+                                            <li>No water supply for more than 2 hours</li>
+                                            <li>Very low water pressure</li>
+                                            <li>Water quality issues (color, taste, odor)</li>
+                                            <li>Visible pipe leaks or burst pipes</li>
+                                        </ul>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #fff3e0, #ffe0b2); border: 1px solid #ff9800; border-radius: 8px; padding: 15px;">
+                                        <h6 style="color: #f57c00; margin-bottom: 10px; font-weight: 600;"><i class="fas fa-clock me-2" style="color: #ff9800;"></i>Response Time</h6>
+                                        <p style="margin: 0; color: #e65100; font-size: 0.9rem;">Our team typically responds within <strong>2-4 hours</strong> during business hours and within <strong>24 hours</strong> on weekends.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div id="outage-reports-list" style="margin: 20px; padding: 0; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, #2196f3, #1976d2); padding: 20px; border-bottom: 1px solid #e0e0e0;">
+                            <h5 style="margin: 0; color: white; font-weight: 600;"><i class="fas fa-list me-2" style="color: white;"></i>Your Submitted Reports</h5>
+                            <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">View all your water outage reports and their status</p>
+                        </div>
+                        <div style="padding: 25px;">
+                            <?php
+                            if (isset($_SESSION['client_id'])) {
+                                $client_id = $_SESSION['client_id'];
+                                $check_table = $conn->query("SHOW TABLES LIKE 'outage_reports'");
+                                if ($check_table->num_rows == 0) {
+                                    $create_table_sql = "CREATE TABLE IF NOT EXISTS outage_reports (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, location VARCHAR(255) NOT NULL, description TEXT NOT NULL, status TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, resolved_at TIMESTAMP NULL, resolution_notes TEXT, FOREIGN KEY (client_id) REFERENCES client_list(id))";
+                                    $conn->query($create_table_sql);
+                                }
+                                $reports_query = "SELECT id, location, description, status, created_at, resolved_at, resolution_notes FROM outage_reports WHERE client_id = ? ORDER BY created_at DESC";
+                                $stmt = $conn->prepare($reports_query);
+                                $stmt->bind_param("i", $client_id);
+                                $stmt->execute();
+                                $result = $stmt->get_result();
+                                $reports = $result->fetch_all(MYSQLI_ASSOC);
+                                $stmt->close();
+                                if (empty($reports)) {
+                                    echo '<div style="text-align: center; padding: 40px; color: #666;"><i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i><p style="margin: 0; font-size: 1.1rem;">No reports submitted yet</p><p style="margin: 10px 0 0 0; color: #999; font-size: 0.9rem;">Submit a report above to get started</p></div>';
+                                } else {
+                                    echo '<div style="max-height: 600px; overflow-y: auto;">';
+                                    foreach ($reports as $report) {
+                                        $is_resolved = $report['status'] == 1;
+                                        $status_color = $is_resolved ? '#4caf50' : '#ff9800';
+                                        $status_text = $is_resolved ? 'Resolved' : 'Pending';
+                                        $status_icon = $is_resolved ? 'fa-check-circle' : 'fa-clock';
+                                        $created_date = date('M d, Y g:i A', strtotime($report['created_at']));
+                                        $resolved_date = $report['resolved_at'] ? date('M d, Y g:i A', strtotime($report['resolved_at'])) : null;
+                                        echo '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: ' . ($is_resolved ? '#f1f8f4' : '#fff8e1') . ';">';
+                                        echo '<div style="display: flex; align-items: center; margin-bottom: 10px;"><span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;"><i class="fas ' . $status_icon . ' me-1"></i>' . $status_text . '</span><span style="color: #666; font-size: 0.9rem;"><i class="fas fa-calendar me-1"></i>' . $created_date . '</span></div>';
+                                        echo '<h6 style="margin: 0 0 8px 0; color: #333; font-weight: 600;"><i class="fas fa-map-marker-alt me-2" style="color: #2196f3;"></i>' . htmlspecialchars($report['location']) . '</h6>';
+                                        echo '<p style="margin: 0; color: #555; line-height: 1.6;">' . htmlspecialchars($report['description']) . '</p>';
+                                        if ($is_resolved && $resolved_date) {
+                                            echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;"><div style="color: #4caf50; font-size: 0.9rem;"><i class="fas fa-check-circle me-2"></i><strong>Resolved on:</strong> ' . $resolved_date . '</div>';
+                                            if (!empty($report['resolution_notes'])) echo '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #4caf50;"><strong style="font-size: 0.9rem;">Resolution Notes:</strong><p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">' . htmlspecialchars($report['resolution_notes']) . '</p></div>';
+                                            echo '</div>';
+                                        } else {
+                                            echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;"><div style="color: #ff9800; font-size: 0.9rem;"><i class="fas fa-hourglass-half me-2"></i><strong>Status:</strong> Under review</div></div>';
+                                        }
+                                        echo '</div>';
+                                    }
+                                    echo '</div>';
+                                }
+                            } else {
+                                echo '<div style="text-align: center; padding: 40px; color: #666;"><p style="margin: 0;">Please log in to view your reports</p></div>';
+                            }
+                            ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1962,27 +1889,7 @@ $disconnection_notices = $stmt->get_result();
     // Tab navigation from URL hash - DISABLED (no hash in URL)
     // Removed to prevent hash from appearing in URL when switching tabs
 
-    // Handle tab changes (without updating URL hash)
-    document.addEventListener('shown.bs.tab', function (e) {
-        const target = e.target.getAttribute('data-bs-target');
-        
-        // Show/hide water reports form and reports list based on active tab
-        const waterReportsForm = document.getElementById('water-reports-form');
-        const outageReportsList = document.getElementById('outage-reports-list');
-        if (waterReportsForm) {
-            if (target === '#nav-reports') {
-                waterReportsForm.style.display = 'block';
-                if (outageReportsList) {
-                    outageReportsList.style.display = 'block';
-                }
-            } else {
-                waterReportsForm.style.display = 'none';
-                if (outageReportsList) {
-                    outageReportsList.style.display = 'none';
-                }
-            }
-        }
-    });
+    // Water Reports form and list are inside #nav-reports tab pane; Bootstrap shows/hides the pane, so no extra toggle needed.
 
     // View report details function
     window.viewReportDetails = function(reportId) {
