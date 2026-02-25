@@ -514,41 +514,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         continue;
                     }
 
-                    // Check if meter code already exists
-                    $check_sql = "SELECT id FROM client_list WHERE meter_code = ? AND delete_flag = 0";
+                    // Check if meter code already exists as active client.
+                    // If yes, reuse that client and continue importing/updating billing rows.
+                    $check_sql = "SELECT id, category_id FROM client_list WHERE meter_code = ? AND delete_flag = 0 LIMIT 1";
                     $check_stmt = $conn->prepare($check_sql);
                     $check_stmt->bind_param("s", $meter_code);
                     $check_stmt->execute();
                     $check_result = $check_stmt->get_result();
-                    if ($check_result->num_rows > 0) {
-                        $errors[] = "Meter Code {$meter_code}: Already exists.";
-                        $skip_count++;
-                        $check_stmt->close();
-                        continue;
+                    $client_id = null;
+                    $is_existing_client = false;
+                    if ($check_result && $check_result->num_rows > 0) {
+                        $existing = $check_result->fetch_assoc();
+                        $client_id = intval($existing['id']);
+                        $existing_category_id = intval($existing['category_id']);
+                        if ($existing_category_id > 0) {
+                            $category_id = $existing_category_id;
+                        }
+                        $is_existing_client = true;
                     }
                     $check_stmt->close();
 
-                    // Generate client code
-                    $last_number++;
-                    if ($last_number > 999) {
-                        $errors[] = "Meter Code {$meter_code}: Maximum client code reached for the year.";
-                        $skip_count++;
-                        continue;
-                    }
-                    $code = $year_prefix . str_pad($last_number, 3, '0', STR_PAD_LEFT);
+                    if (!$is_existing_client) {
+                        // Generate client code
+                        $last_number++;
+                        if ($last_number > 999) {
+                            $errors[] = "Meter Code {$meter_code}: Maximum client code reached for the year.";
+                            $skip_count++;
+                            continue;
+                        }
+                        $code = $year_prefix . str_pad($last_number, 3, '0', STR_PAD_LEFT);
 
-                    // Insert client
-                    $status = 1;
-                    $delete_flag = 0;
-                    $stmt = $conn->prepare("INSERT INTO client_list (code, category_id, firstname, middlename, lastname, contact, address, meter_code, status, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("sissssssii", $code, $category_id, $customer_info['firstname'], $customer_info['middlename'], $customer_info['lastname'], $customer_info['contact'], $customer_info['address'], $meter_code, $status, $delete_flag);
+                        // Insert client
+                        $status = 1;
+                        $delete_flag = 0;
+                        $stmt = $conn->prepare("INSERT INTO client_list (code, category_id, firstname, middlename, lastname, contact, address, meter_code, status, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->bind_param("sissssssii", $code, $category_id, $customer_info['firstname'], $customer_info['middlename'], $customer_info['lastname'], $customer_info['contact'], $customer_info['address'], $meter_code, $status, $delete_flag);
 
-                    if ($stmt->execute()) {
-                        $client_id = $conn->insert_id;
+                        if ($stmt->execute()) {
+                            $client_id = $conn->insert_id;
+                            $success_count++;
+                        } else {
+                            $errors[] = "Meter Code {$meter_code}: " . $stmt->error;
+                            $skip_count++;
+                            $stmt->close();
+                            continue;
+                        }
+                        $stmt->close();
+                    } else {
+                        // Existing active meter code reused
                         $success_count++;
-                        
-                        // Process billing records chronologically
-                        if (!empty($billing_records)) {
+                    }
+                    
+                    // Process billing records chronologically
+                    if (!empty($billing_records)) {
                             // Sort billing records by reading date
                             usort($billing_records, function($a, $b) {
                                 return strtotime($a['reading_date']) - strtotime($b['reading_date']);
@@ -626,38 +644,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 // Calculate due date (30 days from reading date)
                                 $due_date = date('Y-m-d', strtotime($reading_date . ' +30 days'));
                                 
-                                // Insert billing record
-                                $bill_stmt = $conn->prepare("INSERT INTO billing_list (client_id, reading_date, due_date, reading, previous, rate, total, status, date_created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-                                $bill_stmt->bind_param("issddddi", $client_id, $reading_date, $due_date, $current_reading, $prev_reading, $base_total, $final_total, $bill_status_value);
-                                
-                                if ($bill_stmt->execute()) {
-                                    $billing_count++;
-                                    $billing_id = $conn->insert_id;
+                                // Upsert billing record by (client_id, reading_date) so re-imports update status/amount
+                                $billing_id = null;
+                                $existing_bill_stmt = $conn->prepare("SELECT id FROM billing_list WHERE client_id = ? AND reading_date = ? LIMIT 1");
+                                $existing_bill_stmt->bind_param("is", $client_id, $reading_date);
+                                $existing_bill_stmt->execute();
+                                $existing_bill_result = $existing_bill_stmt->get_result();
+                                $existing_bill = $existing_bill_result ? $existing_bill_result->fetch_assoc() : null;
+                                $existing_bill_stmt->close();
+
+                                if ($existing_bill) {
+                                    $billing_id = intval($existing_bill['id']);
+                                    $update_bill_stmt = $conn->prepare("UPDATE billing_list SET due_date = ?, reading = ?, previous = ?, rate = ?, total = ?, status = ? WHERE id = ?");
+                                    $update_bill_stmt->bind_param("sddddii", $due_date, $current_reading, $prev_reading, $base_total, $final_total, $bill_status_value, $billing_id);
+                                    if ($update_bill_stmt->execute()) {
+                                        $billing_count++;
+                                    } else {
+                                        $errors[] = "Meter Code {$meter_code}, Row {$bill_record['row_number']}: Failed to update billing record - " . $update_bill_stmt->error;
+                                    }
+                                    $update_bill_stmt->close();
+                                } else {
+                                    $bill_stmt = $conn->prepare("INSERT INTO billing_list (client_id, reading_date, due_date, reading, previous, rate, total, status, date_created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                                    $bill_stmt->bind_param("issddddi", $client_id, $reading_date, $due_date, $current_reading, $prev_reading, $base_total, $final_total, $bill_status_value);
+                                    if ($bill_stmt->execute()) {
+                                        $billing_count++;
+                                        $billing_id = $conn->insert_id;
+                                    } else {
+                                        $errors[] = "Meter Code {$meter_code}, Row {$bill_record['row_number']}: Failed to create billing record - " . $bill_stmt->error;
+                                    }
                                     $bill_stmt->close();
-                                    // If CSV has Paid amount, add payment record
-                                    $paid_amt = isset($bill_record['paid']) && $bill_record['paid'] !== null && $bill_record['paid'] > 0 ? floatval($bill_record['paid']) : 0;
-                                    if ($paid_amt > 0) {
+                                }
+
+                                // If CSV has Paid amount, top-up payments to match CSV paid amount
+                                $paid_amt = isset($bill_record['paid']) && $bill_record['paid'] !== null && $bill_record['paid'] > 0 ? floatval($bill_record['paid']) : 0;
+                                if ($billing_id && $paid_amt > 0) {
+                                    $paid_sum_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payment_list WHERE billing_id = ? AND status = 1");
+                                    $paid_sum_stmt->bind_param("i", $billing_id);
+                                    $paid_sum_stmt->execute();
+                                    $paid_sum_result = $paid_sum_stmt->get_result();
+                                    $paid_sum_row = $paid_sum_result ? $paid_sum_result->fetch_assoc() : ['total_paid' => 0];
+                                    $already_paid = floatval($paid_sum_row['total_paid'] ?? 0);
+                                    $paid_sum_stmt->close();
+
+                                    $remaining_to_record = max(0, $paid_amt - $already_paid);
+                                    if ($remaining_to_record > 0) {
                                         $pay_stmt = $conn->prepare("INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) VALUES (?, ?, ?, ?, 'csv_import', '', 1)");
-                                        $pay_stmt->bind_param("iisd", $client_id, $billing_id, $reading_date, $paid_amt);
-                                        if ($pay_stmt->execute()) {
-                                            // Optionally mark bill as paid if paid >= total
-                                            if ($paid_amt >= $final_total) {
-                                                $conn->query("UPDATE billing_list SET status = 1 WHERE id = " . intval($billing_id));
-                                            }
-                                        }
+                                        $pay_stmt->bind_param("iisd", $client_id, $billing_id, $reading_date, $remaining_to_record);
+                                        $pay_stmt->execute();
                                         $pay_stmt->close();
                                     }
-                                } else {
-                                    $errors[] = "Meter Code {$meter_code}, Row {$bill_record['row_number']}: Failed to create billing record - " . $bill_stmt->error;
-                                    $bill_stmt->close();
+
+                                    if ($paid_amt >= $final_total) {
+                                        $conn->query("UPDATE billing_list SET status = 1 WHERE id = " . intval($billing_id));
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        $errors[] = "Meter Code {$meter_code}: " . $stmt->error;
-                        $skip_count++;
-                    }
-                    $stmt->close();
                 }
 
                 $conn->commit();
