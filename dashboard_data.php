@@ -50,7 +50,8 @@ class DashboardData {
     }
     
     public function getPendingPayments() {
-        $result = $this->conn->query("SELECT COUNT(*) AS total FROM billing_list WHERE status = 0");
+        // Keep this aligned with payments.php "pending" logic (unverified payment records).
+        $result = $this->conn->query("SELECT COUNT(*) AS total FROM payment_list WHERE status = 0");
         if ($result) {
             $row = $result->fetch_assoc();
             return $row['total'];

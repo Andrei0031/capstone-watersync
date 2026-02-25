@@ -648,10 +648,6 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
 <div class="main-content">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Billing Dashboard</h2>
-        <div>
-            <button class="btn btn-primary me-2" onclick="window.location.href='billing_list.php?action=new'"><i class="fas fa-plus me-2"></i>New Bill</button>
-            <button class="btn btn-outline-primary" onclick="exportReport()"><i class="fas fa-download me-2"></i>Export Report</button>
-        </div>
     </div>
 
     <!-- Stats Row -->
