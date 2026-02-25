@@ -15,21 +15,15 @@ include 'comprehensive_fee_manager.php';
 include 'timezone_helper.php';
 watersync_force_timezone($conn);
 
-// Format datetime to Philippines time (Asia/Manila), same style as meter reading tab
+// Format datetime using PHP's current timezone (already forced to Asia/Manila)
 if (!function_exists('customerFormatDT')) {
     function customerFormatDT($dt) {
         if (empty($dt)) return '';
-        try {
-            $utcTz = new DateTimeZone('UTC');
-            $phTz  = new DateTimeZone('Asia/Manila');
-            $clean = substr((string)$dt, 0, 19);
-            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
-            if (!$d) $d = new DateTime($clean, $utcTz);
-            $d->setTimezone($phTz);
-            return $d->format('M d, Y g:i A');
-        } catch (Exception $e) {
-            return date('M d, Y g:i A', strtotime($dt));
+        $ts = strtotime((string)$dt);
+        if ($ts === false) {
+            return is_string($dt) ? $dt : '';
         }
+        return date('M d, Y g:i A', $ts);
     }
 }
 
