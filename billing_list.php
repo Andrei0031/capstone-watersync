@@ -1350,7 +1350,7 @@ if ($params) {
     <div class="card card-soft">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover" id="billingTable">
                     <thead>
                         <tr>
                             <th style="width: 40px;">
@@ -2583,9 +2583,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Bulk Delete Functionality
+    // Bulk Delete Functionality - scope to main billing table only
+    const billingTable = document.getElementById('billingTable');
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    const billCheckboxes = document.querySelectorAll('.bulk-delete-checkbox');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
@@ -2594,8 +2594,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedBillsCount = document.getElementById('selectedBillsCount');
     const selectedCount = document.getElementById('selectedCount');
 
+    function getBillCheckboxes() {
+        if (!billingTable) return [];
+        return Array.from(billingTable.querySelectorAll('.bulk-delete-checkbox'));
+    }
+
     function updateBulkDeleteButtons() {
-        const selected = document.querySelectorAll('.bulk-delete-checkbox:checked');
+        const billCheckboxes = getBillCheckboxes();
+        const selected = billingTable ? billingTable.querySelectorAll('.bulk-delete-checkbox:checked') : [];
         const count = selected.length;
         
         // Bulk delete functionality removed - hide controls
@@ -2623,21 +2629,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Select All Checkbox
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
+            const billCheckboxes = getBillCheckboxes();
+            const checked = this.checked;
             billCheckboxes.forEach(function(checkbox) {
-                checkbox.checked = this.checked;
-            }, this);
+                checkbox.checked = checked;
+            });
             updateBulkDeleteButtons();
         });
     }
 
-    // Individual checkboxes
-    billCheckboxes.forEach(function(checkbox) {
-        checkbox.addEventListener('change', updateBulkDeleteButtons);
-    });
+    // Individual checkboxes - use event delegation so all current and future checkboxes work
+    if (billingTable) {
+        billingTable.addEventListener('change', function(e) {
+            if (e.target && e.target.classList && e.target.classList.contains('bulk-delete-checkbox')) {
+                updateBulkDeleteButtons();
+            }
+        });
+    }
 
     // Select All Button
     if (selectAllBtn) {
         selectAllBtn.addEventListener('click', function() {
+            const billCheckboxes = getBillCheckboxes();
             billCheckboxes.forEach(function(checkbox) {
                 checkbox.checked = true;
             });
@@ -2649,6 +2662,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Deselect All Button
     if (deselectAllBtn) {
         deselectAllBtn.addEventListener('click', function() {
+            const billCheckboxes = getBillCheckboxes();
             billCheckboxes.forEach(function(checkbox) {
                 checkbox.checked = false;
             });
