@@ -1352,7 +1352,7 @@ if ($params) {
                     <thead>
                         <tr>
                             <th style="width: 40px;">
-                                <input type="checkbox" id="selectAllCheckbox" title="Click to select or deselect all bills">
+                                <input type="checkbox" id="selectAllCheckbox" title="Click to select or deselect all bills" onchange="toggleBillingTableSelection(this)">
                             </th>
                             <th>Customer</th>
                             <th>Meter Reading</th>
@@ -1396,7 +1396,7 @@ if ($params) {
                             ?>
                             <tr>
                                 <td>
-                                    <input type="checkbox" class="bill-checkbox bulk-delete-checkbox" value="<?php echo $row['id']; ?>" data-customer="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>" data-status="<?php echo $status_text; ?>">
+                                    <input type="checkbox" class="bill-checkbox bulk-delete-checkbox" value="<?php echo $row['id']; ?>" data-customer="<?php echo htmlspecialchars($row['firstname'] . ' ' . $row['lastname']); ?>" data-status="<?php echo $status_text; ?>" onchange="updateBillingTableSelectionSummary()">
                                 </td>
                                 <td>
                                     <div>
@@ -1522,7 +1522,7 @@ if ($params) {
                         <?php endwhile; 
                         else: ?>
                             <tr>
-                                <td colspan="8" class="text-center text-muted">No billing records found</td>
+                                <td colspan="9" class="text-center text-muted">No billing records found</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
@@ -1530,6 +1530,51 @@ if ($params) {
             </div>
         </div>
     </div>
+
+    <script>
+    // Fallback select-all handlers for billing table (independent from larger page scripts)
+    // Keeps row highlighting/count/delete button state in sync even if other JS fails.
+    window.updateBillingTableSelectionSummary = function () {
+        var table = document.getElementById('billingTable');
+        if (!table) return;
+        var rowCbs = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+        var checkedCount = 0;
+        for (var i = 0; i < rowCbs.length; i++) {
+            if (rowCbs[i].checked) checkedCount++;
+            var row = rowCbs[i].closest('tr');
+            if (row) {
+                if (rowCbs[i].checked) row.classList.add('bill-row-selected');
+                else row.classList.remove('bill-row-selected');
+            }
+        }
+
+        var selectAll = document.getElementById('selectAllCheckbox');
+        if (selectAll) {
+            selectAll.checked = rowCbs.length > 0 && checkedCount === rowCbs.length;
+        }
+
+        var selectedBillsCount = document.getElementById('selectedBillsCount');
+        if (selectedBillsCount) {
+            selectedBillsCount.textContent = checkedCount + ' bill(s) selected';
+        }
+
+        var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = checkedCount === 0;
+        }
+    };
+
+    window.toggleBillingTableSelection = function (sourceCheckbox) {
+        var table = document.getElementById('billingTable');
+        if (!table) return;
+        var rowCbs = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+        var checked = !!(sourceCheckbox && sourceCheckbox.checked);
+        for (var i = 0; i < rowCbs.length; i++) {
+            rowCbs[i].checked = checked;
+        }
+        window.updateBillingTableSelectionSummary();
+    };
+    </script>
 
     <!-- Add this after the existing billing table card -->
     <div class="card card-soft mt-4">
