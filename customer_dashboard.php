@@ -15,6 +15,24 @@ include 'comprehensive_fee_manager.php';
 include 'timezone_helper.php';
 watersync_force_timezone($conn);
 
+// Format datetime to Philippines time (Asia/Manila), same style as meter reading tab
+if (!function_exists('customerFormatDT')) {
+    function customerFormatDT($dt) {
+        if (empty($dt)) return '';
+        try {
+            $utcTz = new DateTimeZone('UTC');
+            $phTz  = new DateTimeZone('Asia/Manila');
+            $clean = substr((string)$dt, 0, 19);
+            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+            if (!$d) $d = new DateTime($clean, $utcTz);
+            $d->setTimezone($phTz);
+            return $d->format('M d, Y g:i A');
+        } catch (Exception $e) {
+            return date('M d, Y g:i A', strtotime($dt));
+        }
+    }
+}
+
 // Get customer information
 $stmt = $conn->prepare("SELECT cl.*, ca.email 
                        FROM client_list cl 
@@ -1683,23 +1701,27 @@ $disconnection_notices = $stmt->get_result();
                                 } else {
                                     echo '<div style="max-height: 600px; overflow-y: auto;">';
                                     foreach ($reports as $report) {
-                                        $is_resolved = $report['status'] == 1;
+                                        $is_resolved = (int)$report['status'] === 1;
                                         $status_color = $is_resolved ? '#4caf50' : '#ff9800';
                                         $status_text = $is_resolved ? 'Resolved' : 'Pending';
                                         $status_icon = $is_resolved ? 'fa-check-circle' : 'fa-clock';
-                                        $created_date = date('M d, Y g:i A', strtotime($report['created_at']));
-                                        $resolved_date = $report['resolved_at'] ? date('M d, Y g:i A', strtotime($report['resolved_at'])) : null;
+                                        $created_date = customerFormatDT($report['created_at']);
+                                        $resolved_date = !empty($report['resolved_at']) ? customerFormatDT($report['resolved_at']) : null;
+                                        $has_admin_reply = !empty(trim((string)($report['resolution_notes'] ?? '')));
                                         echo '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: ' . ($is_resolved ? '#f1f8f4' : '#fff8e1') . ';">';
-                                        echo '<div style="display: flex; align-items: center; margin-bottom: 10px;"><span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;"><i class="fas ' . $status_icon . ' me-1"></i>' . $status_text . '</span><span style="color: #666; font-size: 0.9rem;"><i class="fas fa-calendar me-1"></i>' . $created_date . '</span></div>';
+                                        echo '<div style="display: flex; align-items: center; margin-bottom: 10px;"><span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;"><i class="fas ' . $status_icon . ' me-1"></i>' . $status_text . '</span><span style="color: #666; font-size: 0.9rem;"><i class="fas fa-calendar me-1"></i>Submitted: ' . $created_date . '</span></div>';
                                         echo '<h6 style="margin: 0 0 8px 0; color: #333; font-weight: 600;"><i class="fas fa-map-marker-alt me-2" style="color: #2196f3;"></i>' . htmlspecialchars($report['location']) . '</h6>';
                                         echo '<p style="margin: 0; color: #555; line-height: 1.6;">' . htmlspecialchars($report['description']) . '</p>';
-                                        if ($is_resolved && $resolved_date) {
-                                            echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;"><div style="color: #4caf50; font-size: 0.9rem;"><i class="fas fa-check-circle me-2"></i><strong>Resolved on:</strong> ' . $resolved_date . '</div>';
-                                            if (!empty($report['resolution_notes'])) echo '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #4caf50;"><strong style="font-size: 0.9rem;">Resolution Notes:</strong><p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">' . htmlspecialchars($report['resolution_notes']) . '</p></div>';
-                                            echo '</div>';
+                                        echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
+                                        if ($is_resolved) {
+                                            echo '<div style="color: #4caf50; font-size: 0.9rem;"><i class="fas fa-check-circle me-2"></i><strong>Status:</strong> Resolved' . ($resolved_date ? ' on ' . $resolved_date : '') . '</div>';
                                         } else {
-                                            echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;"><div style="color: #ff9800; font-size: 0.9rem;"><i class="fas fa-hourglass-half me-2"></i><strong>Status:</strong> Under review</div></div>';
+                                            echo '<div style="color: #ff9800; font-size: 0.9rem;"><i class="fas fa-hourglass-half me-2"></i><strong>Status:</strong> Under review</div>';
                                         }
+                                        if ($has_admin_reply) {
+                                            echo '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #2196f3;"><strong style="font-size: 0.9rem;">Admin reply:</strong><p style="margin: 5px 0 0 0; color: #555; font-size: 0.9rem;">' . nl2br(htmlspecialchars($report['resolution_notes'])) . '</p></div>';
+                                        }
+                                        echo '</div>';
                                         echo '</div>';
                                     }
                                     echo '</div>';
