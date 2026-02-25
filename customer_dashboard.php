@@ -1334,6 +1334,71 @@ $disconnection_notices = $stmt->get_result();
                             </div>
                         </div>
 
+                        <!-- Disconnection Notices -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div style="background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; margin: 20px;">
+                                    <div style="background: linear-gradient(135deg, #ff5722, #d84315); padding: 20px; border-bottom: 1px solid #e0e0e0;">
+                                        <h5 style="margin: 0; color: white; font-weight: 600;">
+                                            <i class="fas fa-exclamation-triangle me-2" style="color: white;"></i>Disconnection Notices
+                                        </h5>
+                                    </div>
+                                    <div style="padding: 25px;">
+                                        <?php if ($disconnection_notices->num_rows > 0): ?>
+                                            <div class="list-group list-group-flush">
+                                                <?php while ($notice = $disconnection_notices->fetch_assoc()): 
+                                                    $notice_class = '';
+                                                    switch($notice['notice_type']) {
+                                                        case 'first_warning':
+                                                            $notice_class = 'warning';
+                                                            break;
+                                                        case 'final_notice':
+                                                            $notice_class = 'danger';
+                                                            break;
+                                                        case 'disconnection_order':
+                                                            $notice_class = 'dark';
+                                                            break;
+                                                        default:
+                                                            $notice_class = 'info';
+                                                    }
+                                                ?>
+                                                <div class="list-group-item">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div>
+                                                            <h6 class="mb-1"><?php echo htmlspecialchars($notice['title']); ?></h6>
+                                                            <p class="mb-1 text-muted small">
+                                                                <?php echo date('M j, Y', strtotime($notice['created_at'])); ?>
+                                                                <?php if ($notice['due_date']): ?>
+                                                                    - Due: <?php echo date('M j, Y', strtotime($notice['due_date'])); ?>
+                                                                <?php endif; ?>
+                                                            </p>
+                                                        </div>
+                                                        <div class="text-end">
+                                                            <span class="badge bg-<?php echo $notice_class; ?> small">
+                                                                <?php echo ucfirst(str_replace('_', ' ', $notice['notice_type'])); ?>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <?php endwhile; ?>
+                                            </div>
+                                            <div class="text-center mt-3">
+                                                <a href="customer_disconnection_notices.php" class="btn btn-outline-warning btn-sm">
+                                                    <i class="fas fa-bell me-1"></i>View All Notices
+                                                </a>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="text-center py-3">
+                                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                                <p class="text-muted">No disconnection notices</p>
+                                                <small class="text-success">Your account is in good standing!</small>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
                 <!-- Billing Information Tab -->
