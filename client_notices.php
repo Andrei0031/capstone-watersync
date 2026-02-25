@@ -7,6 +7,30 @@ if (!isset($_SESSION['client_id'])) {
 
 include 'db.php';
 
+// Shared formatter: DB datetime in UTC -> Philippine time (Asia/Manila)
+if (!function_exists('clientNoticeFormatDT')) {
+    function clientNoticeFormatDT($dt, bool $withTime = true): string
+    {
+        if (empty($dt)) return '';
+        try {
+            $utcTz = new DateTimeZone('UTC');
+            $phTz  = new DateTimeZone('Asia/Manila');
+            $clean = substr((string)$dt, 0, 19);
+
+            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+            if (!$d) {
+                $d = new DateTime($clean, $utcTz);
+            }
+            $d->setTimezone($phTz);
+            return $withTime
+                ? $d->format('M d, Y g:i A')
+                : $d->format('M d, Y');
+        } catch (Exception $e) {
+            return is_string($dt) ? $dt : '';
+        }
+    }
+}
+
 // Mark notices as "viewed" so the navbar badge count goes to zero when user visits this page
 $_SESSION['notices_last_viewed_at'] = date('Y-m-d H:i:s');
 
@@ -181,15 +205,15 @@ $recent_notices = array_slice($all_notices, 0, 12);
                                         <p class="mb-1"><strong><i class="fas fa-map-marker-alt me-2"></i>Affected Areas:</strong> <?php echo htmlspecialchars((string)$affected_areas); ?></p>
                                         <p class="mb-2"><strong><i class="fas fa-clock me-2"></i>Duration:</strong>
                                             <?php
-                                            echo date('M d, Y h:i A', strtotime($notice['start_date']));
+                                            echo clientNoticeFormatDT($notice['start_date'] ?? null, true);
                                             if (!empty($notice['end_date'])) {
-                                                echo ' to ' . date('M d, Y h:i A', strtotime($notice['end_date']));
+                                                echo ' to ' . clientNoticeFormatDT($notice['end_date'], true);
                                             }
                                             ?>
                                         </p>
                                         <small class="text-muted">
                                             <i class="fas fa-user me-1"></i>Posted by <?php echo htmlspecialchars($notice['admin_name'] ?? 'admin'); ?>
-                                            on <?php echo date('M d, Y', strtotime($notice['created_at'] ?? $notice['start_date'])); ?>
+                                            on <?php echo clientNoticeFormatDT($notice['created_at'] ?? $notice['start_date'] ?? '', false); ?>
                                         </small>
                                     </div>
                                 </div>

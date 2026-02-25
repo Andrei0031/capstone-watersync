@@ -4,6 +4,30 @@ validateSession();
 
 include 'db.php';
 
+// Format disconnection notice datetimes from UTC -> Philippine time (Asia/Manila)
+if (!function_exists('customerNoticeFormatDT')) {
+    function customerNoticeFormatDT($dt, bool $withTime = true): string
+    {
+        if (empty($dt)) return '';
+        try {
+            $utcTz = new DateTimeZone('UTC');
+            $phTz  = new DateTimeZone('Asia/Manila');
+            $clean = substr((string)$dt, 0, 19);
+
+            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+            if (!$d) {
+                $d = new DateTime($clean, $utcTz);
+            }
+            $d->setTimezone($phTz);
+            return $withTime
+                ? $d->format('M j, Y g:i A')
+                : $d->format('M j, Y');
+        } catch (Exception $e) {
+            return is_string($dt) ? $dt : '';
+        }
+    }
+}
+
 // Get customer information
 $stmt = $conn->prepare("SELECT cl.*, ca.email 
                        FROM client_list cl 
@@ -351,7 +375,7 @@ $stats = $stmt->get_result()->fetch_assoc();
                                 <div class="text-end">
                                     <div class="h5 mb-1 text-danger">₱<?php echo number_format($notice['amount_due'], 2); ?></div>
                                     <small class="text-muted">
-                                        <?php echo date('M j, Y', strtotime($notice['created_at'])); ?>
+                                        <?php echo customerNoticeFormatDT($notice['created_at'] ?? '', false); ?>
                                     </small>
                                 </div>
                             </div>
@@ -375,11 +399,11 @@ $stats = $stmt->get_result()->fetch_assoc();
                                 <div class="col-md-6">
                                     <h6>Notice Details</h6>
                                     <ul class="list-unstyled">
-                                        <li><strong>Original Due Date:</strong> <?php echo date('M j, Y', strtotime($notice['due_date'])); ?></li>
+                                        <li><strong>Original Due Date:</strong> <?php echo customerNoticeFormatDT($notice['due_date'] ?? '', false); ?></li>
                                         <li><strong>Days Overdue:</strong> <?php echo $notice['overdue_days']; ?> days</li>
                                         <li><strong>Grace Period:</strong> <?php echo $notice['grace_period_days']; ?> days</li>
                                         <?php if ($notice['sent_at']): ?>
-                                        <li><strong>Sent:</strong> <?php echo date('M j, Y g:i A', strtotime($notice['sent_at'])); ?></li>
+                                        <li><strong>Sent:</strong> <?php echo customerNoticeFormatDT($notice['sent_at'], true); ?></li>
                                         <?php endif; ?>
                                     </ul>
                                 </div>

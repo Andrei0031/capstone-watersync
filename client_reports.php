@@ -10,14 +10,25 @@ include 'db.php';
 $success_message = '';
 $error_message = '';
 
-// Format datetime using PHP's current timezone (forced to Asia/Manila in db.php)
+// Format datetime assuming DB stores UTC, convert to Philippine time (Asia/Manila)
 if (!function_exists('adminFormatDT')) {
     function adminFormatDT($dt): string
     {
         if (empty($dt)) return '';
-        $ts = strtotime((string)$dt);
-        if ($ts === false) return is_string($dt) ? $dt : '';
-        return date('M d, Y g:i A', $ts);
+        try {
+            $utcTz = new DateTimeZone('UTC');
+            $phTz  = new DateTimeZone('Asia/Manila');
+            $clean = substr((string)$dt, 0, 19);
+
+            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+            if (!$d) {
+                $d = new DateTime($clean, $utcTz);
+            }
+            $d->setTimezone($phTz);
+            return $d->format('M d, Y g:i A');
+        } catch (Exception $e) {
+            return is_string($dt) ? $dt : '';
+        }
     }
 }
 

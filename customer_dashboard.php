@@ -15,15 +15,24 @@ include 'comprehensive_fee_manager.php';
 include 'timezone_helper.php';
 watersync_force_timezone($conn);
 
-// Format datetime using PHP's current timezone (already forced to Asia/Manila)
+// Format datetime assuming DB stores UTC, convert to Philippine time (Asia/Manila)
 if (!function_exists('customerFormatDT')) {
     function customerFormatDT($dt) {
         if (empty($dt)) return '';
-        $ts = strtotime((string)$dt);
-        if ($ts === false) {
+        try {
+            $utcTz = new DateTimeZone('UTC');
+            $phTz  = new DateTimeZone('Asia/Manila');
+            $clean = substr((string)$dt, 0, 19); // trim microseconds if any
+
+            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+            if (!$d) {
+                $d = new DateTime($clean, $utcTz);
+            }
+            $d->setTimezone($phTz);
+            return $d->format('M d, Y g:i A');
+        } catch (Exception $e) {
             return is_string($dt) ? $dt : '';
         }
-        return date('M d, Y g:i A', $ts);
     }
 }
 
