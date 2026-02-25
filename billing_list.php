@@ -1252,18 +1252,18 @@ if ($params) {
         </div>
     </div>
     
-    <!-- Bulk Action Controls (shown when any bill is selected) -->
-    <div class="card card-soft mb-3" id="bulkActionControls" style="display: none;">
+    <!-- Bulk Action Controls: Select All always visible; Delete when any selected -->
+    <div class="card card-soft mb-3" id="bulkActionControls">
         <div class="card-body py-2">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
-                    <button id="selectAllBtn" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-check-square me-1"></i>Select All
+                    <button id="selectAllBtn" type="button" class="btn btn-sm btn-outline-primary" title="Select all bills in the list (current filter)">
+                        <i class="fas fa-check-double me-1"></i>Select All Bills
                     </button>
                     <button id="deselectAllBtn" class="btn btn-sm btn-outline-secondary" style="display: none;">
                         <i class="fas fa-square me-1"></i>Deselect All
                     </button>
-                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger">
+                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" style="display: none;">
                         <i class="fas fa-trash-alt me-1"></i>Delete Selected
                     </button>
                 </div>
@@ -2703,20 +2703,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedCount = document.getElementById('selectedCount');
 
     function getBillingTable() {
-        return billingTable || (selectAllCheckbox ? selectAllCheckbox.closest('table') : null);
+        return document.getElementById('billingTable') || billingTable || (selectAllCheckbox ? selectAllCheckbox.closest('table') : null);
     }
 
     function getBillCheckboxes() {
         const table = getBillingTable();
         if (!table) return [];
-        return Array.from(table.querySelectorAll('tbody .bulk-delete-checkbox'));
+        return Array.from(table.querySelectorAll('tbody input.bulk-delete-checkbox'));
+    }
+
+    function selectAllBillsInTable() {
+        const table = document.getElementById('billingTable');
+        if (!table) return;
+        const rowCheckboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+        rowCheckboxes.forEach(function(cb) {
+            cb.checked = true;
+        });
+        const headerCb = document.getElementById('selectAllCheckbox');
+        if (headerCb) headerCb.checked = true;
+        updateBulkDeleteButtons();
+    }
+
+    function deselectAllBillsInTable() {
+        const table = document.getElementById('billingTable');
+        if (!table) return;
+        const rowCheckboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+        rowCheckboxes.forEach(function(cb) {
+            cb.checked = false;
+        });
+        const headerCb = document.getElementById('selectAllCheckbox');
+        if (headerCb) headerCb.checked = false;
+        updateBulkDeleteButtons();
     }
 
     function updateRowHighlights() {
         const table = getBillingTable();
         if (!table) return;
         table.querySelectorAll('tbody tr').forEach(function(row) {
-            const cb = row.querySelector('.bulk-delete-checkbox');
+            const cb = row.querySelector('input.bulk-delete-checkbox');
             if (cb && cb.checked) {
                 row.classList.add('bill-row-selected');
             } else {
@@ -2728,12 +2752,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateBulkDeleteButtons() {
         const table = getBillingTable();
         const billCheckboxes = getBillCheckboxes();
-        const selected = table ? table.querySelectorAll('.bulk-delete-checkbox:checked') : [];
+        const selected = table ? table.querySelectorAll('tbody input.bulk-delete-checkbox:checked') : [];
         const count = selected.length;
         
-        if (bulkActionControls) {
-            bulkActionControls.style.display = count > 0 ? 'block' : 'none';
-        }
         if (bulkDeleteBtn) bulkDeleteBtn.style.display = count > 0 ? 'inline-block' : 'none';
         if (bulkDeleteBtn2) bulkDeleteBtn2.style.display = count > 0 ? 'inline-block' : 'none';
         if (selectedBillsCount) selectedBillsCount.textContent = count + ' bill(s) selected';
@@ -2754,23 +2775,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function syncAllRowCheckboxesFromHeader() {
-        const table = selectAllCheckbox ? selectAllCheckbox.closest('table') : null;
-        if (!table || !selectAllCheckbox) return;
-        const checkboxes = table.querySelectorAll('tbody .bulk-delete-checkbox');
-        const checked = selectAllCheckbox.checked;
+        const headerCb = document.getElementById('selectAllCheckbox');
+        const table = document.getElementById('billingTable');
+        if (!table || !headerCb) return;
+        const checkboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+        const checked = headerCb.checked;
         checkboxes.forEach(function(cb) {
             cb.checked = checked;
         });
         updateBulkDeleteButtons();
     }
 
-    // Select All Checkbox - sync row checkboxes and highlights when header is toggled
+    // Header checkbox in table: sync all row checkboxes and highlights
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
             syncAllRowCheckboxesFromHeader();
         });
         selectAllCheckbox.addEventListener('click', function() {
-            setTimeout(syncAllRowCheckboxesFromHeader, 0);
+            var self = this;
+            setTimeout(function() {
+                var table = document.getElementById('billingTable');
+                if (!table) return;
+                var checkboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
+                checkboxes.forEach(function(cb) { cb.checked = self.checked; });
+                updateBulkDeleteButtons();
+            }, 0);
         });
     }
 
@@ -2783,27 +2812,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Select All Button
+    // Select All Button - select every bill in the table (all visible rows, e.g. current filter/month)
     if (selectAllBtn) {
         selectAllBtn.addEventListener('click', function() {
-            const billCheckboxes = getBillCheckboxes();
-            billCheckboxes.forEach(function(checkbox) {
-                checkbox.checked = true;
-            });
-            if (selectAllCheckbox) selectAllCheckbox.checked = true;
-            updateBulkDeleteButtons();
+            selectAllBillsInTable();
         });
     }
 
     // Deselect All Button
     if (deselectAllBtn) {
         deselectAllBtn.addEventListener('click', function() {
-            const billCheckboxes = getBillCheckboxes();
-            billCheckboxes.forEach(function(checkbox) {
-                checkbox.checked = false;
-            });
-            if (selectAllCheckbox) selectAllCheckbox.checked = false;
-            updateBulkDeleteButtons();
+            deselectAllBillsInTable();
         });
     }
 
@@ -2811,7 +2830,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleBulkDeleteMainList() {
         const table = getBillingTable();
         if (!table) return;
-        const selected = table.querySelectorAll('.bulk-delete-checkbox:checked');
+        const selected = table.querySelectorAll('tbody input.bulk-delete-checkbox:checked');
         if (selected.length === 0) {
             showWarning('Please select at least one bill to delete.');
             return;
