@@ -335,6 +335,18 @@ window.showConfirm = showConfirm;
 function convertInlineAlertsToToasts() {
     const alerts = document.querySelectorAll('.alert:not(.ws-notification)');
     alerts.forEach((alertEl) => {
+        // Skip alerts hidden in modals/inactive sections; convert only visible page feedback.
+        const style = window.getComputedStyle(alertEl);
+        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && alertEl.offsetParent !== null;
+        if (!isVisible) return;
+
+        // Skip alerts inside non-open Bootstrap modals.
+        const parentModal = alertEl.closest('.modal');
+        if (parentModal && !parentModal.classList.contains('show')) return;
+
+        // Optional opt-out for inline alerts that should stay in-page.
+        if (alertEl.dataset.wsToast === 'off') return;
+
         const msg = (alertEl.textContent || '').replace(/\s+/g, ' ').trim();
         if (!msg) return;
 
