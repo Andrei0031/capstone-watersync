@@ -1382,7 +1382,7 @@ if ($params) {
         <div class="card-body py-2">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <?php if ($delete_password_configured): ?>
-                <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled>
+                <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled onclick="return submitBillingBulkDelete();">
                     <i class="fas fa-trash-alt me-1"></i>Delete Selected
                 </button>
                 <?php endif; ?>
@@ -1620,6 +1620,47 @@ if ($params) {
             rowCbs[i].checked = checked;
         }
         window.updateBillingTableSelectionSummary();
+    };
+
+    // Direct fallback submit for bulk delete (works even if later JS fails)
+    window.submitBillingBulkDelete = function () {
+        if (window.__bulkDeleteSubmitting) return false;
+        var table = document.getElementById('billingTable');
+        if (!table) return false;
+        var selected = table.querySelectorAll('tbody input.bulk-delete-checkbox:checked');
+        if (!selected.length) {
+            if (typeof showWarning === 'function') showWarning('Please select at least one bill to delete.');
+            else alert('Please select at least one bill to delete.');
+            return false;
+        }
+        var msg = 'Delete ' + selected.length + ' selected bill(s)? This will permanently remove the billing records and cannot be undone.';
+        if (!confirm(msg)) return false;
+
+        window.__bulkDeleteSubmitting = true;
+        var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = true;
+            bulkDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+        }
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.pathname || 'billing_list.php';
+        for (var i = 0; i < selected.length; i++) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_bills[]';
+            input.value = selected[i].value;
+            form.appendChild(input);
+        }
+        var submitInput = document.createElement('input');
+        submitInput.type = 'hidden';
+        submitInput.name = 'bulk_delete_bills';
+        submitInput.value = '1';
+        form.appendChild(submitInput);
+        document.body.appendChild(form);
+        form.submit();
+        return false;
     };
     </script>
 
@@ -2866,6 +2907,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Bulk Delete Selected (main billing table)
     function handleBulkDeleteMainList() {
+        if (typeof window.submitBillingBulkDelete === 'function') {
+            return window.submitBillingBulkDelete();
+        }
         if (bulkDeleteBtn && bulkDeleteBtn.disabled) return;
         const table = getBillingTable();
         if (!table) return;
