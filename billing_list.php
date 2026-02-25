@@ -1,4 +1,5 @@
 <?php
+ob_start();
 session_start();
 if (!isset($_SESSION['admin_id'])) {
     header("Location: adminlogin.php");
@@ -242,7 +243,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $showNotificationModal = true;
     } elseif (isset($_POST['bulk_delete_bills'])) {
-        // Handle bulk delete of bills
+        // Handle bulk delete of bills - clear any buffered output so redirect works
+        if (ob_get_level()) ob_end_clean();
         $selected_ids = $_POST['selected_bills'] ?? [];
         
         if (empty($selected_ids)) {
@@ -2587,7 +2589,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!confirm(msg)) return;
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = 'billing_list.php';
+                form.action = window.location.pathname || 'billing_list.php';
                 billIds.forEach(id => {
                     const input = document.createElement('input');
                     input.type = 'hidden';
@@ -2601,6 +2603,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitInput.value = '1';
                 form.appendChild(submitInput);
                 document.body.appendChild(form);
+                deleteBtn.disabled = true;
+                deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
                 form.submit();
             });
         }
