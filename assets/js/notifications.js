@@ -709,11 +709,27 @@ function initAdminNotificationCenter() {
                     const label = r.source === 'client_reports'
                         ? (r.report_type || 'Client report')
                         : (r.location || 'No location');
+                    const nowTs = Number(data.server_time_ts || 0);
+                    const createdTs = Number(r.created_at_ts || 0);
+                    let timeText = r.report_date || '';
+                    if (nowTs && createdTs) {
+                        let diff = nowTs - createdTs;
+                        if (diff < 0) diff = 0;
+                        if (diff < 60) {
+                            timeText = 'Just now';
+                        } else if (diff < 3600) {
+                            const mins = Math.floor(diff / 60);
+                            timeText = `${mins} min ago`;
+                        } else if (diff < 86400) {
+                            const hrs = Math.floor(diff / 3600);
+                            timeText = `${hrs} hr${hrs === 1 ? '' : 's'} ago`;
+                        }
+                    }
                     return {
                         uid: String(r.uid || r.id),
                         title: 'New Client Report',
                         description: `${customer} - ${label}`,
-                        timeText: r.report_date || '',
+                        timeText,
                         link: 'client_reports.php'
                     };
                 })

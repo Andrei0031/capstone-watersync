@@ -19,6 +19,34 @@ $limit = max(1, min($limit, 20));
 $reports = [];
 $pendingTotal = 0;
 
+function wsUtcToEpoch($dt): int {
+    if (empty($dt)) return 0;
+    try {
+        $utcTz = new DateTimeZone('UTC');
+        $clean = substr((string)$dt, 0, 19);
+        $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+        if (!$d) $d = new DateTime($clean, $utcTz);
+        return (int)$d->getTimestamp();
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+function wsUtcToPhText($dt): string {
+    if (empty($dt)) return '';
+    try {
+        $utcTz = new DateTimeZone('UTC');
+        $phTz  = new DateTimeZone('Asia/Manila');
+        $clean = substr((string)$dt, 0, 19);
+        $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
+        if (!$d) $d = new DateTime($clean, $utcTz);
+        $d->setTimezone($phTz);
+        return $d->format('M d, Y g:i A');
+    } catch (Exception $e) {
+        return '';
+    }
+}
+
 function wsTableExists($conn, $tableName) {
     $safe = $conn->real_escape_string($tableName);
     $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
@@ -51,7 +79,8 @@ if ($hasOutageReports) {
                 'report_type' => 'Water Outage',
                 'description' => $row['description'] ?? '',
                 'created_at' => $row['created_at'] ?? null,
-                'report_date' => !empty($row['created_at']) ? date('M d, Y h:i A', strtotime($row['created_at'])) : '',
+                'created_at_ts' => wsUtcToEpoch($row['created_at'] ?? null),
+                'report_date' => wsUtcToPhText($row['created_at'] ?? null),
                 'status' => intval($row['status'] ?? 0)
             ];
         }
@@ -86,7 +115,8 @@ if ($hasClientReports) {
                 'report_type' => $row['report_type'] ?? 'Client Report',
                 'description' => $row['description'] ?? '',
                 'created_at' => $row['created_at'] ?? null,
-                'report_date' => !empty($row['created_at']) ? date('M d, Y h:i A', strtotime($row['created_at'])) : '',
+                'created_at_ts' => wsUtcToEpoch($row['created_at'] ?? null),
+                'report_date' => wsUtcToPhText($row['created_at'] ?? null),
                 'status' => intval($row['status'] ?? 0)
             ];
         }
@@ -112,6 +142,7 @@ echo json_encode([
     'pending_total' => $pendingTotal,
     'reports' => $reports,
     'server_time' => date('Y-m-d H:i:s'),
+    'server_time_ts' => time(),
     'sources' => [
         'outage_reports' => $hasOutageReports,
         'client_reports' => $hasClientReports
