@@ -483,12 +483,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $customer_info = $customer_data['info'];
                     $billing_records = $customer_data['billing_records'];
                     
-                    // Validate contact number format
-                    if (!preg_match('/^09[0-9]{9}$/', $customer_info['contact'])) {
+                    // Normalize contact from CSV:
+                    // - allow 9XXXXXXXXX (10 digits) and auto-prefix to 09XXXXXXXXX
+                    // - keep 09XXXXXXXXX as-is
+                    $normalized_contact = preg_replace('/\D+/', '', $customer_info['contact']);
+                    if (preg_match('/^9[0-9]{9}$/', $normalized_contact)) {
+                        $normalized_contact = '0' . $normalized_contact;
+                    }
+
+                    // Validate final contact number format
+                    if (!preg_match('/^09[0-9]{9}$/', $normalized_contact)) {
                         $errors[] = "Meter Code {$meter_code}: Invalid contact number format. Must be 11 digits starting with 09.";
                         $skip_count++;
                         continue;
                     }
+                    $customer_info['contact'] = $normalized_contact;
 
                     // Validate meter code (numbers only)
                     if (!preg_match('/^[0-9]+$/', $meter_code)) {
@@ -2074,7 +2083,7 @@ $result = $conn->query($sql);
                   <li>Upload a CSV file with customer data</li>
                   <li><strong>Required columns:</strong> Category, Firstname, Lastname, Contact, Address, Meter Code</li>
                   <li><strong>Optional columns:</strong> Middlename, Reading Date, Previous Reading, Current Reading, Status, Consumption, Amount, Paid, Balance</li>
-                  <li><strong>Contact:</strong> Must be 11 digits starting with 09 (e.g., 09123456789)</li>
+                  <li><strong>Contact:</strong> Accepts <code>09XXXXXXXXX</code> or <code>9XXXXXXXXX</code>. If CSV starts with <code>9</code>, it is auto-saved as <code>09XXXXXXXXX</code>.</li>
                   <li><strong>Address:</strong> Use standard puroks (Purok 1-A, Purok 1-B, Purok 1-C, Purok 2, Purok 3, Purok 4, Purok 5) or custom addresses</li>
                   <li><strong>Meter Readings:</strong> If provided, Previous Reading and Current Reading create billing records. Use Amount for bill total, Paid for payment amount; Balance is informational.</li>
                   <li>Download the template below for the correct column order and format</li>
