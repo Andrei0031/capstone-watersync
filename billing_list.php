@@ -758,7 +758,10 @@ if ($params) {
             background-color: var(--hover-bg);
         }
 
-
+        #billingTable tbody tr.bill-row-selected {
+            background-color: var(--hover-bg);
+            outline: 1px solid rgba(13, 110, 253, 0.5);
+        }
 
         .customer-name {
             color: var(--text-color);
@@ -2594,14 +2597,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedBillsCount = document.getElementById('selectedBillsCount');
     const selectedCount = document.getElementById('selectedCount');
 
+    function getBillingTable() {
+        return billingTable || (selectAllCheckbox ? selectAllCheckbox.closest('table') : null);
+    }
+
     function getBillCheckboxes() {
-        if (!billingTable) return [];
-        return Array.from(billingTable.querySelectorAll('.bulk-delete-checkbox'));
+        const table = getBillingTable();
+        if (!table) return [];
+        return Array.from(table.querySelectorAll('tbody .bulk-delete-checkbox'));
+    }
+
+    function updateRowHighlights() {
+        const table = getBillingTable();
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(function(row) {
+            const cb = row.querySelector('.bulk-delete-checkbox');
+            if (cb && cb.checked) {
+                row.classList.add('bill-row-selected');
+            } else {
+                row.classList.remove('bill-row-selected');
+            }
+        });
     }
 
     function updateBulkDeleteButtons() {
+        const table = getBillingTable();
         const billCheckboxes = getBillCheckboxes();
-        const selected = billingTable ? billingTable.querySelectorAll('.bulk-delete-checkbox:checked') : [];
+        const selected = table ? table.querySelectorAll('.bulk-delete-checkbox:checked') : [];
         const count = selected.length;
         
         // Bulk delete functionality removed - hide controls
@@ -2624,17 +2646,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 deselectAllBtn.style.display = 'none';
             }
         }
+        updateRowHighlights();
     }
 
-    // Select All Checkbox
+    function syncAllRowCheckboxesFromHeader() {
+        const table = selectAllCheckbox ? selectAllCheckbox.closest('table') : null;
+        if (!table || !selectAllCheckbox) return;
+        const checkboxes = table.querySelectorAll('tbody .bulk-delete-checkbox');
+        const checked = selectAllCheckbox.checked;
+        checkboxes.forEach(function(cb) {
+            cb.checked = checked;
+        });
+        updateBulkDeleteButtons();
+    }
+
+    // Select All Checkbox - run after browser toggles so we read correct state
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
-            const billCheckboxes = getBillCheckboxes();
-            const checked = this.checked;
-            billCheckboxes.forEach(function(checkbox) {
-                checkbox.checked = checked;
-            });
-            updateBulkDeleteButtons();
+            syncAllRowCheckboxesFromHeader();
+        });
+        selectAllCheckbox.addEventListener('click', function() {
+            setTimeout(syncAllRowCheckboxesFromHeader, 0);
         });
     }
 
@@ -2670,6 +2702,9 @@ document.addEventListener('DOMContentLoaded', function() {
             updateBulkDeleteButtons();
         });
     }
+
+    // Initial row highlight state
+    updateRowHighlights();
 
     // Bulk Delete Button Handler - REMOVED
     /* function handleBulkDelete() {
