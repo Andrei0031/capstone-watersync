@@ -46,8 +46,8 @@ try {
     )
     SELECT 
         b.*,
-        COALESCE(pt.total_paid, 0) as amount_paid,
-        GREATEST(COALESCE(b.total - COALESCE(pt.total_paid, 0), b.total), 0) as remaining_balance,
+        LEAST(COALESCE(pt.total_paid, 0), COALESCE(b.total, 0)) as amount_paid,
+        GREATEST(COALESCE(b.total - LEAST(COALESCE(pt.total_paid, 0), COALESCE(b.total, 0)), b.total), 0) as remaining_balance,
         pt.last_payment_date,
         CASE 
             WHEN b.status = 1 THEN 'Paid'

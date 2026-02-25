@@ -66,15 +66,76 @@ if (!$today_stats) {
 
 // Process payment verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
-    $payment_id = $_POST['payment_id'];
-    $update_sql = "UPDATE payment_list SET status = 1, verified_date = CURRENT_TIMESTAMP WHERE id = ?";
-    $stmt = $conn->prepare($update_sql);
-    $stmt->bind_param("i", $payment_id);
-    
-    if ($stmt->execute()) {
-        header("Location: payments.php?success=Payment verified successfully");
-    } else {
-        header("Location: payments.php?error=Failed to verify payment");
+    $payment_id = intval($_POST['payment_id']);
+    try {
+        $conn->begin_transaction();
+
+        $payment_check_sql = "SELECT 
+                                pl.id,
+                                pl.billing_id,
+                                pl.amount,
+                                bl.total AS bill_total,
+                                COALESCE((
+                                    SELECT SUM(amount)
+                                    FROM payment_list
+                                    WHERE billing_id = pl.billing_id
+                                      AND status = 1
+                                      AND id != pl.id
+                                ), 0) AS other_verified_paid
+                              FROM payment_list pl
+                              JOIN billing_list bl ON bl.id = pl.billing_id
+                              WHERE pl.id = ?
+                              LIMIT 1";
+        $check_stmt = $conn->prepare($payment_check_sql);
+        $check_stmt->bind_param("i", $payment_id);
+        $check_stmt->execute();
+        $payment_row = $check_stmt->get_result()->fetch_assoc();
+        $check_stmt->close();
+
+        if (!$payment_row) {
+            throw new Exception("Payment record not found.");
+        }
+
+        $bill_total = floatval($payment_row['bill_total'] ?? 0);
+        $other_verified_paid = floatval($payment_row['other_verified_paid'] ?? 0);
+        $current_payment_amount = floatval($payment_row['amount'] ?? 0);
+        $remaining_allowed = max(0, $bill_total - $other_verified_paid);
+
+        if ($remaining_allowed <= 0.0001) {
+            $conn->rollback();
+            header("Location: payments.php?error=" . urlencode("Cannot verify: bill is already fully paid."));
+            exit();
+        }
+
+        $approved_amount = min($current_payment_amount, $remaining_allowed);
+
+        $update_sql = "UPDATE payment_list SET amount = ?, status = 1, verified_date = CURRENT_TIMESTAMP WHERE id = ?";
+        $stmt = $conn->prepare($update_sql);
+        $stmt->bind_param("di", $approved_amount, $payment_id);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to verify payment.");
+        }
+        $stmt->close();
+
+        $new_total_paid = $other_verified_paid + $approved_amount;
+        $new_bill_status = ($new_total_paid >= ($bill_total - 0.0001)) ? 1 : 0;
+        $bill_update_stmt = $conn->prepare("UPDATE billing_list SET status = ? WHERE id = ?");
+        $bill_update_stmt->bind_param("ii", $new_bill_status, $payment_row['billing_id']);
+        if (!$bill_update_stmt->execute()) {
+            throw new Exception("Failed to sync billing status.");
+        }
+        $bill_update_stmt->close();
+
+        $conn->commit();
+
+        if ($approved_amount + 0.0001 < $current_payment_amount) {
+            header("Location: payments.php?success=" . urlencode("Payment verified and capped to remaining bill amount."));
+        } else {
+            header("Location: payments.php?success=" . urlencode("Payment verified successfully"));
+        }
+    } catch (Exception $e) {
+        $conn->rollback();
+        header("Location: payments.php?error=" . urlencode($e->getMessage()));
     }
     exit();
 }
