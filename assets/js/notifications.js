@@ -516,23 +516,17 @@ function initAdminNotificationCenter() {
         document.head.appendChild(style);
     }
 
-    const knownIdsKey = 'ws_admin_reports_seen_ids';
-    const unreadKey = 'ws_admin_notification_center_unread';
+    const readIdsKey = 'ws_admin_notification_center_read_ids';
+    const lastSnapshotKey = 'ws_admin_notification_center_last_snapshot';
 
-    let knownIds = [];
+    let readIds = [];
     try {
-        knownIds = JSON.parse(localStorage.getItem(knownIdsKey) || '[]');
+        readIds = JSON.parse(localStorage.getItem(readIdsKey) || '[]');
     } catch (e) {
-        knownIds = [];
+        readIds = [];
     }
-    const knownSet = new Set(knownIds);
-
+    const readSet = new Set(readIds.map((x) => String(x)));
     let unread = [];
-    try {
-        unread = JSON.parse(localStorage.getItem(unreadKey) || '[]');
-    } catch (e) {
-        unread = [];
-    }
 
     const fab = document.createElement('button');
     fab.className = 'ws-admin-notif-fab';
@@ -556,14 +550,9 @@ function initAdminNotificationCenter() {
     const listEl = panel.querySelector('.ws-admin-notif-list');
     const clearBtn = panel.querySelector('.ws-admin-notif-clear');
 
-    const saveSeenState = () => {
-        const compact = Array.from(knownSet).slice(-200);
-        localStorage.setItem(knownIdsKey, JSON.stringify(compact));
-    };
-
-    const saveUnreadState = () => {
-        unread = unread.slice(0, 80);
-        localStorage.setItem(unreadKey, JSON.stringify(unread));
+    const saveReadState = () => {
+        const compact = Array.from(readSet).slice(-300);
+        localStorage.setItem(readIdsKey, JSON.stringify(compact));
     };
 
     const renderUnread = () => {
@@ -593,8 +582,9 @@ function initAdminNotificationCenter() {
                 <div class="ws-admin-notif-time">${item.timeText || ''}</div>
             `;
             row.addEventListener('click', () => {
+                readSet.add(String(item.uid));
+                saveReadState();
                 unread = unread.filter((x) => x.uid !== item.uid);
-                saveUnreadState();
                 renderUnread();
                 window.location.href = item.link || 'client_reports.php';
             });
@@ -613,8 +603,9 @@ function initAdminNotificationCenter() {
     });
 
     clearBtn.addEventListener('click', () => {
+        unread.forEach((item) => readSet.add(String(item.uid)));
+        saveReadState();
         unread = [];
-        saveUnreadState();
         renderUnread();
     });
 
@@ -632,31 +623,39 @@ function initAdminNotificationCenter() {
             const data = await resp.json();
             if (!data || !data.success || !Array.isArray(data.reports)) return;
 
-            const newReports = data.reports.filter((r) => !knownSet.has(String(r.uid || r.id)));
-            if (newReports.length > 0) {
-                newReports.forEach((r) => {
+            const currentSnapshot = data.reports.map((r) => String(r.uid || r.id));
+            const previousSnapshot = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem(lastSnapshotKey) || '[]');
+                } catch (e) {
+                    return [];
+                }
+            })();
+
+            unread = data.reports
+                .map((r) => {
                     const customer = r.customer_name || 'Unknown customer';
                     const label = r.source === 'client_reports'
                         ? (r.report_type || 'Client report')
                         : (r.location || 'No location');
-
-                    const notif = {
+                    return {
                         uid: String(r.uid || r.id),
                         title: 'New Client Report',
                         description: `${customer} - ${label}`,
                         timeText: r.report_date || '',
                         link: 'client_reports.php'
                     };
-                    // Newest first, avoid duplicates
-                    unread = unread.filter((x) => x.uid !== notif.uid);
-                    unread.unshift(notif);
-                    knownSet.add(String(r.uid || r.id));
-                });
-                saveUnreadState();
-                renderUnread();
+                })
+                .filter((item) => !readSet.has(String(item.uid)))
+                .slice(0, 80);
+
+            const hadNew = currentSnapshot.some((uid) => !previousSnapshot.includes(uid));
+            renderUnread();
+
+            localStorage.setItem(lastSnapshotKey, JSON.stringify(currentSnapshot));
+            if (hadNew && unread.length > 0) {
                 fab.classList.add('ring');
                 setTimeout(() => fab.classList.remove('ring'), 550);
-                saveSeenState();
             }
         } catch (e) {
             // Silent failure: polling should never break page interactions.
