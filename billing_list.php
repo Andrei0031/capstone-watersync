@@ -1508,13 +1508,13 @@ if ($params) {
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="fw-bold"><?php echo number_format($row['reading'], 2); ?></span>
+                                        <span class="fw-bold"><?php echo number_format($row['reading'], 0); ?></span>
                                         <small class="text-muted">(Current)</small>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="fw-bold"><?php echo number_format($row['previous'], 2); ?></span>
+                                        <span class="fw-bold"><?php echo number_format($row['previous'], 0); ?></span>
                                         <small class="text-muted">(Previous)</small>
                                     </div>
                                 </td>
