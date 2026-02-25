@@ -2244,17 +2244,18 @@ $disconnection_notices = $stmt->get_result();
     // Initialize tab functionality
     // Update notification badge (unread-style: vanishes when Notifications tab is opened)
     const clientId = <?php echo intval($_SESSION['client_id'] ?? 0); ?>;
-    const clientNotifSeenKey = `ws_client_notif_seen_count_${clientId}`;
+    const clientNotifSeenKey = `ws_client_notif_seen_event_key_${clientId}`;
     let latestNotifTotalCount = 0;
+    let latestNotifEventKey = '';
 
-    function getSeenNotifCount() {
-        const raw = localStorage.getItem(clientNotifSeenKey);
-        const parsed = parseInt(raw || '0', 10);
-        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    function getSeenNotifEventKey() {
+        return localStorage.getItem(clientNotifSeenKey) || '';
     }
 
     function markNotificationsAsSeen() {
-        localStorage.setItem(clientNotifSeenKey, String(latestNotifTotalCount));
+        if (latestNotifEventKey) {
+            localStorage.setItem(clientNotifSeenKey, latestNotifEventKey);
+        }
         const tabBadge = document.querySelector('#nav-notifications-tab .notification-badge');
         if (tabBadge) {
             tabBadge.style.display = 'none';
@@ -2267,8 +2268,10 @@ $disconnection_notices = $stmt->get_result();
             .then(data => {
                 if (!data.success) return;
                 latestNotifTotalCount = parseInt(data.count || 0, 10);
-                const seenCount = getSeenNotifCount();
-                const unreadCount = Math.max(0, latestNotifTotalCount - seenCount);
+                latestNotifEventKey = (data.event_key || `count-${latestNotifTotalCount}`);
+                const seenEventKey = getSeenNotifEventKey();
+                const hasUnread = latestNotifTotalCount > 0 && latestNotifEventKey !== seenEventKey;
+                const unreadCount = hasUnread ? latestNotifTotalCount : 0;
 
                 // Update tab badge
                 const tabBadge = document.querySelector('#nav-notifications-tab .notification-badge');
