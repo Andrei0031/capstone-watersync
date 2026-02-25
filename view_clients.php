@@ -11,6 +11,22 @@ if (file_exists('comprehensive_fee_manager.php')) {
     include 'comprehensive_fee_manager.php';
 }
 
+function appendCsvImportLog($status, $message, $context = []) {
+    $logFile = __DIR__ . DIRECTORY_SEPARATOR . 'CSV_IMPORT_LOG_SHEET.csv';
+    $fileExists = file_exists($logFile);
+    $fp = fopen($logFile, 'a');
+    if (!$fp) {
+        return;
+    }
+    if (!$fileExists) {
+        fputcsv($fp, ['timestamp', 'admin_id', 'status', 'message', 'context_json']);
+    }
+    $adminId = $_SESSION['admin_id'] ?? '';
+    $contextJson = !empty($context) ? json_encode($context, JSON_UNESCAPED_SLASHES) : '';
+    fputcsv($fp, [date('Y-m-d H:i:s'), $adminId, $status, $message, $contextJson]);
+    fclose($fp);
+}
+
 $notification = '';
 $notificationClass = '';
 $showNotificationModal = false;
@@ -313,9 +329,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     } elseif (isset($_POST['bulk_import_customers'])) {
         // Handle bulk import of customers from CSV
+        appendCsvImportLog('start', 'Bulk CSV import started.', [
+            'uploaded_name' => $_FILES['bulk_csv_file']['name'] ?? '',
+            'uploaded_size' => $_FILES['bulk_csv_file']['size'] ?? 0
+        ]);
         if (!isset($_FILES['bulk_csv_file']) || $_FILES['bulk_csv_file']['error'] !== UPLOAD_ERR_OK) {
             $notification = 'Error uploading CSV file. Please try again.';
             $notificationClass = 'alert-danger';
+            appendCsvImportLog('error', 'Upload failed before parsing.', [
+                'upload_error_code' => $_FILES['bulk_csv_file']['error'] ?? 'unknown'
+            ]);
             header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
             exit();
         }
@@ -641,18 +664,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $notification .= " and " . (count($errors) - 5) . " more.";
                         }
                     }
+                    appendCsvImportLog('success', 'Bulk import completed with at least one customer.', [
+                        'success_count' => $success_count,
+                        'billing_count' => $billing_count,
+                        'skip_count' => $skip_count,
+                        'error_count' => count($errors),
+                        'sample_errors' => array_slice($errors, 0, 10)
+                    ]);
                     header("Location: view_clients.php?add_status=success&message=" . urlencode($notification));
                 } else {
                     $notification = "Failed to import any customers. " . implode(', ', array_slice($errors, 0, 10));
+                    appendCsvImportLog('error', 'Bulk import failed: no customers imported.', [
+                        'success_count' => $success_count,
+                        'billing_count' => $billing_count,
+                        'skip_count' => $skip_count,
+                        'error_count' => count($errors),
+                        'sample_errors' => array_slice($errors, 0, 20)
+                    ]);
                     header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
                 }
             } catch (Exception $e) {
                 $conn->rollback();
                 $notification = "Error during import: " . $e->getMessage();
+                appendCsvImportLog('exception', 'Bulk import exception.', [
+                    'exception' => $e->getMessage(),
+                    'success_count' => $success_count,
+                    'billing_count' => $billing_count,
+                    'skip_count' => $skip_count,
+                    'error_count' => count($errors),
+                    'sample_errors' => array_slice($errors, 0, 20)
+                ]);
                 header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
             }
         } else {
             $notification = "Error reading CSV file.";
+            appendCsvImportLog('error', 'Unable to open uploaded CSV file for reading.', [
+                'tmp_name' => $csv_file
+            ]);
             header("Location: view_clients.php?add_status=error&message=" . urlencode($notification));
         }
         exit();
