@@ -1634,8 +1634,10 @@ $disconnection_notices = $stmt->get_result();
                                         <i class="fas fa-paper-plane me-2"></i>Submit Report
                                     </button>
                                 </div>
-                                <div class="col-12 col-md-6">
-                                    <div style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 col-md-6 mb-3 mb-md-0">
+                                    <div style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1px solid #2196f3; border-radius: 8px; padding: 15px;">
                                         <h6 style="color: #1976d2; margin-bottom: 10px; font-weight: 600;"><i class="fas fa-lightbulb me-2" style="color: #ffc107;"></i>When to Report</h6>
                                         <ul style="margin: 0; color: #1565c0; font-size: 0.9rem;">
                                             <li>No water supply for more than 2 hours</li>
@@ -1644,6 +1646,8 @@ $disconnection_notices = $stmt->get_result();
                                             <li>Visible pipe leaks or burst pipes</li>
                                         </ul>
                                     </div>
+                                </div>
+                                <div class="col-12 col-md-6">
                                     <div style="background: linear-gradient(135deg, #fff3e0, #ffe0b2); border: 1px solid #ff9800; border-radius: 8px; padding: 15px;">
                                         <h6 style="color: #f57c00; margin-bottom: 10px; font-weight: 600;"><i class="fas fa-clock me-2" style="color: #ff9800;"></i>Response Time</h6>
                                         <p style="margin: 0; color: #e65100; font-size: 0.9rem;">Our team typically responds within <strong>2-4 hours</strong> during business hours and within <strong>24 hours</strong> on weekends.</p>
