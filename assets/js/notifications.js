@@ -620,7 +620,7 @@ function initAdminNotificationCenter() {
 
     renderUnread();
 
-    const poll = async (initial = false) => {
+    const poll = async () => {
         try {
             // Always fetch the latest pending reports and dedupe by uid/id to avoid time precision misses.
             const resp = await fetch('check_new_reports.php?limit=20', {
@@ -631,12 +631,6 @@ function initAdminNotificationCenter() {
             if (!resp.ok) return;
             const data = await resp.json();
             if (!data || !data.success || !Array.isArray(data.reports)) return;
-
-            if (initial) {
-                data.reports.forEach((r) => knownSet.add(String(r.uid || r.id)));
-                saveSeenState();
-                return;
-            }
 
             const newReports = data.reports.filter((r) => !knownSet.has(String(r.uid || r.id)));
             if (newReports.length > 0) {
@@ -669,9 +663,9 @@ function initAdminNotificationCenter() {
         }
     };
 
-    // Prime cache without popups, then poll periodically.
-    poll(true);
-    setInterval(() => poll(false), 15000);
+    // Prime and then keep polling frequently for near-realtime updates.
+    poll();
+    setInterval(() => poll(), 5000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
