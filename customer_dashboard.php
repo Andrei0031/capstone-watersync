@@ -392,9 +392,8 @@ $disconnection_notices = $stmt->get_result();
             }
         }
 
-        /* Basic tab styling that works */
+        /* Basic tab styling - no min-height so Water Reports content sits under tabs like others */
         .tab-content {
-            min-height: 500px;
             background-color: #fff;
         }
 
@@ -419,10 +418,13 @@ $disconnection_notices = $stmt->get_result();
             margin: 0 !important;
         }
 
-        /* Clean Water Reports - matches other tabs */
+        /* Water Reports: content aligned under tab buttons like Overview/Billing */
         #nav-reports {
             margin: 0;
             padding: 0;
+        }
+        #nav-reports #water-reports-form {
+            margin-top: 1rem;
         }
 
         /* Smooth transitions for responsive design */
