@@ -46,6 +46,112 @@ function normalizeCsvNumber($rawValue) {
     return floatval($value);
 }
 
+function runOneTimeOverpaymentCleanup($conn) {
+    $logDir = __DIR__ . DIRECTORY_SEPARATOR . 'logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0777, true);
+    }
+    $flagFile = $logDir . DIRECTORY_SEPARATOR . 'overpayment_cleanup_v1.done';
+    if (file_exists($flagFile)) {
+        return ['ran' => false, 'reason' => 'already_done'];
+    }
+
+    $stats = [
+        'ran' => true,
+        'affected_bills' => 0,
+        'voided_payments' => 0,
+        'adjusted_payments' => 0
+    ];
+
+    $conn->begin_transaction();
+    try {
+        $overpaid_sql = "SELECT 
+                            b.id AS billing_id,
+                            b.total AS bill_total,
+                            COALESCE(SUM(CASE WHEN p.status = 1 THEN p.amount ELSE 0 END), 0) AS total_paid
+                         FROM billing_list b
+                         LEFT JOIN payment_list p ON p.billing_id = b.id
+                         GROUP BY b.id, b.total
+                         HAVING total_paid > (b.total + 0.0001)";
+        $overpaid_result = $conn->query($overpaid_sql);
+
+        if ($overpaid_result) {
+            while ($bill = $overpaid_result->fetch_assoc()) {
+                $billing_id = intval($bill['billing_id']);
+                $bill_total = floatval($bill['bill_total']);
+                $total_paid = floatval($bill['total_paid']);
+                $excess = $total_paid - $bill_total;
+                if ($excess <= 0.0001) {
+                    continue;
+                }
+
+                $stats['affected_bills']++;
+
+                // Reduce excess from latest active payments first; prioritize csv_import entries.
+                $pay_stmt = $conn->prepare("SELECT id, amount
+                                            FROM payment_list
+                                            WHERE billing_id = ? AND status = 1
+                                            ORDER BY (payment_method = 'csv_import') DESC, payment_date DESC, id DESC");
+                $pay_stmt->bind_param("i", $billing_id);
+                $pay_stmt->execute();
+                $payments = $pay_stmt->get_result();
+                $pay_stmt->close();
+
+                while ($excess > 0.0001 && $payments && ($p = $payments->fetch_assoc())) {
+                    $payment_id = intval($p['id']);
+                    $amount = floatval($p['amount']);
+                    if ($amount <= 0) {
+                        continue;
+                    }
+
+                    if ($amount <= ($excess + 0.0001)) {
+                        $void_stmt = $conn->prepare("UPDATE payment_list SET status = 0 WHERE id = ?");
+                        $void_stmt->bind_param("i", $payment_id);
+                        $void_stmt->execute();
+                        $void_stmt->close();
+                        $excess -= $amount;
+                        $stats['voided_payments']++;
+                    } else {
+                        $new_amount = max(0, $amount - $excess);
+                        $adj_stmt = $conn->prepare("UPDATE payment_list SET amount = ? WHERE id = ?");
+                        $adj_stmt->bind_param("di", $new_amount, $payment_id);
+                        $adj_stmt->execute();
+                        $adj_stmt->close();
+                        $excess = 0;
+                        $stats['adjusted_payments']++;
+                    }
+                }
+
+                // Sync bill status after cleanup.
+                $sync_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payment_list WHERE billing_id = ? AND status = 1");
+                $sync_stmt->bind_param("i", $billing_id);
+                $sync_stmt->execute();
+                $sync_result = $sync_stmt->get_result();
+                $sync_row = $sync_result ? $sync_result->fetch_assoc() : ['total_paid' => 0];
+                $sync_stmt->close();
+
+                $post_total_paid = floatval($sync_row['total_paid'] ?? 0);
+                $new_status = ($post_total_paid >= ($bill_total - 0.0001)) ? 1 : 0;
+                $status_stmt = $conn->prepare("UPDATE billing_list SET status = ? WHERE id = ?");
+                $status_stmt->bind_param("ii", $new_status, $billing_id);
+                $status_stmt->execute();
+                $status_stmt->close();
+            }
+        }
+
+        $conn->commit();
+        @file_put_contents($flagFile, json_encode([
+            'ran_at' => date('Y-m-d H:i:s'),
+            'stats' => $stats
+        ], JSON_UNESCAPED_SLASHES));
+        return $stats;
+    } catch (Exception $e) {
+        $conn->rollback();
+        appendSystemImportLog('error', 'One-time overpayment cleanup failed.', ['exception' => $e->getMessage()]);
+        return ['ran' => false, 'reason' => 'failed', 'error' => $e->getMessage()];
+    }
+}
+
 $notification = '';
 $notificationClass = '';
 $showNotificationModal = false;
@@ -368,6 +474,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $billing_count = 0;
         $skip_count = 0;
         $year_prefix = date('Y') . '/';
+
+        // Run once after deploy to fix historical overpayments that cause negative balances.
+        $cleanup_result = runOneTimeOverpaymentCleanup($conn);
+        if (!empty($cleanup_result['ran'])) {
+            appendSystemImportLog('info', 'One-time overpayment cleanup executed.', $cleanup_result);
+        }
 
         // Get the last code number for this year
         $code_sql = "SELECT code FROM client_list WHERE code LIKE '{$year_prefix}%' ORDER BY code DESC LIMIT 1";
