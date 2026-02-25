@@ -501,6 +501,29 @@ function initAdminNotificationCenter() {
                 text-align: center;
                 background: #ffffff;
             }
+            .ws-sidebar-unread-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 18px;
+                height: 18px;
+                padding: 0 5px;
+                border-radius: 999px;
+                background: #ef4444;
+                color: #ffffff;
+                font-size: 0.68rem;
+                font-weight: 700;
+                margin-left: auto;
+                box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+            }
+            .ws-sidebar-unread-badge.pulse {
+                animation: ws-badge-pulse 1.2s infinite;
+            }
+            @keyframes ws-badge-pulse {
+                0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+                70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            }
             .ws-admin-notif-fab.ring i {
                 animation: ws-bell-ring 0.5s ease;
             }
@@ -555,12 +578,63 @@ function initAdminNotificationCenter() {
         localStorage.setItem(readIdsKey, JSON.stringify(compact));
     };
 
+    const getSidebarTargets = () => {
+        const selectors = [
+            '.sidebar a[href="client_reports.php"]',
+            '.sidebar a[href$="/client_reports.php"]',
+            '.sidebar a[href="reports.php"]',
+            '.sidebar a[href$="/reports.php"]'
+        ];
+        const all = [];
+        selectors.forEach((s) => {
+            document.querySelectorAll(s).forEach((el) => all.push(el));
+        });
+        return Array.from(new Set(all));
+    };
+
+    const clearAllUnread = () => {
+        unread.forEach((item) => readSet.add(String(item.uid)));
+        saveReadState();
+        unread = [];
+        renderUnread();
+    };
+
+    const updateSidebarBubbles = (count) => {
+        const targets = getSidebarTargets();
+        targets.forEach((link) => {
+            if (!link.dataset.wsNotifBound) {
+                link.dataset.wsNotifBound = '1';
+                link.addEventListener('click', () => {
+                    // Opening reports view marks current notifications as seen/read.
+                    clearAllUnread();
+                });
+            }
+
+            let bubble = link.querySelector('.ws-sidebar-unread-badge');
+            if (!bubble) {
+                bubble = document.createElement('span');
+                bubble.className = 'ws-sidebar-unread-badge';
+                link.appendChild(bubble);
+            }
+
+            if (count > 0) {
+                bubble.textContent = count > 99 ? '99+' : String(count);
+                bubble.style.display = 'inline-flex';
+                bubble.classList.add('pulse');
+            } else {
+                bubble.style.display = 'none';
+                bubble.classList.remove('pulse');
+            }
+        });
+    };
+
     const renderUnread = () => {
         const count = unread.length;
         if (badge) {
             badge.textContent = count > 99 ? '99+' : String(count);
             badge.style.display = count > 0 ? 'inline-flex' : 'none';
         }
+        updateSidebarBubbles(count);
 
         if (!listEl) return;
         listEl.innerHTML = '';
@@ -603,10 +677,7 @@ function initAdminNotificationCenter() {
     });
 
     clearBtn.addEventListener('click', () => {
-        unread.forEach((item) => readSet.add(String(item.uid)));
-        saveReadState();
-        unread = [];
-        renderUnread();
+        clearAllUnread();
     });
 
     renderUnread();
