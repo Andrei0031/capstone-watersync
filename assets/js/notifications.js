@@ -328,3 +328,119 @@ window.showWarning = showWarning;
 window.showInfo = showInfo;
 window.showConfirm = showConfirm;
 
+/**
+ * Convert existing inline bootstrap alerts to toast-style notifications.
+ * This helps standardize system messages across pages.
+ */
+function convertInlineAlertsToToasts() {
+    const alerts = document.querySelectorAll('.alert:not(.ws-notification)');
+    alerts.forEach((alertEl) => {
+        const msg = (alertEl.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!msg) return;
+
+        let type = 'info';
+        if (alertEl.classList.contains('alert-success')) type = 'success';
+        else if (alertEl.classList.contains('alert-danger')) type = 'error';
+        else if (alertEl.classList.contains('alert-warning')) type = 'warning';
+        else if (alertEl.classList.contains('alert-info')) type = 'info';
+
+        showNotification(msg, type, 6000, 'top-right');
+        alertEl.remove();
+    });
+}
+
+/**
+ * Admin realtime outage report popups (facebook-like side notifications).
+ * Polls new pending outage reports and shows message boxes.
+ */
+function initAdminOutageReportPopups() {
+    const currentPath = (window.location.pathname || '').toLowerCase();
+    const adminPages = [
+        'adminlandingpage.php',
+        'billing_list.php',
+        'view_clients.php',
+        'pending_readings.php',
+        'payments.php',
+        'client_reports.php',
+        'reports.php',
+        'settings_rate.php',
+        'customer_accounts.php'
+    ];
+    const isAdminPage = adminPages.some((p) => currentPath.includes('/' + p) || currentPath.endsWith(p));
+    if (!isAdminPage) return;
+
+    let lastServerTime = sessionStorage.getItem('ws_admin_reports_last_server_time') || '';
+    let knownIds = [];
+    try {
+        knownIds = JSON.parse(sessionStorage.getItem('ws_admin_reports_seen_ids') || '[]');
+    } catch (e) {
+        knownIds = [];
+    }
+    const knownSet = new Set(knownIds);
+
+    const saveSeenState = () => {
+        const compact = Array.from(knownSet).slice(-100);
+        sessionStorage.setItem('ws_admin_reports_seen_ids', JSON.stringify(compact));
+        if (lastServerTime) {
+            sessionStorage.setItem('ws_admin_reports_last_server_time', lastServerTime);
+        }
+    };
+
+    const poll = async (initial = false) => {
+        try {
+            const sinceParam = lastServerTime ? `?since=${encodeURIComponent(lastServerTime)}&limit=10` : '?limit=10';
+            const resp = await fetch(`check_new_reports.php${sinceParam}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data || !data.success || !Array.isArray(data.reports)) return;
+
+            if (data.server_time) {
+                lastServerTime = data.server_time;
+            }
+
+            if (initial) {
+                data.reports.forEach((r) => knownSet.add(String(r.id)));
+                saveSeenState();
+                return;
+            }
+
+            const newReports = data.reports.filter((r) => !knownSet.has(String(r.id)));
+            if (newReports.length > 0) {
+                // Show up to 3 detailed popups to avoid spamming the UI.
+                newReports.slice(0, 3).forEach((r) => {
+                    const customer = r.customer_name || 'Unknown customer';
+                    const location = r.location || 'No location';
+                    const message = `New outage report from ${customer} (${location}).`;
+                    showNotification(message, 'info', 9000, 'top-right');
+                    knownSet.add(String(r.id));
+                });
+
+                if (newReports.length > 3) {
+                    showNotification(
+                        `${newReports.length} new outage reports received. Open Client Reports to review.`,
+                        'warning',
+                        9000,
+                        'top-right'
+                    );
+                }
+                saveSeenState();
+            }
+        } catch (e) {
+            // Silent failure: polling should never break page interactions.
+        }
+    };
+
+    // Prime cache without popups, then poll periodically.
+    poll(true);
+    setInterval(() => poll(false), 15000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    convertInlineAlertsToToasts();
+    initAdminOutageReportPopups();
+});
+
