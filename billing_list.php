@@ -1332,21 +1332,13 @@ if ($params) {
         </div>
     </div>
 
-    <!-- Bulk actions for table below: Select All + Delete Selected -->
+    <!-- Bulk action: Delete Selected only (use checkbox beside Customer to select all) -->
     <div class="card card-soft mb-2" id="bulkActionControls">
         <div class="card-body py-2">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <button id="selectAllBtn" type="button" class="btn btn-sm btn-outline-primary" title="Select all bills in the table">
-                        <i class="fas fa-check-double me-1"></i>Select All
-                    </button>
-                    <button id="deselectAllBtn" type="button" class="btn btn-sm btn-outline-secondary" style="display: none;">
-                        <i class="fas fa-square me-1"></i>Deselect All
-                    </button>
-                    <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled>
-                        <i class="fas fa-trash-alt me-1"></i>Delete Selected
-                    </button>
-                </div>
+                <button id="bulkDeleteBtn" type="button" class="btn btn-sm btn-danger" title="Delete selected bills" disabled>
+                    <i class="fas fa-trash-alt me-1"></i>Delete Selected
+                </button>
                 <span id="selectedBillsCount" class="text-muted">0 bills selected</span>
             </div>
         </div>
@@ -1360,7 +1352,7 @@ if ($params) {
                     <thead>
                         <tr>
                             <th style="width: 40px;">
-                                <input type="checkbox" id="selectAllCheckbox" title="Select All">
+                                <input type="checkbox" id="selectAllCheckbox" title="Click to select or deselect all bills">
                             </th>
                             <th>Customer</th>
                             <th>Meter Reading</th>
@@ -2694,8 +2686,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Bulk Delete Functionality - scope to main billing table only
     const billingTable = document.getElementById('billingTable');
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    const deselectAllBtn = document.getElementById('deselectAllBtn');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     const bulkDeleteBtn2 = document.getElementById('bulkDeleteBtn2');
     const bulkActionControls = document.getElementById('bulkActionControls');
@@ -2710,41 +2700,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const table = getBillingTable();
         if (!table) return [];
         return Array.from(table.querySelectorAll('tbody input.bulk-delete-checkbox'));
-    }
-
-    function selectAllBillsInTable() {
-        const table = document.getElementById('billingTable');
-        if (!table) {
-            if (typeof showWarning === 'function') showWarning('Billing table not found.');
-            return;
-        }
-        const tbody = table.querySelector('tbody');
-        const rowCheckboxes = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
-        if (!rowCheckboxes.length) {
-            if (typeof showWarning === 'function') showWarning('No bills in the list to select. Change filters or add bills.');
-            return;
-        }
-        for (let i = 0; i < rowCheckboxes.length; i++) {
-            rowCheckboxes[i].checked = true;
-        }
-        const headerCb = document.getElementById('selectAllCheckbox');
-        if (headerCb) headerCb.checked = true;
-        updateBulkDeleteButtons();
-        if (typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame(updateRowHighlights);
-        }
-    }
-
-    function deselectAllBillsInTable() {
-        const table = document.getElementById('billingTable');
-        if (!table) return;
-        const rowCheckboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
-        rowCheckboxes.forEach(function(cb) {
-            cb.checked = false;
-        });
-        const headerCb = document.getElementById('selectAllCheckbox');
-        if (headerCb) headerCb.checked = false;
-        updateBulkDeleteButtons();
     }
 
     function updateRowHighlights() {
@@ -2779,44 +2734,22 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = count === billCheckboxes.length && billCheckboxes.length > 0;
         }
-        if (selectAllBtn && deselectAllBtn) {
-            if (count > 0) {
-                selectAllBtn.style.display = 'none';
-                deselectAllBtn.style.display = 'inline-block';
-            } else {
-                selectAllBtn.style.display = 'inline-block';
-                deselectAllBtn.style.display = 'none';
-            }
-        }
         updateRowHighlights();
     }
 
-    function syncAllRowCheckboxesFromHeader() {
-        const headerCb = document.getElementById('selectAllCheckbox');
-        const table = document.getElementById('billingTable');
-        if (!table || !headerCb) return;
-        const checkboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
-        const checked = headerCb.checked;
-        checkboxes.forEach(function(cb) {
-            cb.checked = checked;
-        });
-        updateBulkDeleteButtons();
-    }
-
-    // Header checkbox in table: sync all row checkboxes and highlights
+    // Header checkbox beside Customer: click to select/deselect all row checkboxes (we control toggle)
     if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            syncAllRowCheckboxesFromHeader();
-        });
-        selectAllCheckbox.addEventListener('click', function() {
-            var self = this;
-            setTimeout(function() {
-                var table = document.getElementById('billingTable');
-                if (!table) return;
-                var checkboxes = table.querySelectorAll('tbody input.bulk-delete-checkbox');
-                checkboxes.forEach(function(cb) { cb.checked = self.checked; });
-                updateBulkDeleteButtons();
-            }, 0);
+        selectAllCheckbox.addEventListener('click', function(e) {
+            e.preventDefault();
+            this.checked = !this.checked;
+            const table = document.getElementById('billingTable');
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            const rowCbs = tbody ? tbody.querySelectorAll('input.bulk-delete-checkbox') : table.querySelectorAll('input.bulk-delete-checkbox');
+            for (let i = 0; i < rowCbs.length; i++) {
+                rowCbs[i].checked = this.checked;
+            }
+            updateBulkDeleteButtons();
         });
     }
 
@@ -2826,22 +2759,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target && e.target.classList && e.target.classList.contains('bulk-delete-checkbox')) {
                 updateBulkDeleteButtons();
             }
-        });
-    }
-
-    // Select All Button - select every bill in the table (all visible rows)
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            selectAllBillsInTable();
-        });
-    }
-
-    // Deselect All Button
-    if (deselectAllBtn) {
-        deselectAllBtn.addEventListener('click', function() {
-            deselectAllBillsInTable();
         });
     }
 
