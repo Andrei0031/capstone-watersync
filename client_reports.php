@@ -10,6 +10,17 @@ include 'db.php';
 $success_message = '';
 $error_message = '';
 
+// Format datetime using PHP's current timezone (forced to Asia/Manila in db.php)
+if (!function_exists('adminFormatDT')) {
+    function adminFormatDT($dt): string
+    {
+        if (empty($dt)) return '';
+        $ts = strtotime((string)$dt);
+        if ($ts === false) return is_string($dt) ? $dt : '';
+        return date('M d, Y g:i A', $ts);
+    }
+}
+
 // Handle notice operations (create, update, delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $admin_id = $_SESSION['admin_id'];
@@ -814,7 +825,7 @@ $notices = $conn->query($notices_query);
                                                 <?php echo $report['status'] ? 'Resolved' : 'Pending'; ?>
                                             </span>
                                         </td>
-                                        <td><?php echo date('M d, Y H:i', strtotime($report['created_at'])); ?></td>
+                                        <td><?php echo adminFormatDT($report['created_at']); ?></td>
                                         <td>
                                             <?php if (!$report['status']): ?>
                                             <button type="button" class="btn btn-sm btn-outline-success" 
@@ -860,14 +871,14 @@ $notices = $conn->query($notices_query);
                                                     </p>
                                                     
                                                     <h6>Submitted</h6>
-                                                    <p><?php echo date('M d, Y H:i', strtotime($report['created_at'])); ?></p>
+                                                    <p><?php echo adminFormatDT($report['created_at']); ?></p>
                                                     
                                                     <?php if ($report['status']): ?>
                                                     <h6>Resolution Notes</h6>
                                                     <p><?php echo htmlspecialchars($report['resolution_notes']); ?></p>
                                                     
                                                     <h6>Resolved At</h6>
-                                                    <p><?php echo date('M d, Y H:i', strtotime($report['resolved_at'])); ?></p>
+                                                    <p><?php echo adminFormatDT($report['resolved_at']); ?></p>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
