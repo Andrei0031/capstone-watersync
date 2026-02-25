@@ -7,6 +7,9 @@ if (!isset($_SESSION['client_id'])) {
 
 include 'db.php';
 
+// Mark notices as "viewed" so the navbar badge count goes to zero when user visits this page
+$_SESSION['notices_last_viewed_at'] = date('Y-m-d H:i:s');
+
 // Get active notices from notices table
 $notices_query = "
     SELECT n.*, a.username as admin_name, 'notice' as source_type

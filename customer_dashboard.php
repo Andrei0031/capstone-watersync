@@ -93,9 +93,10 @@ $stmt->bind_param("i", $_SESSION['client_id']);
 $stmt->execute();
 $payments = $stmt->get_result();
 
-// Get notification count for badge
+// Get notification count for badge (only "unread" = created after last time user opened Notices page)
 $notification_count = 0;
-// Count active notices
+$notices_since = isset($_SESSION['notices_last_viewed_at']) ? $conn->real_escape_string($_SESSION['notices_last_viewed_at']) : null;
+// Count active notices (optionally only since last view)
 $notices_count_query = "
     SELECT COUNT(*) as count 
     FROM notices 
@@ -103,18 +104,20 @@ $notices_count_query = "
           (status = 'scheduled' AND start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) OR
           (status = 'completed' AND end_date >= DATE_SUB(NOW(), INTERVAL 24 HOUR)))
     AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    " . ($notices_since ? " AND created_at > '$notices_since'" : "") . "
 ";
 $notices_count_result = $conn->query($notices_count_query);
 if ($notices_count_result) {
     $notification_count += $notices_count_result->fetch_assoc()['count'];
 }
 
-// Count unacknowledged disconnection notices
+// Count unacknowledged disconnection notices (optionally only since last view)
 $disconnection_count_query = "
     SELECT COUNT(*) as count 
     FROM disconnection_notices 
     WHERE client_id = ? 
     AND status IN ('pending', 'sent')
+    " . ($notices_since ? " AND created_at > '$notices_since'" : "") . "
 ";
 $stmt_count = $conn->prepare($disconnection_count_query);
 $stmt_count->bind_param("i", $_SESSION['client_id']);
