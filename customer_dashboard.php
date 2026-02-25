@@ -1399,6 +1399,147 @@ $disconnection_notices = $stmt->get_result();
                             </div>
                         </div>
 
+                        <!-- Water Advisory Notices on Dashboard -->
+                        <?php
+                        // Get active water advisory notices for dashboard
+                        $dashboard_notices_query = "
+                            SELECT n.*, a.username as admin_name
+                            FROM notices n
+                            JOIN admin a ON n.created_by = a.id
+                            WHERE n.status = 'ongoing' 
+                               OR (n.status = 'scheduled' AND n.start_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR))
+                            ORDER BY 
+                                CASE n.status
+                                    WHEN 'ongoing' THEN 1
+                                    WHEN 'scheduled' THEN 2
+                                END,
+                                n.start_date DESC
+                            LIMIT 2";
+                        $dashboard_notices = $conn->query($dashboard_notices_query);
+                        
+                        if ($dashboard_notices && $dashboard_notices->num_rows > 0):
+                        ?>
+                        <div style="background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; margin: 20px;">
+                            <div style="background: linear-gradient(135deg, #2196f3, #1976d2); padding: 20px; border-bottom: 1px solid #e0e0e0;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 style="margin: 0; color: white; font-weight: 600;">
+                                        <i class="fas fa-bell me-2" style="color: white;"></i>Water Service Notices
+                                    </h5>
+                                    <a href="client_notices.php" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.3s ease;"
+                                       onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                                       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                                        View All
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="padding: 25px;">
+                                <div class="row">
+                                    <?php while ($notice = $dashboard_notices->fetch_assoc()): ?>
+                                        <div class="col-12 col-md-6 mb-3">
+                                            <div class="card border h-100">
+                                                <div class="card-body p-3">
+                                                    <?php
+                                                    $icon_class = '';
+                                                    switch($notice['type']) {
+                                                        case 'interruption':
+                                                            $icon_class = 'fa-tint-slash text-danger';
+                                                            break;
+                                                        case 'maintenance':
+                                                            $icon_class = 'fa-wrench text-warning';
+                                                            break;
+                                                        case 'announcement':
+                                                            $icon_class = 'fa-info-circle text-info';
+                                                            break;
+                                                    }
+                                                    ?>
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <h6 class="mb-0">
+                                                            <i class="fas <?php echo $icon_class; ?> me-2"></i>
+                                                            <?php echo htmlspecialchars($notice['title']); ?>
+                                                        </h6>
+                                                        <span class="badge <?php 
+                                                            $status_class = 'bg-secondary';
+                                                            if ($notice['status'] === 'ongoing') {
+                                                                $status_class = 'bg-warning';
+                                                            } elseif ($notice['status'] === 'scheduled') {
+                                                                $status_class = 'bg-info';
+                                                            }
+                                                            echo $status_class;
+                                                        ?> small">
+                                                            <?php echo ucfirst($notice['status']); ?>
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <p class="text-muted small mb-2">
+                                                        <?php echo htmlspecialchars(substr($notice['description'], 0, 100)) . (strlen($notice['description']) > 100 ? '...' : ''); ?>
+                                                    </p>
+                                                    
+                                                    <div class="small text-muted">
+                                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                                        <?php echo htmlspecialchars($notice['affected_areas']); ?>
+                                                        <br>
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        <?php 
+                                                        echo date('M d, Y h:i A', strtotime($notice['start_date']));
+                                                        if ($notice['end_date']) {
+                                                            echo ' - ' . date('h:i A', strtotime($notice['end_date']));
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endwhile; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- Account Summary -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-user me-2"></i>Account Summary
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3 mb-md-0">
+                                        <div class="list-group list-group-flush">
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-user me-2"></i>Account Holder</span>
+                                                <strong><?php echo htmlspecialchars($customer['firstname'] . ' ' . $customer['lastname']); ?></strong>
+                                            </div>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-tachometer-alt me-2"></i>Meter Code</span>
+                                                <strong><?php echo htmlspecialchars($customer['meter_code']); ?></strong>
+                                            </div>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-phone me-2"></i>Contact</span>
+                                                <strong><?php echo htmlspecialchars($customer['contact']); ?></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <div class="list-group list-group-flush">
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-envelope me-2"></i>Email</span>
+                                                <strong><?php echo htmlspecialchars($customer['email']); ?></strong>
+                                            </div>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-map-marker-alt me-2"></i>Address</span>
+                                                <strong><?php echo htmlspecialchars($customer['address']); ?></strong>
+                                            </div>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-chart-line me-2"></i>Total Bills</span>
+                                                <strong><?php echo $total_bills_count; ?></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
                 <!-- Billing Information Tab -->
