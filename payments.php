@@ -109,9 +109,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
 
         $approved_amount = min($current_payment_amount, $remaining_allowed);
 
-        $update_sql = "UPDATE payment_list SET amount = ?, status = 1, verified_date = CURRENT_TIMESTAMP WHERE id = ?";
+        $verified_at = date('Y-m-d H:i:s');
+        $update_sql = "UPDATE payment_list SET amount = ?, status = 1, verified_date = ? WHERE id = ?";
         $stmt = $conn->prepare($update_sql);
-        $stmt->bind_param("di", $approved_amount, $payment_id);
+        $stmt->bind_param("dsi", $approved_amount, $verified_at, $payment_id);
         if (!$stmt->execute()) {
             throw new Exception("Failed to verify payment.");
         }
@@ -148,6 +149,7 @@ $payments_sql = "SELECT
     cl.meter_code, 
     bl.reading_date,
     bl.total as bill_total,
+    COALESCE(pl.verified_date, pl.payment_date) as display_payment_datetime,
     COALESCE((SELECT SUM(amount) FROM payment_list WHERE billing_id = bl.id AND status = 1), 0) as total_paid,
     CASE 
         WHEN pl.status = 1 AND pl.amount >= (bl.total - COALESCE((SELECT SUM(amount) FROM payment_list WHERE billing_id = bl.id AND status = 1 AND id != pl.id), 0)) THEN 'Fully Paid'
@@ -158,7 +160,7 @@ $payments_sql = "SELECT
 FROM payment_list pl 
 JOIN client_list cl ON pl.client_id = cl.id 
 JOIN billing_list bl ON pl.billing_id = bl.id 
-ORDER BY pl.payment_date DESC";
+ORDER BY COALESCE(pl.verified_date, pl.payment_date) DESC, pl.id DESC";
 $payments_result = $conn->query($payments_sql);
 
 ?>
@@ -983,7 +985,7 @@ $payments_result = $conn->query($payments_sql);
                                 </td>
                                 <td><?php echo htmlspecialchars($row['reference_number']); ?></td>
                                 <td>₱<?php echo number_format($row['display_amount'], 2); ?></td>
-                                <td><?php echo date('M d, Y h:i A', strtotime($row['payment_date'])); ?></td>
+                                <td><?php echo date('M d, Y h:i A', strtotime($row['display_payment_datetime'])); ?></td>
                                 <td><?php echo date('M d, Y', strtotime($row['reading_date'])); ?></td>
                                 <td>
                                     <span class="status-badge status-verified"><?php echo htmlspecialchars($row['status_text']); ?></span>

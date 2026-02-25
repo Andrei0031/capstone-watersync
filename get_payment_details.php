@@ -7,6 +7,7 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 include 'db.php';
+date_default_timezone_set('Asia/Manila');
 
 if (isset($_GET['id'])) {
     $payment_id = $_GET['id'];
@@ -17,7 +18,7 @@ if (isset($_GET['id'])) {
         cl.firstname, 
         cl.lastname, 
         cl.meter_code,
-        DATE_FORMAT(pl.payment_date, '%M %d, %Y %r') as formatted_payment_date,
+        DATE_FORMAT(COALESCE(pl.verified_date, pl.payment_date), '%M %d, %Y %r') as formatted_payment_date,
         DATE_FORMAT(pl.verified_date, '%M %d, %Y %r') as formatted_verified_date,
         bl.reading_date, 
         bl.reading, 

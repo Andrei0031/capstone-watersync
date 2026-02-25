@@ -56,10 +56,20 @@ try {
 
     // Parse input data
     $client_id = intval($_POST['client_id']);
-    $payment_date = $_POST['payment_date'];
+    $payment_date_input = trim((string)$_POST['payment_date']);
     $payment_method = $_POST['payment_method'];
     $reference_number = $_POST['reference_number'];
     $amount_to_pay = floatval($_POST['amount']);
+
+    // Keep fee calculations date-based, but always save payment with actual PH timestamp.
+    $payment_date_for_fees = date('Y-m-d');
+    if (!empty($payment_date_input)) {
+        $parsed_input = strtotime($payment_date_input);
+        if ($parsed_input !== false) {
+            $payment_date_for_fees = date('Y-m-d', $parsed_input);
+        }
+    }
+    $payment_recorded_at = $payment_date_for_fees . ' ' . date('H:i:s');
     
     // Validate amount is positive
     if ($amount_to_pay <= 0) {
@@ -86,7 +96,7 @@ try {
     // Process each bill
     foreach ($bill_ids as $bill_id) {
         // Check and apply late fees first
-        $late_fee_data = calculateLateFees($bill_id, $payment_date, $conn);
+        $late_fee_data = calculateLateFees($bill_id, $payment_date_for_fees, $conn);
         
         if ($late_fee_data['has_late_fee'] && !$late_fee_data['already_applied']) {
             $late_fee_result = applyLateFee($bill_id, $late_fee_data, $conn);
@@ -130,13 +140,13 @@ try {
             $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date) 
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($payment_sql);
-            $stmt->bind_param('iisdssss', $client_id, $bill_id, $payment_date, $payment_amount, $payment_method, $reference_number, $payment_status, $verified_date);
+            $stmt->bind_param('iisdssss', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $payment_status, $verified_date);
         } else {
             // Partial payment - pending verification
             $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) 
                            VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($payment_sql);
-            $stmt->bind_param('iisdssi', $client_id, $bill_id, $payment_date, $payment_amount, $payment_method, $reference_number, $payment_status);
+            $stmt->bind_param('iisdssi', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $payment_status);
         }
         
         if (!$stmt->execute()) {
