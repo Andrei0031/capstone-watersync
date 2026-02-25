@@ -369,7 +369,6 @@ function initAdminOutageReportPopups() {
     const isAdminPage = adminPages.some((p) => currentPath.includes('/' + p) || currentPath.endsWith(p));
     if (!isAdminPage) return;
 
-    let lastServerTime = sessionStorage.getItem('ws_admin_reports_last_server_time') || '';
     let knownIds = [];
     try {
         knownIds = JSON.parse(sessionStorage.getItem('ws_admin_reports_seen_ids') || '[]');
@@ -381,15 +380,12 @@ function initAdminOutageReportPopups() {
     const saveSeenState = () => {
         const compact = Array.from(knownSet).slice(-100);
         sessionStorage.setItem('ws_admin_reports_seen_ids', JSON.stringify(compact));
-        if (lastServerTime) {
-            sessionStorage.setItem('ws_admin_reports_last_server_time', lastServerTime);
-        }
     };
 
     const poll = async (initial = false) => {
         try {
-            const sinceParam = lastServerTime ? `?since=${encodeURIComponent(lastServerTime)}&limit=10` : '?limit=10';
-            const resp = await fetch(`check_new_reports.php${sinceParam}`, {
+            // Always fetch the latest pending reports and dedupe by uid/id to avoid time precision misses.
+            const resp = await fetch('check_new_reports.php?limit=20', {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: { 'Accept': 'application/json' }
@@ -398,25 +394,23 @@ function initAdminOutageReportPopups() {
             const data = await resp.json();
             if (!data || !data.success || !Array.isArray(data.reports)) return;
 
-            if (data.server_time) {
-                lastServerTime = data.server_time;
-            }
-
             if (initial) {
-                data.reports.forEach((r) => knownSet.add(String(r.id)));
+                data.reports.forEach((r) => knownSet.add(String(r.uid || r.id)));
                 saveSeenState();
                 return;
             }
 
-            const newReports = data.reports.filter((r) => !knownSet.has(String(r.id)));
+            const newReports = data.reports.filter((r) => !knownSet.has(String(r.uid || r.id)));
             if (newReports.length > 0) {
                 // Show up to 3 detailed popups to avoid spamming the UI.
                 newReports.slice(0, 3).forEach((r) => {
                     const customer = r.customer_name || 'Unknown customer';
-                    const location = r.location || 'No location';
-                    const message = `New outage report from ${customer} (${location}).`;
+                    const label = r.source === 'client_reports'
+                        ? (r.report_type || 'Client report')
+                        : (r.location || 'No location');
+                    const message = `New report from ${customer} (${label}).`;
                     showNotification(message, 'info', 9000, 'top-right');
-                    knownSet.add(String(r.id));
+                    knownSet.add(String(r.uid || r.id));
                 });
 
                 if (newReports.length > 3) {
