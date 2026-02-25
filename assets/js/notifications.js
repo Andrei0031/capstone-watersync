@@ -350,10 +350,10 @@ function convertInlineAlertsToToasts() {
 }
 
 /**
- * Admin realtime outage report popups (facebook-like side notifications).
- * Polls new pending outage reports and shows message boxes.
+ * Admin realtime notification center (floating bell + unread badge + list).
+ * Replaces popup spam with a persistent lower-right notification inbox.
  */
-function initAdminOutageReportPopups() {
+function initAdminNotificationCenter() {
     const currentPath = (window.location.pathname || '').toLowerCase();
     const adminPages = [
         'adminlandingpage.php',
@@ -369,18 +369,219 @@ function initAdminOutageReportPopups() {
     const isAdminPage = adminPages.some((p) => currentPath.includes('/' + p) || currentPath.endsWith(p));
     if (!isAdminPage) return;
 
+    // Inject styles for notification center (once)
+    if (!document.getElementById('ws-admin-notification-center-styles')) {
+        const style = document.createElement('style');
+        style.id = 'ws-admin-notification-center-styles';
+        style.textContent = `
+            .ws-admin-notif-fab {
+                position: fixed;
+                right: 20px;
+                bottom: 20px;
+                width: 56px;
+                height: 56px;
+                border: none;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                color: #fff;
+                box-shadow: 0 10px 25px rgba(37, 99, 235, 0.35);
+                z-index: 10000;
+                cursor: pointer;
+            }
+            .ws-admin-notif-fab i {
+                font-size: 1.15rem;
+            }
+            .ws-admin-notif-badge {
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                min-width: 22px;
+                height: 22px;
+                border-radius: 999px;
+                background: #ef4444;
+                color: #fff;
+                font-size: 0.72rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 6px;
+                border: 2px solid #fff;
+            }
+            .ws-admin-notif-panel {
+                position: fixed;
+                right: 20px;
+                bottom: 86px;
+                width: 360px;
+                max-width: calc(100vw - 30px);
+                max-height: 460px;
+                background: #fff;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+                z-index: 10000;
+                overflow: hidden;
+                display: none;
+            }
+            .ws-admin-notif-panel.open {
+                display: block;
+            }
+            .ws-admin-notif-header {
+                padding: 12px 14px;
+                border-bottom: 1px solid #e5e7eb;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-weight: 600;
+            }
+            .ws-admin-notif-clear {
+                border: none;
+                background: transparent;
+                color: #2563eb;
+                font-size: 0.82rem;
+                cursor: pointer;
+            }
+            .ws-admin-notif-list {
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .ws-admin-notif-item {
+                border-bottom: 1px solid #f1f5f9;
+                padding: 12px 14px;
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+            }
+            .ws-admin-notif-item:hover {
+                background: #f8fafc;
+            }
+            .ws-admin-notif-title {
+                font-size: 0.88rem;
+                font-weight: 600;
+                color: #111827;
+                margin-bottom: 3px;
+            }
+            .ws-admin-notif-desc {
+                font-size: 0.8rem;
+                color: #4b5563;
+                margin-bottom: 4px;
+            }
+            .ws-admin-notif-time {
+                font-size: 0.74rem;
+                color: #6b7280;
+            }
+            .ws-admin-notif-empty {
+                padding: 20px 14px;
+                font-size: 0.85rem;
+                color: #6b7280;
+                text-align: center;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const knownIdsKey = 'ws_admin_reports_seen_ids';
+    const unreadKey = 'ws_admin_notification_center_unread';
+
     let knownIds = [];
     try {
-        knownIds = JSON.parse(sessionStorage.getItem('ws_admin_reports_seen_ids') || '[]');
+        knownIds = JSON.parse(localStorage.getItem(knownIdsKey) || '[]');
     } catch (e) {
         knownIds = [];
     }
     const knownSet = new Set(knownIds);
 
+    let unread = [];
+    try {
+        unread = JSON.parse(localStorage.getItem(unreadKey) || '[]');
+    } catch (e) {
+        unread = [];
+    }
+
+    const fab = document.createElement('button');
+    fab.className = 'ws-admin-notif-fab';
+    fab.type = 'button';
+    fab.setAttribute('aria-label', 'Open notifications');
+    fab.innerHTML = '<i class="fas fa-bell"></i><span class="ws-admin-notif-badge" style="display:none">0</span>';
+
+    const panel = document.createElement('div');
+    panel.className = 'ws-admin-notif-panel';
+    panel.innerHTML = `
+        <div class="ws-admin-notif-header">
+            <span>Notifications</span>
+            <button type="button" class="ws-admin-notif-clear">Mark all as read</button>
+        </div>
+        <div class="ws-admin-notif-list"></div>
+    `;
+    document.body.appendChild(fab);
+    document.body.appendChild(panel);
+
+    const badge = fab.querySelector('.ws-admin-notif-badge');
+    const listEl = panel.querySelector('.ws-admin-notif-list');
+    const clearBtn = panel.querySelector('.ws-admin-notif-clear');
+
     const saveSeenState = () => {
-        const compact = Array.from(knownSet).slice(-100);
-        sessionStorage.setItem('ws_admin_reports_seen_ids', JSON.stringify(compact));
+        const compact = Array.from(knownSet).slice(-200);
+        localStorage.setItem(knownIdsKey, JSON.stringify(compact));
     };
+
+    const saveUnreadState = () => {
+        unread = unread.slice(0, 80);
+        localStorage.setItem(unreadKey, JSON.stringify(unread));
+    };
+
+    const renderUnread = () => {
+        const count = unread.length;
+        if (badge) {
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.style.display = count > 0 ? 'inline-flex' : 'none';
+        }
+
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        if (count === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'ws-admin-notif-empty';
+            empty.textContent = 'No new notifications';
+            listEl.appendChild(empty);
+            return;
+        }
+
+        unread.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'ws-admin-notif-item';
+            row.dataset.uid = item.uid;
+            row.innerHTML = `
+                <div class="ws-admin-notif-title">${item.title}</div>
+                <div class="ws-admin-notif-desc">${item.description}</div>
+                <div class="ws-admin-notif-time">${item.timeText || ''}</div>
+            `;
+            row.addEventListener('click', () => {
+                unread = unread.filter((x) => x.uid !== item.uid);
+                saveUnreadState();
+                renderUnread();
+                window.location.href = item.link || 'client_reports.php';
+            });
+            listEl.appendChild(row);
+        });
+    };
+
+    fab.addEventListener('click', () => {
+        panel.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!panel.classList.contains('open')) return;
+        if (panel.contains(e.target) || fab.contains(e.target)) return;
+        panel.classList.remove('open');
+    });
+
+    clearBtn.addEventListener('click', () => {
+        unread = [];
+        saveUnreadState();
+        renderUnread();
+    });
+
+    renderUnread();
 
     const poll = async (initial = false) => {
         try {
@@ -402,25 +603,26 @@ function initAdminOutageReportPopups() {
 
             const newReports = data.reports.filter((r) => !knownSet.has(String(r.uid || r.id)));
             if (newReports.length > 0) {
-                // Show up to 3 detailed popups to avoid spamming the UI.
-                newReports.slice(0, 3).forEach((r) => {
+                newReports.forEach((r) => {
                     const customer = r.customer_name || 'Unknown customer';
                     const label = r.source === 'client_reports'
                         ? (r.report_type || 'Client report')
                         : (r.location || 'No location');
-                    const message = `New report from ${customer} (${label}).`;
-                    showNotification(message, 'info', 9000, 'top-right');
+
+                    const notif = {
+                        uid: String(r.uid || r.id),
+                        title: 'New Client Report',
+                        description: `${customer} - ${label}`,
+                        timeText: r.report_date || '',
+                        link: 'client_reports.php'
+                    };
+                    // Newest first, avoid duplicates
+                    unread = unread.filter((x) => x.uid !== notif.uid);
+                    unread.unshift(notif);
                     knownSet.add(String(r.uid || r.id));
                 });
-
-                if (newReports.length > 3) {
-                    showNotification(
-                        `${newReports.length} new outage reports received. Open Client Reports to review.`,
-                        'warning',
-                        9000,
-                        'top-right'
-                    );
-                }
+                saveUnreadState();
+                renderUnread();
                 saveSeenState();
             }
         } catch (e) {
@@ -435,6 +637,6 @@ function initAdminOutageReportPopups() {
 
 document.addEventListener('DOMContentLoaded', () => {
     convertInlineAlertsToToasts();
-    initAdminOutageReportPopups();
+    initAdminNotificationCenter();
 });
 
