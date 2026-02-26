@@ -153,15 +153,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $conn->begin_transaction();
 
             try {
+                // Get the billing cycle ID based on the reading date
+                $cycle_stmt = $conn->prepare("SELECT id FROM billing_cycles WHERE start_date <= ? AND end_date >= ? LIMIT 1");
+                $cycle_stmt->bind_param("ss", $reading_date, $reading_date);
+                $cycle_stmt->execute();
+                $cycle_result = $cycle_stmt->get_result();
+                $billing_cycle_id = ($cycle_result->num_rows > 0) ? $cycle_result->fetch_assoc()['id'] : NULL;
+                $cycle_stmt->close();
+
                 if ($existing_bill) {
                     // Update existing bill
                     $total = $current_bill_total + $existing_bill['total']; // Add new charges to existing total
-                    $stmt = $conn->prepare("UPDATE billing_list SET reading_date = ?, due_date = ?, reading = ?, previous = ?, total = ?, status = ? WHERE id = ?");
-                    $stmt->bind_param("ssdddii", $reading_date, $due_date, $reading, $previous, $total, $status, $existing_bill['id']);
+                    $stmt = $conn->prepare("UPDATE billing_list SET reading_date = ?, due_date = ?, reading = ?, previous = ?, total = ?, status = ?, billing_cycle_id = ? WHERE id = ?");
+                    $stmt->bind_param("ssdddiii", $reading_date, $due_date, $reading, $previous, $total, $status, $billing_cycle_id, $existing_bill['id']);
                 } else {
                     // Insert new billing record
-                    $stmt = $conn->prepare("INSERT INTO billing_list (client_id, reading_date, due_date, reading, previous, total, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("issdddi", $client_id, $reading_date, $due_date, $reading, $previous, $current_bill_total, $status);
+                    $stmt = $conn->prepare("INSERT INTO billing_list (client_id, reading_date, due_date, reading, previous, total, status, billing_cycle_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("issdddii", $client_id, $reading_date, $due_date, $reading, $previous, $current_bill_total, $status, $billing_cycle_id);
                 }
 
                 if (!$stmt->execute()) {
