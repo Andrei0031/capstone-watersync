@@ -694,23 +694,14 @@ if (!$failed_result) {
     $failed_result = $conn->query("SELECT * FROM pending_meter_readings WHERE status = 'failed' LIMIT 0");
 }
 
-// Format datetime assuming database stores UTC, convert to Philippine time (Asia/Manila)
+// Format datetime using PHP's default timezone (already forced to Asia/Manila via timezone_helper)
 function pendingFormatDT($dt) {
     if (empty($dt)) return 'N/A';
-    try {
-        $utcTz = new DateTimeZone('UTC');
-        $phTz  = new DateTimeZone('Asia/Manila');
-        $clean = substr((string)$dt, 0, 19); // trim microseconds if any
-
-        $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
-        if (!$d) {
-            $d = new DateTime($clean, $utcTz);
-        }
-        $d->setTimezone($phTz);
-        return $d->format('M d, Y g:i A');
-    } catch (Exception $e) {
+    $ts = @strtotime((string)$dt);
+    if ($ts === false) {
         return is_string($dt) ? $dt : 'N/A';
     }
+    return date('M d, Y g:i A', $ts);
 }
 
 ?>
