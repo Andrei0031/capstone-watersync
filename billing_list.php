@@ -95,6 +95,19 @@ if ($overdue_result && $row = $overdue_result->fetch_assoc()) {
 $sql_clients = "SELECT id, firstname, lastname, category_id FROM client_list WHERE status = 1";
 $result_clients = $conn->query($sql_clients);
 
+// Safety net: ensure existing bills are linked to billing cycles based on reading_date
+// This helps older bills (created before billing_cycle_id column) appear in cycle filters.
+if ($conn instanceof mysqli) {
+    $conn->query("
+        UPDATE billing_list b
+        LEFT JOIN billing_cycles bc 
+            ON b.reading_date BETWEEN bc.start_date AND bc.end_date
+        SET b.billing_cycle_id = bc.id
+        WHERE b.billing_cycle_id IS NULL
+          AND bc.id IS NOT NULL
+    ");
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
         // Debug log

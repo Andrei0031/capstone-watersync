@@ -557,12 +557,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
                 $total = $rate_data['rate'] + ($excess * $rate_data['excess_rate']);
             }
             
-            // Create new bill
+            // Create new bill, preserving the billing cycle from the reading
             $bill_stmt = $conn->prepare("INSERT INTO billing_list 
-                (client_id, reading_date, due_date, reading, previous, total, status) 
-                VALUES (?, CURRENT_DATE(), ?, ?, ?, ?, 0)");
-            $bill_stmt->bind_param("isddd", 
+                (client_id, billing_cycle_id, reading_date, due_date, reading, previous, total, status) 
+                VALUES (?, ?, CURRENT_DATE(), ?, ?, ?, ?, 0)");
+            $bill_stmt->bind_param("iisddd", 
                 $reading['client_id'],
+                $reading['billing_cycle_id'],
                 $due_date,
                 $current_reading,
                 $previous,

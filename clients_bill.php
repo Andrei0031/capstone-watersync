@@ -179,8 +179,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $total = $base_rate + $excess_charge;
         }
 
-        $stmt = $conn->prepare("INSERT INTO billing_list (client_id, reading_date, due_date, reading, previous, rate, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("issdddis", $client_id, $reading_date, $due_date, $reading, $previous, $rate, $total, $status);
+        // Determine billing cycle based on reading date (if it falls within a defined cycle)
+        $billing_cycle_id = null;
+        if ($cycle_stmt = $conn->prepare("SELECT id FROM billing_cycles WHERE start_date <= ? AND end_date >= ? LIMIT 1")) {
+            $cycle_stmt->bind_param("ss", $reading_date, $reading_date);
+            if ($cycle_stmt->execute()) {
+                $cycle_res = $cycle_stmt->get_result();
+                if ($cycle_res && $cycle_row = $cycle_res->fetch_assoc()) {
+                    $billing_cycle_id = (int)$cycle_row['id'];
+                }
+            }
+            $cycle_stmt->close();
+        }
+
+        $stmt = $conn->prepare("INSERT INTO billing_list (client_id, billing_cycle_id, reading_date, due_date, reading, previous, rate, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("iissdddis", $client_id, $billing_cycle_id, $reading_date, $due_date, $reading, $previous, $rate, $total, $status);
 
         if ($stmt->execute()) {
             $message = "New billing record added successfully";
