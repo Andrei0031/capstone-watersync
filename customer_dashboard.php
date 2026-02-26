@@ -15,24 +15,13 @@ include 'comprehensive_fee_manager.php';
 include 'timezone_helper.php';
 watersync_force_timezone($conn);
 
-// Format datetime assuming DB stores UTC, convert to Philippine time (Asia/Manila)
+// Format datetime using PHP default timezone (Asia/Manila from timezone_helper)
 if (!function_exists('customerFormatDT')) {
     function customerFormatDT($dt) {
         if (empty($dt)) return '';
-        try {
-            $utcTz = new DateTimeZone('UTC');
-            $phTz  = new DateTimeZone('Asia/Manila');
-            $clean = substr((string)$dt, 0, 19); // trim microseconds if any
-
-            $d = DateTime::createFromFormat('Y-m-d H:i:s', $clean, $utcTz);
-            if (!$d) {
-                $d = new DateTime($clean, $utcTz);
-            }
-            $d->setTimezone($phTz);
-            return $d->format('M d, Y g:i A');
-        } catch (Exception $e) {
-            return is_string($dt) ? $dt : '';
-        }
+        $ts = @strtotime((string)$dt);
+        if ($ts === false) return is_string($dt) ? $dt : '';
+        return date('M d, Y g:i A', $ts);
     }
 }
 
@@ -1684,6 +1673,7 @@ $disconnection_notices = $stmt->get_result();
                             <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">View all your water outage reports and their status</p>
                         </div>
                         <div style="padding: 25px;">
+                            <div id="outage-reports-list-body">
                             <?php
                             if (isset($_SESSION['client_id'])) {
                                 $client_id = $_SESSION['client_id'];
@@ -1733,6 +1723,7 @@ $disconnection_notices = $stmt->get_result();
                                 echo '<div style="text-align: center; padding: 40px; color: #666;"><p style="margin: 0;">Please log in to view your reports</p></div>';
                             }
                             ?>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1919,6 +1910,17 @@ $disconnection_notices = $stmt->get_result();
             'nav-reports-tab': document.getElementById('nav-reports'),
         };
 
+        function refreshOutageReportsList() {
+            const el = document.getElementById('outage-reports-list-body');
+            if (!el) return;
+            fetch('get_my_outage_reports.php', { credentials: 'same-origin' })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    el.innerHTML = html;
+                })
+                .catch(function() {});
+        }
+
         function activateTab(tabId) {
             tabButtons.forEach(btn => btn.classList.remove('active'));
             const btn = document.getElementById(tabId);
@@ -1934,6 +1936,7 @@ $disconnection_notices = $stmt->get_result();
             if (pane) {
                 pane.classList.add('show', 'active');
                 pane.style.display = 'block';
+                if (tabId === 'nav-reports-tab') refreshOutageReportsList();
             }
         }
 
