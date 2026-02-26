@@ -1419,12 +1419,12 @@ $disconnection_notices = $stmt->get_result();
                                                 </td>
                                                 <td>
                                                     <div class="d-flex flex-column">
-                                                        <small class="text-muted">Previous: <?php echo number_format($previous_reading, 1); ?></small>
-                                                        <small>Current: <?php echo number_format($current_reading, 1); ?></small>
+                                                        <small class="text-muted">Previous: <?php echo number_format((float)$previous_reading, 0); ?></small>
+                                                        <small>Current: <?php echo number_format((float)$current_reading, 0); ?></small>
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <?php echo number_format($usage, 1); ?>m³
+                                                    <?php echo number_format((float)$usage, 0); ?>m³
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center">
