@@ -39,7 +39,7 @@ if ($settings_result) {
 }
 $delete_password_configured = $has_password && $delete_enabled;
 
-// Calculate statistics
+// Calculate statistics (overall, not filtered)
 $total_sql = "SELECT 
     COUNT(*) as total,
     COALESCE(SUM(CASE WHEN status = 1 THEN amount ELSE 0 END), 0) as total_amount,
@@ -47,22 +47,28 @@ $total_sql = "SELECT
     COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) as pending_count
     FROM payment_list";
 $total_result = $conn->query($total_sql);
-$stats = $total_result->fetch_assoc();
+$stats = $total_result ? $total_result->fetch_assoc() : null;
 if (!$stats) {
     $stats = ['total' => 0, 'total_amount' => 0, 'verified_count' => 0, 'pending_count' => 0];
 }
 
-// Get today's payments
+// Get today's payments (overall, not filtered)
 $today_sql = "SELECT 
     COUNT(*) as today_count, 
     COALESCE(SUM(CASE WHEN status = 1 THEN amount ELSE 0 END), 0) as today_amount 
     FROM payment_list 
     WHERE DATE(payment_date) = CURRENT_DATE()";
 $today_result = $conn->query($today_sql);
-$today_stats = $today_result->fetch_assoc();
+$today_stats = $today_result ? $today_result->fetch_assoc() : null;
 if (!$today_stats) {
     $today_stats = ['today_count' => 0, 'today_amount' => 0];
 }
+
+// Filters for Payment Records table (search, status, billing cycle)
+$payment_status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+$payment_search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$payment_search_safe = $payment_search !== '' ? $conn->real_escape_string($payment_search) : '';
+$payment_billing_cycle_filter = isset($_GET['billing_cycle']) ? intval($_GET['billing_cycle']) : 0;
 
 // Process payment verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
@@ -141,7 +147,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
     exit();
 }
 
-// Fetch payments with client information
+// Fetch payments with client information (supports search/status/billing cycle filters)
+$payment_where_conditions = [];
+$payment_params = [];
+$payment_types = '';
+
+if ($payment_search_safe !== '') {
+    $payment_where_conditions[] = "(cl.firstname LIKE ? OR cl.lastname LIKE ? OR cl.meter_code LIKE ? OR pl.reference_number LIKE ?)";
+    $like = '%' . $payment_search_safe . '%';
+    $payment_params[] = $like;
+    $payment_params[] = $like;
+    $payment_params[] = $like;
+    $payment_params[] = $like;
+    $payment_types .= 'ssss';
+}
+
+if ($payment_status_filter === 'verified') {
+    $payment_where_conditions[] = "pl.status = 1";
+} elseif ($payment_status_filter === 'pending') {
+    $payment_where_conditions[] = "pl.status = 0";
+}
+
+if ($payment_billing_cycle_filter) {
+    $payment_where_conditions[] = "bl.billing_cycle_id = ?";
+    $payment_params[] = $payment_billing_cycle_filter;
+    $payment_types .= 'i';
+}
+
+$payment_where_sql = $payment_where_conditions ? 'WHERE ' . implode(' AND ', $payment_where_conditions) : '';
+
 $payments_sql = "SELECT 
     pl.*, 
     cl.firstname, 
@@ -160,8 +194,21 @@ $payments_sql = "SELECT
 FROM payment_list pl 
 JOIN client_list cl ON pl.client_id = cl.id 
 JOIN billing_list bl ON pl.billing_id = bl.id 
+$payment_where_sql
 ORDER BY COALESCE(pl.verified_date, pl.payment_date) DESC, pl.id DESC";
-$payments_result = $conn->query($payments_sql);
+
+if (!empty($payment_params)) {
+    $payments_stmt = $conn->prepare($payments_sql);
+    if ($payments_stmt) {
+        $payments_stmt->bind_param($payment_types, ...$payment_params);
+        $payments_stmt->execute();
+        $payments_result = $payments_stmt->get_result();
+    } else {
+        $payments_result = $conn->query($payments_sql); // Fallback without params
+    }
+} else {
+    $payments_result = $conn->query($payments_sql);
+}
 
 ?>
 <!DOCTYPE html>
@@ -949,6 +996,60 @@ $payments_result = $conn->query($payments_sql);
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="card card-soft mb-4">
+        <div class="card-body">
+            <form class="row g-3 align-items-end" method="GET" action="payments.php">
+                <div class="col-md-4">
+                    <label for="paymentSearch" class="form-label mb-1">Search</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input 
+                            type="text" 
+                            id="paymentSearch" 
+                            class="form-control" 
+                            name="search" 
+                            placeholder="Search by name, meter code, or reference no..." 
+                            value="<?php echo htmlspecialchars($payment_search); ?>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label for="paymentBillingCycle" class="form-label mb-1">Billing Cycle</label>
+                    <select class="form-select" id="paymentBillingCycle" name="billing_cycle">
+                        <option value="">All Cycles</option>
+                        <?php
+                        $cycles_query = "SELECT id, cycle_name, status FROM billing_cycles ORDER BY start_date DESC";
+                        $cycles_result = $conn->query($cycles_query);
+                        if ($cycles_result && $cycles_result->num_rows > 0) {
+                            while ($cycle = $cycles_result->fetch_assoc()) {
+                                $selected = ($payment_billing_cycle_filter == $cycle['id']) ? 'selected' : '';
+                                $status_badge = ucfirst($cycle['status']);
+                                echo '<option value="' . $cycle['id'] . '" ' . $selected . '>' . htmlspecialchars($cycle['cycle_name']) . ' (' . $status_badge . ')</option>';
+                            }
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="paymentStatus" class="form-label mb-1">Status</label>
+                    <select class="form-select" id="paymentStatus" name="status">
+                        <option value="">All Status</option>
+                        <option value="verified" <?php echo $payment_status_filter === 'verified' ? 'selected' : ''; ?>>Verified</option>
+                        <option value="pending" <?php echo $payment_status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a href="payments.php" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo me-1"></i>Reset
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Apply Filters
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
