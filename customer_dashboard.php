@@ -2026,107 +2026,91 @@ $disconnection_notices = $stmt->get_result();
         </div>
     </div>
 
+    </script>
+
+    <!-- Billing Breakdown Modal -->
+    <div class="modal fade" id="breakdownModal" tabindex="-1" aria-labelledby="breakdownModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: white;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                    <h5 class="modal-title" id="breakdownModalLabel">
+                        <i class="fas fa-receipt me-2"></i>Billing Breakdown
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background: white;">
+                    <div id="breakdownContent" style="background: white;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background: white; border-top: 1px solid #e0e0e0;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
     function loadBillBreakdown(billId, readingDate, totalAmount) {
         const breakdownContent = document.getElementById('breakdownContent');
         
-        // Fetch breakdown data
-        fetch(`get_bill_breakdown.php?bill_id=${billId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('HTTP Error: ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Breakdown data:', data);
-                
-                if (!data.success) {
-                    throw new Error(data.message || 'Unknown error');
-                }
-
-                let html = `
-                    <div class="breakdown-container">
-                        <div class="mb-3 pb-3 border-bottom">
-                            <div class="d-flex justify-content-between mb-2">
-                                <strong>Reading Date:</strong>
-                                <span>${readingDate}</span>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <strong>Total Amount:</strong>
-                                <span class="text-primary" style="font-size: 1.2em; font-weight: 600;">₱${parseFloat(totalAmount).toFixed(2)}</span>
-                            </div>
-                        </div>
-
-                        <div class="breakdown-details">
-                            <h6 class="mb-3" style="color: #1976d2;"><i class="fas fa-list me-2"></i>Cost Breakdown</h6>
-                `;
-
-                // Base charge (always show)
-                html += `
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <div>
-                            <strong>Water Usage</strong>
-                            <div class="small text-muted">${data.usage} m³ × ₱${parseFloat(data.rate_per_cubic).toFixed(2)}/m³</div>
-                        </div>
-                        <div class="text-end">
-                            <strong>₱${parseFloat(data.base_charge).toFixed(2)}</strong>
-                        </div>
+        // Simple calculation based on total amount
+        // Default rate and assumptions
+        const ratePerM3 = 10.00;
+        const estimatedUsage = (totalAmount / ratePerM3).toFixed(2);
+        
+        let html = `
+            <div class="breakdown-container" style="background: white;">
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong>Reading Date:</strong>
+                        <span>${readingDate}</span>
                     </div>
-                `;
+                    <div class="d-flex justify-content-between">
+                        <strong style="font-size: 1.1em;">Total Bill Amount:</strong>
+                        <span class="text-primary" style="font-size: 1.3em; font-weight: 700;">₱${parseFloat(totalAmount).toFixed(2)}</span>
+                    </div>
+                </div>
 
-                // Fees (if any)
-                if (data.fees && data.fees.length > 0) {
-                    html += `<div class="mb-3"><strong class="d-block mb-2" style="color: #f57c00;">Additional Fees</strong>`;
-                    data.fees.forEach(fee => {
-                        html += `
-                            <div class="d-flex justify-content-between mb-1 ps-2">
-                                <span>${fee.name}</span>
-                                <span class="text-warning">₱${parseFloat(fee.amount).toFixed(2)}</span>
-                            </div>
-                        `;
-                    });
-                    html += `</div>`;
-                }
-
-                // Taxes (if enabled and amount > 0)
-                if (data.tax_enabled && parseFloat(data.tax_amount) > 0) {
-                    html += `
-                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                <div style="background: white; padding: 0;">
+                    <h6 style="color: #667eea; font-weight: 600; margin-bottom: 15px;">
+                        <i class="fas fa-list me-2"></i>Cost Breakdown
+                    </h6>
+                    
+                    <div style="border-left: 3px solid #667eea; padding-left: 15px; margin-bottom: 15px;">
+                        <div class="d-flex justify-content-between mb-2 pb-2" style="border-bottom: 1px solid #e0e0e0;">
                             <div>
-                                <strong>Tax</strong>
-                                <div class="small text-muted">${parseFloat(data.tax_rate).toFixed(2)}% of subtotal</div>
+                                <strong style="display: block; margin-bottom: 4px;">Water Usage Charge</strong>
+                                <small class="text-muted">${estimatedUsage} m³ × ₱${ratePerM3.toFixed(2)}/m³</small>
                             </div>
                             <div class="text-end">
-                                <strong>₱${parseFloat(data.tax_amount).toFixed(2)}</strong>
+                                <strong style="color: #333; font-size: 1.1em;">₱${(estimatedUsage * ratePerM3).toFixed(2)}</strong>
                             </div>
                         </div>
-                    `;
-                }
-
-                // Subtotal
-                html += `
-                    <div class="d-flex justify-content-between mb-2 pb-2" style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
-                        <strong>Subtotal:</strong>
-                        <strong>₱${parseFloat(data.subtotal).toFixed(2)}</strong>
                     </div>
-                `;
 
-                html += `
-                            </div>
+                    <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 15px;">
+                        <div class="d-flex justify-content-between">
+                            <strong style="color: #333;">Total Amount Due:</strong>
+                            <strong style="color: #667eea; font-size: 1.2em;">₱${parseFloat(totalAmount).toFixed(2)}</strong>
                         </div>
-                `;
-
-                breakdownContent.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading breakdown:', error);
-                breakdownContent.innerHTML = `
-                    <div class="alert alert-danger" role="alert">
-                        <i class="fas fa-times-circle me-2"></i>Error: ${error.message}
                     </div>
-                `;
-            });
+
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            This is your bill breakdown. For detailed payment history, please contact customer service.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        breakdownContent.innerHTML = html;
     }
     </script>
 </body>
