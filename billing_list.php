@@ -509,35 +509,63 @@ if ($billing_cycle_filter) {
 
 $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
 
-// Modified query to get only the latest bill per customer
-$sql = "WITH LatestBills AS (
-            SELECT client_id, MAX(reading_date) as latest_date
-            FROM billing_list
-            GROUP BY client_id
-        )
-        SELECT b.*, 
-               COALESCE(cl.firstname, 'Deleted') as firstname, 
-               COALESCE(cl.lastname, 'Client') as lastname, 
-               COALESCE(cl.meter_code, 'N/A') as meter_code,
-               CASE WHEN cl.id IS NULL THEN true ELSE false END as is_deleted_client,
-               COALESCE((SELECT SUM(p.amount) FROM payment_list p WHERE p.billing_id = b.id AND p.status = 1), 0) as total_paid,
-               (SELECT reading FROM billing_list prev 
-                WHERE prev.client_id = b.client_id 
-                AND prev.reading_date < b.reading_date 
-                ORDER BY reading_date DESC LIMIT 1) as previous_reading,
-               (SELECT SUM(total) 
-                FROM billing_list prev 
-                WHERE prev.client_id = b.client_id 
-                AND prev.status = 0 
-                AND prev.id != b.id) as previous_balance
-        FROM billing_list b
-        INNER JOIN LatestBills lb ON b.client_id = lb.client_id AND b.reading_date = lb.latest_date
-        LEFT JOIN client_list cl ON b.client_id = cl.id
-        $where_clause
-        ORDER BY 
-            LOWER(COALESCE(cl.lastname, '')) ASC,
-            LOWER(COALESCE(cl.firstname, '')) ASC,
-            CAST(COALESCE(cl.meter_code, '0') AS UNSIGNED) ASC";
+// Modified query to get only the latest bill per customer when no cycle filter is applied
+// When filtering by billing cycle, show all bills in that cycle
+if ($billing_cycle_filter) {
+    // Show all bills for the selected billing cycle (not just latest per customer)
+    $sql = "SELECT b.*, 
+                   COALESCE(cl.firstname, 'Deleted') as firstname, 
+                   COALESCE(cl.lastname, 'Client') as lastname, 
+                   COALESCE(cl.meter_code, 'N/A') as meter_code,
+                   CASE WHEN cl.id IS NULL THEN true ELSE false END as is_deleted_client,
+                   COALESCE((SELECT SUM(p.amount) FROM payment_list p WHERE p.billing_id = b.id AND p.status = 1), 0) as total_paid,
+                   (SELECT reading FROM billing_list prev 
+                    WHERE prev.client_id = b.client_id 
+                    AND prev.reading_date < b.reading_date 
+                    ORDER BY reading_date DESC LIMIT 1) as previous_reading,
+                   (SELECT SUM(total) 
+                    FROM billing_list prev 
+                    WHERE prev.client_id = b.client_id 
+                    AND prev.status = 0 
+                    AND prev.id != b.id) as previous_balance
+            FROM billing_list b
+            LEFT JOIN client_list cl ON b.client_id = cl.id
+            $where_clause
+            ORDER BY 
+                LOWER(COALESCE(cl.lastname, '')) ASC,
+                LOWER(COALESCE(cl.firstname, '')) ASC,
+                CAST(COALESCE(cl.meter_code, '0') AS UNSIGNED) ASC";
+} else {
+    // Show only latest bill per customer when not filtering by cycle
+    $sql = "WITH LatestBills AS (
+                SELECT client_id, MAX(reading_date) as latest_date
+                FROM billing_list
+                GROUP BY client_id
+            )
+            SELECT b.*, 
+                   COALESCE(cl.firstname, 'Deleted') as firstname, 
+                   COALESCE(cl.lastname, 'Client') as lastname, 
+                   COALESCE(cl.meter_code, 'N/A') as meter_code,
+                   CASE WHEN cl.id IS NULL THEN true ELSE false END as is_deleted_client,
+                   COALESCE((SELECT SUM(p.amount) FROM payment_list p WHERE p.billing_id = b.id AND p.status = 1), 0) as total_paid,
+                   (SELECT reading FROM billing_list prev 
+                    WHERE prev.client_id = b.client_id 
+                    AND prev.reading_date < b.reading_date 
+                    ORDER BY reading_date DESC LIMIT 1) as previous_reading,
+                   (SELECT SUM(total) 
+                    FROM billing_list prev 
+                    WHERE prev.client_id = b.client_id 
+                    AND prev.status = 0 
+                    AND prev.id != b.id) as previous_balance
+            FROM billing_list b
+            INNER JOIN LatestBills lb ON b.client_id = lb.client_id AND b.reading_date = lb.latest_date
+            LEFT JOIN client_list cl ON b.client_id = cl.id
+            $where_clause
+            ORDER BY 
+                LOWER(COALESCE(cl.lastname, '')) ASC,
+                LOWER(COALESCE(cl.firstname, '')) ASC,
+                CAST(COALESCE(cl.meter_code, '0') AS UNSIGNED) ASC";
+}
 
 if ($params) {
     $stmt = $conn->prepare($sql);
