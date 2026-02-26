@@ -2032,99 +2032,98 @@ $disconnection_notices = $stmt->get_result();
         
         // Fetch breakdown data
         fetch(`get_bill_breakdown.php?bill_id=${billId}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP Error: ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.success) {
-                    let html = `
-                        <div class="breakdown-container">
-                            <div class="mb-3 pb-3 border-bottom">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <strong>Reading Date:</strong>
-                                    <span>${readingDate}</span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <strong>Total Amount:</strong>
-                                    <span class="text-primary" style="font-size: 1.2em; font-weight: 600;">₱${parseFloat(totalAmount).toFixed(2)}</span>
-                                </div>
+                console.log('Breakdown data:', data);
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Unknown error');
+                }
+
+                let html = `
+                    <div class="breakdown-container">
+                        <div class="mb-3 pb-3 border-bottom">
+                            <div class="d-flex justify-content-between mb-2">
+                                <strong>Reading Date:</strong>
+                                <span>${readingDate}</span>
                             </div>
+                            <div class="d-flex justify-content-between">
+                                <strong>Total Amount:</strong>
+                                <span class="text-primary" style="font-size: 1.2em; font-weight: 600;">₱${parseFloat(totalAmount).toFixed(2)}</span>
+                            </div>
+                        </div>
 
-                            <div class="breakdown-details">
-                                <h6 class="mb-3" style="color: #1976d2;"><i class="fas fa-list me-2"></i>Cost Breakdown</h6>
-                    `;
+                        <div class="breakdown-details">
+                            <h6 class="mb-3" style="color: #1976d2;"><i class="fas fa-list me-2"></i>Cost Breakdown</h6>
+                `;
 
-                    // Base charge
-                    if (data.base_charge) {
+                // Base charge (always show)
+                html += `
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <div>
+                            <strong>Water Usage</strong>
+                            <div class="small text-muted">${data.usage} m³ × ₱${parseFloat(data.rate_per_cubic).toFixed(2)}/m³</div>
+                        </div>
+                        <div class="text-end">
+                            <strong>₱${parseFloat(data.base_charge).toFixed(2)}</strong>
+                        </div>
+                    </div>
+                `;
+
+                // Fees (if any)
+                if (data.fees && data.fees.length > 0) {
+                    html += `<div class="mb-3"><strong class="d-block mb-2" style="color: #f57c00;">Additional Fees</strong>`;
+                    data.fees.forEach(fee => {
                         html += `
-                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                                <div>
-                                    <strong>Water Usage</strong>
-                                    <div class="small text-muted">${data.usage} m³ × ₱${data.rate_per_cubic.toFixed(2)}/m³</div>
-                                </div>
-                                <div class="text-end">
-                                    <strong>₱${data.base_charge.toFixed(2)}</strong>
-                                </div>
+                            <div class="d-flex justify-content-between mb-1 ps-2">
+                                <span>${fee.name}</span>
+                                <span class="text-warning">₱${parseFloat(fee.amount).toFixed(2)}</span>
                             </div>
                         `;
-                    }
+                    });
+                    html += `</div>`;
+                }
 
-                    // Fees
-                    if (data.fees && data.fees.length > 0) {
-                        html += `<div class="mb-3"><strong class="d-block mb-2" style="color: #f57c00;">Additional Fees</strong>`;
-                        data.fees.forEach(fee => {
-                            html += `
-                                <div class="d-flex justify-content-between mb-1 ps-2">
-                                    <span>${fee.name}</span>
-                                    <span class="text-warning">₱${fee.amount.toFixed(2)}</span>
-                                </div>
-                            `;
-                        });
-                        html += `</div>`;
-                    }
-
-                    // Taxes
-                    if (data.tax_amount && data.tax_amount > 0) {
-                        html += `
-                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                                <div>
-                                    <strong>Tax</strong>
-                                    <div class="small text-muted">${data.tax_rate}% of subtotal</div>
-                                </div>
-                                <div class="text-end">
-                                    <strong>₱${data.tax_amount.toFixed(2)}</strong>
-                                </div>
-                            </div>
-                        `;
-                    }
-
-                    // Subtotal
-                    if (data.subtotal) {
-                        html += `
-                            <div class="d-flex justify-content-between mb-2 pb-2" style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
-                                <strong>Subtotal:</strong>
-                                <strong>₱${data.subtotal.toFixed(2)}</strong>
-                            </div>
-                        `;
-                    }
-
+                // Taxes (if enabled and amount > 0)
+                if (data.tax_enabled && parseFloat(data.tax_amount) > 0) {
                     html += `
-                                </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <div>
+                                <strong>Tax</strong>
+                                <div class="small text-muted">${parseFloat(data.tax_rate).toFixed(2)}% of subtotal</div>
                             </div>
-                    `;
-
-                    breakdownContent.innerHTML = html;
-                } else {
-                    breakdownContent.innerHTML = `
-                        <div class="alert alert-warning" role="alert">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Unable to load breakdown details.
+                            <div class="text-end">
+                                <strong>₱${parseFloat(data.tax_amount).toFixed(2)}</strong>
+                            </div>
                         </div>
                     `;
                 }
+
+                // Subtotal
+                html += `
+                    <div class="d-flex justify-content-between mb-2 pb-2" style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+                        <strong>Subtotal:</strong>
+                        <strong>₱${parseFloat(data.subtotal).toFixed(2)}</strong>
+                    </div>
+                `;
+
+                html += `
+                            </div>
+                        </div>
+                `;
+
+                breakdownContent.innerHTML = html;
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading breakdown:', error);
                 breakdownContent.innerHTML = `
                     <div class="alert alert-danger" role="alert">
-                        <i class="fas fa-times-circle me-2"></i>Error loading breakdown. Please try again.
+                        <i class="fas fa-times-circle me-2"></i>Error: ${error.message}
                     </div>
                 `;
             });
