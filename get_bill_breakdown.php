@@ -35,14 +35,11 @@ try {
         exit;
     }
 
-    // Get bill details
+    // Get bill details (simplified - don't rely on billing_cycles)
     $bill_stmt = $conn->prepare("
-        SELECT bl.*, 
-               bc.rate_per_cubic,
-               (bl.reading - bl.previous) as usage,
+        SELECT bl.id, bl.client_id, bl.reading, bl.previous, bl.total, bl.due_date, bl.status,
                COALESCE(SUM(p.amount), 0) as amount_paid
         FROM billing_list bl
-        LEFT JOIN billing_cycles bc ON bl.billing_cycle_id = bc.id
         LEFT JOIN payment_list p ON bl.id = p.billing_id AND p.status = 1
         WHERE bl.id = ?
         GROUP BY bl.id
@@ -55,6 +52,22 @@ try {
         echo json_encode(['success' => false, 'message' => 'Bill not found']);
         exit;
     }
+
+    // Get rate from system settings or client's category
+    $rate_query = "SELECT *, 
+                   CASE 
+                       WHEN cl.category_id = 1 THEN 10.00
+                       WHEN cl.category_id = 2 THEN 12.00
+                       WHEN cl.category_id = 3 THEN 15.00
+                       ELSE 10.00
+                   END as rate_per_cubic
+                   FROM client_list cl
+                   WHERE cl.id = ?";
+    $rate_stmt = $conn->prepare($rate_query);
+    $rate_stmt->bind_param("i", $bill['client_id']);
+    $rate_stmt->execute();
+    $client_info = $rate_stmt->get_result()->fetch_assoc();
+    $rate = isset($client_info['rate_per_cubic']) ? floatval($client_info['rate_per_cubic']) : 10.00;
 
     // Get system settings for tax
     $settings_stmt = $conn->prepare("
@@ -72,8 +85,8 @@ try {
     $tax_enabled = isset($settings['tax_enabled']) ? $settings['tax_enabled'] : 0;
 
     // Calculate base charge
-    $usage = $bill['usage'] > 0 ? $bill['usage'] : 0;
-    $rate = $bill['rate_per_cubic'] ? floatval($bill['rate_per_cubic']) : 0;
+    $usage = isset($bill['reading'], $bill['previous']) ? ($bill['reading'] - $bill['previous']) : 0;
+    $usage = $usage > 0 ? $usage : 0;
     $base_charge = $usage * $rate;
 
     // Get applied fees

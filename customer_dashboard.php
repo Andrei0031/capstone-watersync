@@ -1477,12 +1477,12 @@ $disconnection_notices = $stmt->get_result();
                                                     <?php echo date('M d, Y', strtotime($bill['due_date'])); ?>
                                                 </td>
                                                 <td class="d-none d-md-table-cell">
-                                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                                                    <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; font-weight: 600;" type="button" 
                                                             data-bs-toggle="modal" 
                                                             data-bs-target="#breakdownModal"
                                                             onclick="loadBillBreakdown(<?php echo $bill['id']; ?>, '<?php echo date('M d, Y', strtotime($bill['reading_date'])); ?>', <?php echo $bill['total']; ?>)"
                                                             title="View billing breakdown">
-                                                        <i class="fas fa-eye me-1"></i>View Breakdown
+                                                        <i class="fas fa-receipt me-1"></i>Breakdown
                                                     </button>
                                                 </td>
                                                 <td>
