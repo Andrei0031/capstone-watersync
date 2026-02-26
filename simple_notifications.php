@@ -307,8 +307,10 @@ function sendBillingNotification($client_id, $bill_id, $event_type = 'bill_appro
         // Send SMS if phone number exists
         if (!empty($client['phone'])) {
             $sms_overdue = $is_overdue ? "OVERDUE! " : "";
-            // Avoid ₱ symbol for SMS gateways that don't support it
-            $sms_message = "Hi $first_name! $billing_month_short bill $amount pesos | {$consumption} m³. Due $due_date. {$sms_overdue}Pay on time to avoid disconnection. Thank you!";
+            // Avoid ₱ symbol for SMS gateways that don't support it and make usage explicit in cu.m
+            // Example format:
+            // "Hi Juan! Feb 2026 bill 8820 pesos | 304 cu.m | Due Mar 15, 2026. OVERDUE! Pay on time..."
+            $sms_message = "Hi $first_name! $billing_month_short bill $amount pesos | {$consumption} cu.m | Due $due_date. {$sms_overdue}Pay on time to avoid disconnection. Thank you!";
             $sms_result = sendDummySMS($client['phone'], $sms_message, [
                 'first_name' => $client['firstname'],
                 'last_name' => $client['lastname']
