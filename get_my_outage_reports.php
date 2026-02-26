@@ -28,7 +28,9 @@ $reports = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 header('Content-Type: text/html; charset=UTF-8');
-header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 if (empty($reports)) {
     echo '<div style="text-align: center; padding: 40px; color: #666;"><i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i><p style="margin: 0; font-size: 1.1rem;">No reports submitted yet</p><p style="margin: 10px 0 0 0; color: #999; font-size: 0.9rem;">Submit a report above to get started</p></div>';
@@ -51,8 +53,6 @@ foreach ($reports as $report) {
     echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
     if ($is_resolved) {
         echo '<div style="color: #4caf50; font-size: 0.9rem;"><i class="fas fa-check-circle me-2"></i><strong>Status:</strong> Resolved' . ($resolved_date ? ' on ' . $resolved_date : '') . '</div>';
-    } else {
-        echo '<div style="color: #ff9800; font-size: 0.9rem;"><i class="fas fa-hourglass-half me-2"></i><strong>Status:</strong> Under review</div>';
     }
     if ($has_admin_reply) {
         echo '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #2196f3;"><strong style="font-size: 0.9rem;">Admin reply:</strong><p style="margin: 5px 0 0 0; color: #555; font-size: 0.9rem;">' . nl2br(htmlspecialchars($report['resolution_notes'])) . '</p></div>';

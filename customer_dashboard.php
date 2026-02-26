@@ -1708,8 +1708,6 @@ $disconnection_notices = $stmt->get_result();
                                         echo '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
                                         if ($is_resolved) {
                                             echo '<div style="color: #4caf50; font-size: 0.9rem;"><i class="fas fa-check-circle me-2"></i><strong>Status:</strong> Resolved' . ($resolved_date ? ' on ' . $resolved_date : '') . '</div>';
-                                        } else {
-                                            echo '<div style="color: #ff9800; font-size: 0.9rem;"><i class="fas fa-hourglass-half me-2"></i><strong>Status:</strong> Under review</div>';
                                         }
                                         if ($has_admin_reply) {
                                             echo '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 3px solid #2196f3;"><strong style="font-size: 0.9rem;">Admin reply:</strong><p style="margin: 5px 0 0 0; color: #555; font-size: 0.9rem;">' . nl2br(htmlspecialchars($report['resolution_notes'])) . '</p></div>';
@@ -1913,7 +1911,7 @@ $disconnection_notices = $stmt->get_result();
         function refreshOutageReportsList() {
             const el = document.getElementById('outage-reports-list-body');
             if (!el) return;
-            fetch('get_my_outage_reports.php', { credentials: 'same-origin' })
+            fetch('get_my_outage_reports.php?t=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' })
                 .then(function(r) { return r.text(); })
                 .then(function(html) {
                     el.innerHTML = html;
@@ -1921,6 +1919,7 @@ $disconnection_notices = $stmt->get_result();
                 .catch(function() {});
         }
 
+        var reportsRefreshInterval = null;
         function activateTab(tabId) {
             tabButtons.forEach(btn => btn.classList.remove('active'));
             const btn = document.getElementById(tabId);
@@ -1936,7 +1935,15 @@ $disconnection_notices = $stmt->get_result();
             if (pane) {
                 pane.classList.add('show', 'active');
                 pane.style.display = 'block';
-                if (tabId === 'nav-reports-tab') refreshOutageReportsList();
+                if (tabId === 'nav-reports-tab') {
+                    refreshOutageReportsList();
+                    if (reportsRefreshInterval) clearInterval(reportsRefreshInterval);
+                    reportsRefreshInterval = setInterval(function() {
+                        if (panes['nav-reports-tab'] && panes['nav-reports-tab'].style.display === 'block') refreshOutageReportsList();
+                    }, 20000);
+                } else {
+                    if (reportsRefreshInterval) { clearInterval(reportsRefreshInterval); reportsRefreshInterval = null; }
+                }
             }
         }
 
