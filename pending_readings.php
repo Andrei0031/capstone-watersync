@@ -1868,17 +1868,34 @@ function pendingFormatDT($dt) {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)" title="Verify / Correct Reading">
-                                                    <i class="fas fa-check-circle"></i> Verify
-                                                </button>
-                                                <?php if ($delete_password_configured): ?>
-                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
-                                                        <i class="fas fa-trash"></i>
+                                                <div class="btn-group" role="group">
+                                                    <button 
+                                                        class="btn btn-sm btn-outline-secondary" 
+                                                        onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')" 
+                                                        title="View full image">
+                                                        <i class="fas fa-eye"></i>
                                                     </button>
-                                                <?php endif; ?>
+                                                    <button 
+                                                        class="btn btn-sm btn-outline-success" 
+                                                        onclick="quickVerifyReading(<?php echo $row['id']; ?>, <?php echo json_encode($reading); ?>)" 
+                                                        title="Mark as verified using this reading">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button 
+                                                        class="btn btn-sm btn-outline-warning" 
+                                                        onclick="editReading(<?php echo $row['id']; ?>)" 
+                                                        title="Open verify modal / correct reading">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                    <?php if ($delete_password_configured): ?>
+                                                        <button 
+                                                            class="btn btn-sm btn-outline-danger" 
+                                                            onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" 
+                                                            title="Delete Reading">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
@@ -2791,6 +2808,44 @@ function pendingFormatDT($dt) {
             
             passwordModal.show();
             document.getElementById('deletePasswordInput').focus();
+        }
+
+        function quickVerifyReading(id, readingValue) {
+            if (!readingValue || isNaN(readingValue)) {
+                alert('Cannot verify: reading value is missing or invalid.');
+                return;
+            }
+
+            const confirmMsg = `Mark this reading as VERIFIED with value ${readingValue}?`;
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.append('reading_id', id);
+            params.append('verified_reading', readingValue);
+            params.append('admin_notes', 'Quick verify from Needs Verification tab (no modal)');
+
+            fetch('update_meter_reading.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload to move reading into Verified tab and update counts
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to verify reading.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('An error occurred while verifying the reading.');
+            });
         }
 
         function editReading(id) {
