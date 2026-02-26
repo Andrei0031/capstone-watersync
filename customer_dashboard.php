@@ -2032,7 +2032,7 @@ $disconnection_notices = $stmt->get_result();
     <div class="modal fade" id="breakdownModal" tabindex="-1" aria-labelledby="breakdownModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content" style="background: white;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--secondary-color), var(--primary-color)); color: white; border: none;">
                     <h5 class="modal-title" id="breakdownModalLabel">
                         <i class="fas fa-receipt me-2"></i>Billing Breakdown
                     </h5>
@@ -2101,11 +2101,11 @@ $disconnection_notices = $stmt->get_result();
                 </div>
 
                 <div style="background: white; padding: 0;">
-                    <h6 style="color: #667eea; font-weight: 600; margin-bottom: 15px;">
+                    <h6 style="color: var(--primary-color); font-weight: 600; margin-bottom: 15px;">
                         <i class="fas fa-list me-2"></i>Cost Breakdown
                     </h6>
                     
-                    <div style="border-left: 3px solid #667eea; padding-left: 15px; margin-bottom: 15px;">
+                    <div style="border-left: 3px solid var(--primary-color); padding-left: 15px; margin-bottom: 15px;">
                         <!-- First tier: 6 m³ for ₱100 -->
                         <div class="d-flex justify-content-between mb-2 pb-2" style="border-bottom: 1px solid #e0e0e0;">
                             <div>
@@ -2147,10 +2147,10 @@ $disconnection_notices = $stmt->get_result();
                         </div>
                     </div>
 
-                    <div style="background: #f0f8ff; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 3px solid #667eea;">
+                    <div style="background: rgba(33, 150, 243, 0.1); padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 3px solid var(--primary-color);">
                         <div class="d-flex justify-content-between">
-                            <strong style="color: #667eea; font-size: 1.1em;">Total Amount Due:</strong>
-                            <strong style="color: #667eea; font-size: 1.2em;">₱${parseFloat(totalAmount).toFixed(2)}</strong>
+                            <strong style="color: var(--primary-color); font-size: 1.1em;">Total Amount Due:</strong>
+                            <strong style="color: var(--primary-color); font-size: 1.2em;">₱${parseFloat(totalAmount).toFixed(2)}</strong>
                         </div>
                     </div>
 
