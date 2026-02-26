@@ -622,9 +622,11 @@ function initAdminNotificationCenter() {
         targets.forEach((link) => {
             if (!link.dataset.wsNotifBound) {
                 link.dataset.wsNotifBound = '1';
-                link.addEventListener('click', () => {
-                    // Opening reports view marks current notifications as seen/read.
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
                     clearAllUnread();
+                    const href = link.getAttribute('href') || link.href || 'client_reports.php';
+                    setTimeout(function () { window.location.href = href; }, 80);
                 });
             }
 
@@ -757,6 +759,16 @@ function initAdminNotificationCenter() {
                 })
                 .filter((item) => !readSet.has(String(item.uid)))
                 .slice(0, 80);
+
+            const onReportsPage = (function () {
+                const p = (window.location.pathname || '').toLowerCase();
+                return p.indexOf('client_reports.php') !== -1 || p.indexOf('reports.php') !== -1;
+            })();
+            if (onReportsPage && data.reports && data.reports.length > 0) {
+                data.reports.forEach(function (r) { readSet.add(String(r.uid || r.id)); });
+                saveReadState();
+                unread = [];
+            }
 
             const hadNew = currentSnapshot.some((uid) => !previousSnapshot.includes(uid));
             renderUnread();
