@@ -106,18 +106,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Handle report resolution
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resolve_report'])) {
-    $report_id = $_POST['report_id'];
-    $resolution_notes = $_POST['resolution_notes'];
-    
-    $stmt = $conn->prepare("UPDATE outage_reports SET status = 1, resolved_at = CURRENT_TIMESTAMP, resolution_notes = ? WHERE id = ?");
-    $stmt->bind_param("si", $resolution_notes, $report_id);
-    
-    if ($stmt->execute()) {
-        $success_message = "Report has been resolved successfully.";
+    $report_id = (int)($_POST['report_id'] ?? 0);
+    $resolution_notes = trim((string)($_POST['resolution_notes'] ?? ''));
+    if ($report_id > 0) {
+        $stmt = $conn->prepare("UPDATE outage_reports SET status = 1, resolved_at = CURRENT_TIMESTAMP, resolution_notes = ? WHERE id = ?");
+        $stmt->bind_param("si", $resolution_notes, $report_id);
+        if ($stmt->execute()) {
+            $success_message = "Report has been resolved successfully.";
+        } else {
+            $error_message = "Error resolving report. Please try again.";
+        }
+        $stmt->close();
     } else {
-        $error_message = "Error resolving report. Please try again.";
+        $error_message = "Invalid report ID.";
     }
-    $stmt->close();
 }
 
 // Get filter parameters

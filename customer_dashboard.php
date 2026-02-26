@@ -1682,7 +1682,7 @@ $disconnection_notices = $stmt->get_result();
                                     $create_table_sql = "CREATE TABLE IF NOT EXISTS outage_reports (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, location VARCHAR(255) NOT NULL, description TEXT NOT NULL, status TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, resolved_at TIMESTAMP NULL, resolution_notes TEXT, FOREIGN KEY (client_id) REFERENCES client_list(id))";
                                     $conn->query($create_table_sql);
                                 }
-                                $reports_query = "SELECT id, location, description, status, created_at, resolved_at, resolution_notes FROM outage_reports WHERE client_id = ? ORDER BY created_at DESC";
+                                $reports_query = "SELECT id, location, description, COALESCE(status,0) AS status, created_at, resolved_at, resolution_notes FROM outage_reports WHERE client_id = ? ORDER BY created_at DESC";
                                 $stmt = $conn->prepare($reports_query);
                                 $stmt->bind_param("i", $client_id);
                                 $stmt->execute();
@@ -1694,13 +1694,15 @@ $disconnection_notices = $stmt->get_result();
                                 } else {
                                     echo '<div style="max-height: 600px; overflow-y: auto;">';
                                     foreach ($reports as $report) {
-                                        $is_resolved = (int)$report['status'] === 1;
+                                        $status_val = (int)$report['status'];
+                                        $has_notes = !empty(trim((string)($report['resolution_notes'] ?? '')));
+                                        $is_resolved = ($status_val === 1) || $has_notes;
                                         $status_color = $is_resolved ? '#4caf50' : '#ff9800';
                                         $status_text = $is_resolved ? 'Resolved' : 'Pending';
                                         $status_icon = $is_resolved ? 'fa-check-circle' : 'fa-clock';
                                         $created_date = customerFormatDT($report['created_at']);
                                         $resolved_date = !empty($report['resolved_at']) ? customerFormatDT($report['resolved_at']) : null;
-                                        $has_admin_reply = !empty(trim((string)($report['resolution_notes'] ?? '')));
+                                        $has_admin_reply = $has_notes;
                                         echo '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: ' . ($is_resolved ? '#f1f8f4' : '#fff8e1') . ';">';
                                         echo '<div style="display: flex; align-items: center; margin-bottom: 10px;"><span style="background: ' . $status_color . '; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-right: 10px;"><i class="fas ' . $status_icon . ' me-1"></i>' . $status_text . '</span><span style="color: #666; font-size: 0.9rem;"><i class="fas fa-calendar me-1"></i>Submitted: ' . $created_date . '</span></div>';
                                         echo '<h6 style="margin: 0 0 8px 0; color: #333; font-weight: 600;"><i class="fas fa-map-marker-alt me-2" style="color: #2196f3;"></i>' . htmlspecialchars($report['location']) . '</h6>';
