@@ -376,9 +376,14 @@ function initAdminNotificationCenter() {
         'client_reports.php',
         'reports.php',
         'settings_rate.php',
-        'customer_accounts.php'
+        'customer_accounts.php',
+        'disconnection_notices.php',
+        'view_payment.php',
+        'view_client.php'
     ];
-    const isAdminPage = adminPages.some((p) => currentPath.includes('/' + p) || currentPath.endsWith(p));
+    const pathMatch = adminPages.some((p) => currentPath.includes('/' + p) || currentPath.endsWith(p));
+    const hasAdminSidebar = !!document.querySelector('a[href*="client_reports.php"], a[href*="pending_readings.php"]');
+    const isAdminPage = pathMatch || (hasAdminSidebar && !currentPath.includes('login'));
     if (!isAdminPage) return;
 
     // Inject styles for notification center (once)
@@ -387,18 +392,23 @@ function initAdminNotificationCenter() {
         style.id = 'ws-admin-notification-center-styles';
         style.textContent = `
             .ws-admin-notif-fab {
-                position: fixed;
-                right: 20px;
-                bottom: 20px;
-                width: 56px;
-                height: 56px;
-                border: none;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #2563eb, #1d4ed8);
-                color: #fff;
-                box-shadow: 0 10px 25px rgba(37, 99, 235, 0.35);
-                z-index: 10000;
-                cursor: pointer;
+                position: fixed !important;
+                right: 20px !important;
+                bottom: 20px !important;
+                width: 56px !important;
+                height: 56px !important;
+                border: none !important;
+                border-radius: 50% !important;
+                background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+                color: #fff !important;
+                box-shadow: 0 10px 25px rgba(37, 99, 235, 0.35) !important;
+                z-index: 99999 !important;
+                cursor: pointer !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
             .ws-admin-notif-fab i {
                 font-size: 1.15rem;
@@ -431,7 +441,7 @@ function initAdminNotificationCenter() {
                 border: 1px solid #e5e7eb;
                 border-radius: 12px;
                 box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
-                z-index: 10000;
+                z-index: 99999;
                 overflow: hidden;
                 opacity: 0;
                 visibility: hidden;
@@ -752,6 +762,16 @@ function initAdminNotificationCenter() {
     // Prime and then keep polling frequently for near-realtime updates.
     poll();
     setInterval(() => poll(), 5000);
+
+    // Keep FAB in DOM: if something removes it (e.g. dynamic content), re-append.
+    setInterval(() => {
+        if (!document.body.contains(fab)) {
+            document.body.appendChild(fab);
+        }
+        if (!document.body.contains(panel)) {
+            document.body.appendChild(panel);
+        }
+    }, 2000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
