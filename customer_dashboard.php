@@ -2030,7 +2030,7 @@ $disconnection_notices = $stmt->get_result();
 
     <!-- Billing Breakdown Modal -->
     <div class="modal fade" id="breakdownModal" tabindex="-1" aria-labelledby="breakdownModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content" style="background: white;">
                 <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
                     <h5 class="modal-title" id="breakdownModalLabel">
@@ -2038,8 +2038,8 @@ $disconnection_notices = $stmt->get_result();
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" style="background: white;">
-                    <div id="breakdownContent" style="background: white;">
+                <div class="modal-body" style="background: white; padding: 20px;">
+                    <div id="breakdownContent">
                         <div class="text-center">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
@@ -2158,8 +2158,7 @@ $disconnection_notices = $stmt->get_result();
                         <small class="text-muted" style="line-height: 1.6;">
                             <strong style="color: #333;">Pricing Structure:</strong><br>
                             • First 6 m³: ₱100.00 (flat rate)<br>
-                            • Above 6 m³: ₱20.00 per m³<br>
-                            <i class="fas fa-info-circle me-1" style="color: #667eea;"></i>For detailed payment history, contact customer service.
+                            • Above 6 m³: ₱20.00 per m³
                         </small>
                     </div>
                 </div>
