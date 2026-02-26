@@ -464,7 +464,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Get filter parameters
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
-$billing_month = isset($_GET['billing_month']) ? $_GET['billing_month'] : '';
 $billing_cycle_filter = isset($_GET['billing_cycle']) ? intval($_GET['billing_cycle']) : 0;
 
 // Build the WHERE clause based on filters
@@ -493,12 +492,6 @@ if ($status_filter) {
             $where_conditions[] = "b.status = 0 AND b.due_date < CURRENT_DATE()";
             break;
     }
-}
-
-if ($billing_month) {
-    $where_conditions[] = "DATE_FORMAT(b.reading_date, '%Y-%m') = ?";
-    $params[] = $billing_month;
-    $types .= 's';
 }
 
 if ($billing_cycle_filter) {
@@ -1434,10 +1427,6 @@ if ($params) {
                         <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
                         <option value="overdue" <?php echo $status_filter === 'overdue' ? 'selected' : ''; ?>>Overdue</option>
                     </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="billingMonth" class="form-label mb-1">Billing Month</label>
-                    <input type="month" id="billingMonth" name="billing_month" class="form-control" value="<?php echo htmlspecialchars($billing_month); ?>">
                 </div>
                 <div class="col-12 d-flex justify-content-end gap-2">
                     <a href="billing_list.php" class="btn btn-outline-secondary">
