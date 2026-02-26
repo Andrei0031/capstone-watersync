@@ -2058,10 +2058,34 @@ $disconnection_notices = $stmt->get_result();
     function loadBillBreakdown(billId, readingDate, totalAmount) {
         const breakdownContent = document.getElementById('breakdownContent');
         
-        // Simple calculation based on total amount
-        // Default rate and assumptions
-        const ratePerM3 = 10.00;
-        const estimatedUsage = (totalAmount / ratePerM3).toFixed(2);
+        // Tiered pricing calculation
+        // First 6 m³ = ₱100 flat
+        // Above 6 m³ = ₱20 per m³
+        
+        const FIRST_TIER_USAGE = 6;
+        const FIRST_TIER_PRICE = 100.00;
+        const EXCESS_PRICE_PER_M3 = 20.00;
+        
+        // Estimate usage from total amount
+        let estimatedUsage = (totalAmount - FIRST_TIER_PRICE) / EXCESS_PRICE_PER_M3;
+        if (estimatedUsage < 0) {
+            estimatedUsage = 0;
+        }
+        estimatedUsage = estimatedUsage + FIRST_TIER_USAGE;
+        estimatedUsage = parseFloat(estimatedUsage).toFixed(2);
+        
+        // Calculate breakdown
+        let baseCharge = 0;
+        let excessCharge = 0;
+        let excessUsage = 0;
+        
+        if (estimatedUsage <= FIRST_TIER_USAGE) {
+            baseCharge = FIRST_TIER_PRICE;
+        } else {
+            baseCharge = FIRST_TIER_PRICE;
+            excessUsage = estimatedUsage - FIRST_TIER_USAGE;
+            excessCharge = excessUsage * EXCESS_PRICE_PER_M3;
+        }
         
         let html = `
             <div class="breakdown-container" style="background: white;">
@@ -2082,28 +2106,60 @@ $disconnection_notices = $stmt->get_result();
                     </h6>
                     
                     <div style="border-left: 3px solid #667eea; padding-left: 15px; margin-bottom: 15px;">
+                        <!-- First tier: 6 m³ for ₱100 -->
                         <div class="d-flex justify-content-between mb-2 pb-2" style="border-bottom: 1px solid #e0e0e0;">
                             <div>
-                                <strong style="display: block; margin-bottom: 4px;">Water Usage Charge</strong>
-                                <small class="text-muted">${estimatedUsage} m³ × ₱${ratePerM3.toFixed(2)}/m³</small>
+                                <strong style="display: block; margin-bottom: 4px;">First 6 m³ Usage</strong>
+                                <small class="text-muted">First 6 cubic meters</small>
                             </div>
                             <div class="text-end">
-                                <strong style="color: #333; font-size: 1.1em;">₱${(estimatedUsage * ratePerM3).toFixed(2)}</strong>
+                                <strong style="color: #333; font-size: 1.1em;">₱${FIRST_TIER_PRICE.toFixed(2)}</strong>
                             </div>
                         </div>
+        `;
+        
+        // Excess usage (if any)
+        if (excessUsage > 0) {
+            html += `
+                        <div class="d-flex justify-content-between mb-2 pb-2" style="border-bottom: 1px solid #e0e0e0;">
+                            <div>
+                                <strong style="display: block; margin-bottom: 4px;">Excess Usage</strong>
+                                <small class="text-muted">${excessUsage.toFixed(2)} m³ × ₱${EXCESS_PRICE_PER_M3.toFixed(2)}/m³</small>
+                            </div>
+                            <div class="text-end">
+                                <strong style="color: #333; font-size: 1.1em;">₱${excessCharge.toFixed(2)}</strong>
+                            </div>
+                        </div>
+            `;
+        }
+        
+        html += `
                     </div>
 
                     <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 15px;">
+                        <div class="d-flex justify-content-between mb-2">
+                            <strong style="color: #333;">Subtotal:</strong>
+                            <strong style="color: #333;">₱${(baseCharge + excessCharge).toFixed(2)}</strong>
+                        </div>
                         <div class="d-flex justify-content-between">
-                            <strong style="color: #333;">Total Amount Due:</strong>
+                            <strong style="color: #333;">Total Usage:</strong>
+                            <strong style="color: #333;">${estimatedUsage} m³</strong>
+                        </div>
+                    </div>
+
+                    <div style="background: #f0f8ff; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 3px solid #667eea;">
+                        <div class="d-flex justify-content-between">
+                            <strong style="color: #667eea; font-size: 1.1em;">Total Amount Due:</strong>
                             <strong style="color: #667eea; font-size: 1.2em;">₱${parseFloat(totalAmount).toFixed(2)}</strong>
                         </div>
                     </div>
 
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            This is your bill breakdown. For detailed payment history, please contact customer service.
+                        <small class="text-muted" style="line-height: 1.6;">
+                            <strong style="color: #333;">Pricing Structure:</strong><br>
+                            • First 6 m³: ₱100.00 (flat rate)<br>
+                            • Above 6 m³: ₱20.00 per m³<br>
+                            <i class="fas fa-info-circle me-1" style="color: #667eea;"></i>For detailed payment history, contact customer service.
                         </small>
                     </div>
                 </div>
