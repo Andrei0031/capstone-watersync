@@ -512,19 +512,22 @@ function initAdminNotificationCenter() {
                 background: #ffffff;
             }
             .ws-sidebar-unread-badge {
-                display: inline-flex;
+                display: inline-flex !important;
                 align-items: center;
                 justify-content: center;
                 min-width: 18px;
                 height: 18px;
                 padding: 0 5px;
                 border-radius: 999px;
-                background: #ef4444;
-                color: #ffffff;
+                background: #ef4444 !important;
+                color: #ffffff !important;
                 font-size: 0.68rem;
                 font-weight: 700;
                 margin-left: auto;
                 box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+                visibility: visible !important;
+                opacity: 1 !important;
+                flex-shrink: 0;
             }
             .ws-sidebar-unread-badge.pulse {
                 animation: ws-badge-pulse 1.2s infinite;
@@ -591,13 +594,18 @@ function initAdminNotificationCenter() {
     const getSidebarTargets = () => {
         const selectors = [
             '.sidebar a[href="client_reports.php"]',
+            '.sidebar a[href*="client_reports.php"]',
             '.sidebar a[href$="/client_reports.php"]',
             '.sidebar a[href="reports.php"]',
-            '.sidebar a[href$="/reports.php"]'
+            '.sidebar a[href*="reports.php"]',
+            '.nav-content a[href*="client_reports"]',
+            '.nav-content a[href*="reports.php"]'
         ];
         const all = [];
         selectors.forEach((s) => {
-            document.querySelectorAll(s).forEach((el) => all.push(el));
+            try {
+                document.querySelectorAll(s).forEach((el) => all.push(el));
+            } catch (e) { /* ignore */ }
         });
         return Array.from(new Set(all));
     };
@@ -624,12 +632,16 @@ function initAdminNotificationCenter() {
             if (!bubble) {
                 bubble = document.createElement('span');
                 bubble.className = 'ws-sidebar-unread-badge';
+                bubble.setAttribute('aria-hidden', 'true');
+                if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
                 link.appendChild(bubble);
             }
 
             if (count > 0) {
                 bubble.textContent = count > 99 ? '99+' : String(count);
                 bubble.style.display = 'inline-flex';
+                bubble.style.visibility = 'visible';
+                bubble.style.opacity = '1';
                 bubble.classList.add('pulse');
             } else {
                 bubble.style.display = 'none';
@@ -772,6 +784,11 @@ function initAdminNotificationCenter() {
             document.body.appendChild(panel);
         }
     }, 2000);
+
+    // Re-apply sidebar unread bubbles so they stay visible (e.g. after DOM updates).
+    setInterval(() => {
+        updateSidebarBubbles(unread.length);
+    }, 3000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
