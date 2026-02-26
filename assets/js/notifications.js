@@ -512,21 +512,19 @@ function initAdminNotificationCenter() {
                 background: #ffffff;
             }
             .ws-sidebar-unread-badge {
-                display: inline-flex !important;
+                display: none;
                 align-items: center;
                 justify-content: center;
                 min-width: 18px;
                 height: 18px;
                 padding: 0 5px;
                 border-radius: 999px;
-                background: #ef4444 !important;
-                color: #ffffff !important;
+                background: #ef4444;
+                color: #ffffff;
                 font-size: 0.68rem;
                 font-weight: 700;
                 margin-left: auto;
                 box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
-                visibility: visible !important;
-                opacity: 1 !important;
                 flex-shrink: 0;
             }
             .ws-sidebar-unread-badge.pulse {
