@@ -12,10 +12,9 @@ $response = ['count' => 0, 'success' => true];
 try {
     // Check if user is logged in
     if (isset($_SESSION['client_id'])) {
-        // Customer/Client view - count only notices created after last time they opened Notices page
+        // Customer/Client view - count only service notices created after last time they opened Notices page
         $client_id = $_SESSION['client_id'];
         $latest_notice_at = null;
-        $latest_disconnection_at = null;
         $notices_since = isset($_SESSION['notices_last_viewed_at']) ? $conn->real_escape_string($_SESSION['notices_last_viewed_at']) : null;
         $notices_since_sql = $notices_since ? " AND created_at > '$notices_since'" : "";
 
@@ -37,33 +36,10 @@ try {
             $count += $notices_count;
         }
 
-        // Count unacknowledged disconnection notices (optionally only since last view)
-        $disconnection_query = "
-            SELECT COUNT(*) as count, MAX(created_at) as latest_at
-            FROM disconnection_notices 
-            WHERE client_id = ? 
-            AND status IN ('pending', 'sent')
-            $notices_since_sql
-        ";
-        $stmt = $conn->prepare($disconnection_query);
-        $stmt->bind_param("i", $client_id);
-        $stmt->execute();
-        $disconnection_result = $stmt->get_result();
-        if ($disconnection_result) {
-            $disconnection_row = $disconnection_result->fetch_assoc();
-            $disconnection_count = $disconnection_row['count'] ?? 0;
-            $latest_disconnection_at = $disconnection_row['latest_at'] ?? null;
-            $count += $disconnection_count;
-        }
-
         // Build a stable client event key so UI can detect "new" notifications
-        // even when total count stays the same.
         $latest_ts = 0;
         if (!empty($latest_notice_at)) {
             $latest_ts = max($latest_ts, strtotime($latest_notice_at) ?: 0);
-        }
-        if (!empty($latest_disconnection_at)) {
-            $latest_ts = max($latest_ts, strtotime($latest_disconnection_at) ?: 0);
         }
         $response['event_key'] = 'client-' . $client_id . '-' . $latest_ts . '-' . intval($count);
         $response['latest_timestamp'] = $latest_ts;
