@@ -1366,10 +1366,15 @@ if ($params) {
     <div class="card card-soft mb-4">
         <div class="card-body">
             <form id="filterForm" class="row g-3" method="GET" action="billing_list.php">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search bills..." name="search" value="<?php echo htmlspecialchars($search); ?>">
+                    </div>
+                </div>
                 <div class="col-md-4">
-                    <label class="form-label">Billing Cycle</label>
                     <select class="form-select" id="billingCycleSelect" name="billing_cycle">
-                        <option value="">All Cycles</option>
+                        <option value="">All Billing Cycles</option>
                         <?php
                         $cycles_query = "SELECT id, cycle_name, status FROM billing_cycles ORDER BY created_at DESC";
                         $cycles_result = $conn->query($cycles_query);
@@ -1384,21 +1389,9 @@ if ($params) {
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">Status</label>
-                    <select class="form-select" id="statusSelect" name="status">
-                        <option value="">All Status</option>
-                        <option value="paid" <?php echo $status_filter === 'paid' ? 'selected' : ''; ?>>Paid</option>
-                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Unpaid</option>
-                        <option value="overdue" <?php echo $status_filter === 'overdue' ? 'selected' : ''; ?>>Overdue</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Month</label>
-                    <input type="month" id="billingMonthSelect" class="form-control" name="billing_month" value="<?php echo htmlspecialchars($billing_month); ?>">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">Reset</button>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Filter
+                    </button>
                 </div>
             </form>
         </div>
@@ -2198,20 +2191,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // View Bill Modal Functionality
     // Real-time search functionality
     const searchInput = document.getElementById('searchInput');
+    const billingCycleSelect = document.getElementById('billingCycleSelect');
     const statusSelect = document.getElementById('statusSelect');
     const billingMonthSelect = document.getElementById('billingMonthSelect');
     const filterForm = document.getElementById('filterForm');
-    const resetFiltersBtn = document.getElementById('resetFilters');
     
-    let searchTimeout;
-    
-    // Real-time search with debouncing
+    // Submit form on Enter key in search input
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(function() {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
                 filterForm.submit();
-            }, 500); // Wait 500ms after user stops typing
+            }
+        });
+    }
+    
+    // Submit form when billing cycle changes
+    if (billingCycleSelect) {
+        billingCycleSelect.addEventListener('change', function() {
+            filterForm.submit();
         });
     }
     
@@ -2229,12 +2227,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Reset filters
+    // Reset filters - clear search and billing cycle
+    const resetFiltersBtn = document.getElementById('resetFilters');
     if (resetFiltersBtn) {
         resetFiltersBtn.addEventListener('click', function() {
-            searchInput.value = '';
-            statusSelect.value = '';
-            billingMonthSelect.value = '';
+            if (searchInput) searchInput.value = '';
+            if (statusSelect) statusSelect.value = '';
+            if (billingMonthSelect) billingMonthSelect.value = '';
+            if (billingCycleSelect) billingCycleSelect.value = '';
             filterForm.submit();
         });
     }
