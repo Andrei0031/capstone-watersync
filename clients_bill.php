@@ -912,10 +912,7 @@ $result = $conn->query($sql);
                         <option value="overdue">Overdue</option>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <input type="month" class="form-control" name="billing_month">
-                </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
                 </div>
                 <div class="col-md-2">
@@ -1145,10 +1142,6 @@ $result = $conn->query($sql);
                                     </option>
                                 <?php endwhile; ?>
                             </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Billing Period</label>
-                            <input type="month" class="form-control" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Previous Reading</label>
