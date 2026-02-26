@@ -1401,16 +1401,18 @@ if ($params) {
     <!-- Filter Section -->
     <div class="card card-soft mb-4">
         <div class="card-body">
-            <form id="filterForm" class="row g-3" method="GET" action="billing_list.php">
-                <div class="col-md-6">
+            <form id="filterForm" class="row g-3 align-items-end" method="GET" action="billing_list.php">
+                <div class="col-md-4">
+                    <label for="searchInput" class="form-label mb-1">Search</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search bills..." name="search" value="<?php echo htmlspecialchars($search); ?>">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, code..." name="search" value="<?php echo htmlspecialchars($search); ?>">
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label for="billingCycleSelect" class="form-label mb-1">Billing Cycle</label>
                     <select class="form-select" id="billingCycleSelect" name="billing_cycle">
-                        <option value="">All Billing Cycles</option>
+                        <option value="">All Cycles</option>
                         <?php
                         $cycles_query = "SELECT id, cycle_name, status FROM billing_cycles ORDER BY created_at DESC";
                         $cycles_result = $conn->query($cycles_query);
@@ -1424,9 +1426,25 @@ if ($params) {
                         ?>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label for="statusFilter" class="form-label mb-1">Status</label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">All Status</option>
+                        <option value="paid" <?php echo $status_filter === 'paid' ? 'selected' : ''; ?>>Paid</option>
+                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                        <option value="overdue" <?php echo $status_filter === 'overdue' ? 'selected' : ''; ?>>Overdue</option>
+                    </select>
+                </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-2"></i>Filter
+                    <label for="billingMonth" class="form-label mb-1">Billing Month</label>
+                    <input type="month" id="billingMonth" name="billing_month" class="form-control" value="<?php echo htmlspecialchars($billing_month); ?>">
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a href="billing_list.php" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo me-1"></i>Reset
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Apply Filters
                     </button>
                 </div>
             </form>
