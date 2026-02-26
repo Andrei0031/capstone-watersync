@@ -108,12 +108,37 @@ function isTesseractAvailable() {
     return $testReturn === 0;
 }
 
-// Get current active billing cycle (for UI display)
+// Get current active billing cycle (for UI display and stats)
 $active_cycle = null;
 $active_cycle_sql = "SELECT * FROM billing_cycles WHERE status = 'active' LIMIT 1";
 $active_cycle_result = $conn->query($active_cycle_sql);
 if ($active_cycle_result && $active_cycle_result->num_rows > 0) {
     $active_cycle = $active_cycle_result->fetch_assoc();
+}
+
+// Track how many active clients already have a reading in the active cycle
+$active_clients_count = 0;
+$cycle_scanned_clients_count = 0;
+if ($active_cycle) {
+    // Total active clients
+    $clients_sql = "SELECT COUNT(*) AS cnt FROM client_list WHERE status = 1";
+    if ($clients_result = $conn->query($clients_sql)) {
+        if ($row = $clients_result->fetch_assoc()) {
+            $active_clients_count = (int) ($row['cnt'] ?? 0);
+        }
+    }
+
+    // Distinct clients with at least one pending_meter_readings record in this billing cycle
+    if ($stmt = $conn->prepare("SELECT COUNT(DISTINCT client_id) AS cnt FROM pending_meter_readings WHERE billing_cycle_id = ?")) {
+        $stmt->bind_param("i", $active_cycle['id']);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            if ($res && $row = $res->fetch_assoc()) {
+                $cycle_scanned_clients_count = (int) ($row['cnt'] ?? 0);
+            }
+        }
+        $stmt->close();
+    }
 }
 
 // Calculate statistics (count ALL readings to match what's displayed in lists)
@@ -1490,9 +1515,17 @@ function pendingFormatDT($dt) {
                             </small>
                         </div>
                         <div class="col-md-4">
-                            <small class="text-primary">
+                            <small class="text-primary d-block">
                                 <i class="fas fa-mobile-alt me-1"></i>
-                                Mobile readings will auto-assign to this cycle
+                                Mobile readings auto-assign to this cycle
+                            </small>
+                            <small class="text-muted">
+                                <i class="fas fa-users me-1"></i>
+                                Scanned this cycle: 
+                                <strong><?php echo $cycle_scanned_clients_count; ?></strong>
+                                /
+                                <strong><?php echo $active_clients_count; ?></strong>
+                                active clients
                             </small>
                         </div>
                     </div>
