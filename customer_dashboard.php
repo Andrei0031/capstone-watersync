@@ -1363,6 +1363,7 @@ $disconnection_notices = $stmt->get_result();
                                                 <th>Usage</th>
                                                 <th>Amount</th>
                                                 <th class="d-none d-md-table-cell">Due Date</th>
+                                                <th class="d-none d-md-table-cell">Action</th>
                                                 <th>Status</th>
                                             </tr>
                                         </thead>
@@ -1474,6 +1475,15 @@ $disconnection_notices = $stmt->get_result();
                                                 </td>
                                                 <td class="d-none d-md-table-cell">
                                                     <?php echo date('M d, Y', strtotime($bill['due_date'])); ?>
+                                                </td>
+                                                <td class="d-none d-md-table-cell">
+                                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#breakdownModal"
+                                                            onclick="loadBillBreakdown(<?php echo $bill['id']; ?>, '<?php echo date('M d, Y', strtotime($bill['reading_date'])); ?>', <?php echo $bill['total']; ?>)"
+                                                            title="View billing breakdown">
+                                                        <i class="fas fa-eye me-1"></i>View Breakdown
+                                                    </button>
                                                 </td>
                                                 <td>
                                                     <span class="badge <?php 
@@ -1988,6 +1998,137 @@ $disconnection_notices = $stmt->get_result();
             });
         }
     });
+    </script>
+
+    <!-- Billing Breakdown Modal -->
+    <div class="modal fade" id="breakdownModal" tabindex="-1" aria-labelledby="breakdownModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #2196f3, #1976d2); color: white;">
+                    <h5 class="modal-title" id="breakdownModalLabel">
+                        <i class="fas fa-receipt me-2"></i>Billing Breakdown
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="breakdownContent">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function loadBillBreakdown(billId, readingDate, totalAmount) {
+        const breakdownContent = document.getElementById('breakdownContent');
+        
+        // Fetch breakdown data
+        fetch(`get_bill_breakdown.php?bill_id=${billId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let html = `
+                        <div class="breakdown-container">
+                            <div class="mb-3 pb-3 border-bottom">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <strong>Reading Date:</strong>
+                                    <span>${readingDate}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <strong>Total Amount:</strong>
+                                    <span class="text-primary" style="font-size: 1.2em; font-weight: 600;">₱${parseFloat(totalAmount).toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <div class="breakdown-details">
+                                <h6 class="mb-3" style="color: #1976d2;"><i class="fas fa-list me-2"></i>Cost Breakdown</h6>
+                    `;
+
+                    // Base charge
+                    if (data.base_charge) {
+                        html += `
+                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                <div>
+                                    <strong>Water Usage</strong>
+                                    <div class="small text-muted">${data.usage} m³ × ₱${data.rate_per_cubic.toFixed(2)}/m³</div>
+                                </div>
+                                <div class="text-end">
+                                    <strong>₱${data.base_charge.toFixed(2)}</strong>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Fees
+                    if (data.fees && data.fees.length > 0) {
+                        html += `<div class="mb-3"><strong class="d-block mb-2" style="color: #f57c00;">Additional Fees</strong>`;
+                        data.fees.forEach(fee => {
+                            html += `
+                                <div class="d-flex justify-content-between mb-1 ps-2">
+                                    <span>${fee.name}</span>
+                                    <span class="text-warning">₱${fee.amount.toFixed(2)}</span>
+                                </div>
+                            `;
+                        });
+                        html += `</div>`;
+                    }
+
+                    // Taxes
+                    if (data.tax_amount && data.tax_amount > 0) {
+                        html += `
+                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                <div>
+                                    <strong>Tax</strong>
+                                    <div class="small text-muted">${data.tax_rate}% of subtotal</div>
+                                </div>
+                                <div class="text-end">
+                                    <strong>₱${data.tax_amount.toFixed(2)}</strong>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Subtotal
+                    if (data.subtotal) {
+                        html += `
+                            <div class="d-flex justify-content-between mb-2 pb-2" style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+                                <strong>Subtotal:</strong>
+                                <strong>₱${data.subtotal.toFixed(2)}</strong>
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                                </div>
+                            </div>
+                    `;
+
+                    breakdownContent.innerHTML = html;
+                } else {
+                    breakdownContent.innerHTML = `
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Unable to load breakdown details.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                breakdownContent.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-times-circle me-2"></i>Error loading breakdown. Please try again.
+                    </div>
+                `;
+            });
+    }
     </script>
 </body>
 </html> 
