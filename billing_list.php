@@ -457,6 +457,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
 $billing_month = isset($_GET['billing_month']) ? $_GET['billing_month'] : '';
+$billing_cycle_filter = isset($_GET['billing_cycle']) ? intval($_GET['billing_cycle']) : 0;
 
 // Build the WHERE clause based on filters
 $where_conditions = [];
@@ -490,6 +491,12 @@ if ($billing_month) {
     $where_conditions[] = "DATE_FORMAT(b.reading_date, '%Y-%m') = ?";
     $params[] = $billing_month;
     $types .= 's';
+}
+
+if ($billing_cycle_filter) {
+    $where_conditions[] = "b.billing_cycle_id = ?";
+    $params[] = $billing_cycle_filter;
+    $types .= 'i';
 }
 
 $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
@@ -1360,12 +1367,24 @@ if ($params) {
         <div class="card-body">
             <form id="filterForm" class="row g-3" method="GET" action="billing_list.php">
                 <div class="col-md-4">
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search bills..." name="search" value="<?php echo htmlspecialchars($search); ?>">
-                    </div>
+                    <label class="form-label">Billing Cycle</label>
+                    <select class="form-select" id="billingCycleSelect" name="billing_cycle">
+                        <option value="">All Cycles</option>
+                        <?php
+                        $cycles_query = "SELECT id, cycle_name, status FROM billing_cycles ORDER BY created_at DESC";
+                        $cycles_result = $conn->query($cycles_query);
+                        if ($cycles_result && $cycles_result->num_rows > 0) {
+                            while ($cycle = $cycles_result->fetch_assoc()) {
+                                $selected = $billing_cycle_filter == $cycle['id'] ? 'selected' : '';
+                                $status_badge = ucfirst($cycle['status']);
+                                echo '<option value="' . $cycle['id'] . '" ' . $selected . '>' . htmlspecialchars($cycle['cycle_name']) . ' (' . $status_badge . ')</option>';
+                            }
+                        }
+                        ?>
+                    </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label">Status</label>
                     <select class="form-select" id="statusSelect" name="status">
                         <option value="">All Status</option>
                         <option value="paid" <?php echo $status_filter === 'paid' ? 'selected' : ''; ?>>Paid</option>
@@ -1374,9 +1393,11 @@ if ($params) {
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label">Month</label>
                     <input type="month" id="billingMonthSelect" class="form-control" name="billing_month" value="<?php echo htmlspecialchars($billing_month); ?>">
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
                     <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">Reset</button>
                 </div>
             </form>
