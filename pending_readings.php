@@ -409,11 +409,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 }
                 
                 // Check if reading needs review based on consumption
-                // Default behavior: OCR readings require human confirmation.
-                // Start all OCR-processed readings in Needs Verification.
-                // Admins promote accurate readings to VERIFIED using the quick check or edit actions.
+                // Decide initial status based on digit detection confidence:
+                // - If ALL detected digits have good confidence and we have at least 5 digits,
+                //   automatically mark as VERIFIED.
+                // - Otherwise, send to Needs Verification for manual review.
                 $needsReview = true;
                 $statusToSet = 'needs_review';
+                $digitStats = $ocrResult['digit_stats'] ?? null;
+                if ($digitStats) {
+                    $digitCount = (int)($digitStats['count'] ?? 0);
+                    $minConf   = (float)($digitStats['min_confidence'] ?? 0.0);
+                    // Require at least 5 digits and all with confidence >= 0.5 to auto-verify
+                    if ($digitCount >= 5 && $minConf >= 0.5) {
+                        $needsReview = false;
+                        $statusToSet = 'verified';
+                    }
+                }
                 
                 // Update reading status (force Asia/Manila timestamp via PHP)
                 $processedAt = date('Y-m-d H:i:s');

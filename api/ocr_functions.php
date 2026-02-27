@@ -510,16 +510,28 @@ function processImageWithRoboflowDigits($imagePath) {
         
         // Create extracted text representation (for compatibility)
         $extractedText = 'Detected digits: ';
+        $confidences = [];
         foreach ($digits as $digit) {
-            $extractedText .= $digit['digit'] . ' (confidence: ' . round($digit['confidence'], 2) . ', x: ' . round($digit['x']) . ') ';
+            $c = isset($digit['confidence']) ? floatval($digit['confidence']) : 0.0;
+            $confidences[] = $c;
+            $extractedText .= $digit['digit'] . ' (confidence: ' . round($c, 2) . ', x: ' . round($digit['x']) . ') ';
         }
+
+        // Basic stats for callers (used to decide auto-verify vs needs-review)
+        $digitStats = [
+            'count' => count($digits),
+            'min_confidence' => !empty($confidences) ? min($confidences) : 0.0,
+            'avg_confidence' => !empty($confidences) ? array_sum($confidences) / count($confidences) : 0.0,
+        ];
         
         if ($meterReading) {
             error_log("✓ Roboflow OCR: Successfully extracted reading: $meterReading");
             return [
                 'success' => true,
                 'extracted_text' => $extractedText,
-                'meter_reading' => $meterReading
+                'meter_reading' => $meterReading,
+                'digit_stats' => $digitStats,
+                'digits' => $digits,
             ];
         } else {
             $errorMsg = 'Could not form 5-digit reading from detected digits. Found ' . count($digits) . ' digit(s): ' . implode(', ', array_map(function($d) { return $d['digit']; }, $digits));
@@ -528,7 +540,9 @@ function processImageWithRoboflowDigits($imagePath) {
                 'success' => false,
                 'extracted_text' => $extractedText,
                 'meter_reading' => null,
-                'error' => $errorMsg
+                'error' => $errorMsg,
+                'digit_stats' => $digitStats,
+                'digits' => $digits,
             ];
         }
         
