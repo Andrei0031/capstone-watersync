@@ -754,11 +754,16 @@ if (!$failed_result) {
 // Format datetime using PHP's default timezone (already forced to Asia/Manila via timezone_helper)
 function pendingFormatDT($dt) {
     if (empty($dt)) return 'N/A';
-    $ts = @strtotime((string)$dt);
-    if ($ts === false) {
+    
+    try {
+        // Parse the datetime string as-is (already in Manila time from SQL CONVERT_TZ)
+        // Don't use strtotime as it may misinterpret timezone
+        $datetime = new DateTime($dt);
+        // Return formatted datetime without timezone conversion
+        return $datetime->format('M d, Y g:i A');
+    } catch (Exception $e) {
         return is_string($dt) ? $dt : 'N/A';
     }
-    return date('M d, Y g:i A', $ts);
 }
 
 ?>
