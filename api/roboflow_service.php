@@ -951,10 +951,10 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.15 (15%) - higher to filter out false detections
-            // Version 7 trained model - balance catching all digits vs avoiding garbage detections
-            // This filters low-confidence erroneous detections while keeping legitimate digits
-            if ($isDigit && $confidence > 0.15) {
+            // Use confidence threshold of 0.10 (10%) - balanced to filter garbage while keeping legitimate digits
+            // Version 7 trained model - rejects very low confidence detections but accepts reasonable ones
+            // This filters out clear false detections while preserving actual meter digits
+            if ($isDigit && $confidence > 0.10) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -964,8 +964,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.15) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.15)");
+            } elseif ($isDigit && $confidence <= 0.10) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.10)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
@@ -1092,30 +1092,27 @@ function detectDigitsWithRoboflow($imagePath) {
  * @return string|null 5-digit reading or null if not enough digits
  */
 function extractMeterReadingFromDigits($digits) {
+    // Require at least 4 digits to form a valid meter reading
+    // Water meter typically shows 4-5 digits (e.g., 0342, 01234)
     if (empty($digits) || count($digits) < 4) {
-        // Require at least 4 digits to form a valid meter reading (instead of 3)
-        // This prevents incomplete or erroneous readings from single/double digit detections
         return null;
     }
     
     // Step 1: Filter digits by confidence (remove very low-confidence detections)
-    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.15)
-    // We already filtered to 0.15 in detectDigitsWithRoboflow, so we can be more lenient here
-    $minConfidence = 0.15; // Match the detection threshold (15%) - filters out low-confidence garbage
+    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.10)
+    // We already filtered to 0.10 in detectDigitsWithRoboflow, so we can be more lenient here
+    $minConfidence = 0.10; // Match the detection threshold (10%) - balanced filtering
     $filteredDigits = array_filter($digits, function($digit) use ($minConfidence) {
         return isset($digit['confidence']) && $digit['confidence'] >= $minConfidence;
     });
     
-    if (count($filteredDigits) < 4) {
-        error_log("⚠ Not enough digits after confidence filter. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
-        error_log("   Original digits count: " . count($digits));
-        if (count($digits) > 0) {
-            $confidences = array_map(function($d) { return round($d['confidence'] ?? 0, 3); }, $digits);
-            error_log("   Digit confidences: " . implode(', ', $confidences));
-        }
-        // Only use filtered digits - don't include low-confidence garbage detections
-        if (count($filteredDigits) < 3) {
-            // Less than 3 high-confidence digits = can't form valid reading
+    if (count($filteredDigits) < 5) {
+        error_log("⚠ Less than 5 high-confidence digits. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
+        error_log("   Continuing with " . count($filteredDigits) . " detected digits if >= 4");
+        
+        // Use what we have if at least 4 high-confidence digits
+        if (count($filteredDigits) < 4) {
+            error_log("✗ Insufficient high-confidence digits: " . count($filteredDigits) . " < 4 required");
             return null;
         }
     }
