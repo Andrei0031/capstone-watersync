@@ -128,8 +128,8 @@ if ($active_cycle) {
         }
     }
 
-    // Distinct clients with at least one pending_meter_readings record in this billing cycle
-    if ($stmt = $conn->prepare("SELECT COUNT(DISTINCT client_id) AS cnt FROM pending_meter_readings WHERE billing_cycle_id = ?")) {
+    // Distinct clients with at least one mobile upload in this billing cycle
+    if ($stmt = $conn->prepare("SELECT COUNT(DISTINCT client_id) AS cnt FROM pending_meter_readings WHERE billing_cycle_id = ? AND mobile_upload_id IS NOT NULL")) {
         $stmt->bind_param("i", $active_cycle['id']);
         if ($stmt->execute()) {
             $res = $stmt->get_result();
