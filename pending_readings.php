@@ -141,7 +141,7 @@ if ($active_cycle) {
     }
 }
 
-// Calculate statistics (count ALL readings to match what's displayed in lists)
+// Calculate statistics (by active billing cycle if available, otherwise all readings)
 $total_readings = 0;
 $pending_count = 0;
 $needs_review_count = 0;
@@ -150,7 +150,14 @@ $processed_count = 0;
 $failed_count = 0;
 $ocr_processed_count = 0;
 
-// Get counts for each status (all readings, not filtered by cycle)
+// Limit stats to current active billing cycle when available, otherwise all readings
+$stats_where = '';
+if ($active_cycle && isset($active_cycle['id'])) {
+    $cycle_id = (int)$active_cycle['id'];
+    $stats_where = "WHERE billing_cycle_id = {$cycle_id}";
+}
+
+// Get counts for each status
 $stats_sql = "SELECT 
     COUNT(*) as total,
     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
@@ -159,7 +166,8 @@ $stats_sql = "SELECT
     SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as processed,
     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
     SUM(CASE WHEN status IN ('processed', 'verified') THEN 1 ELSE 0 END) as processed_and_verified
-    FROM pending_meter_readings";
+    FROM pending_meter_readings
+    {$stats_where}";
 $stats_result = $conn->query($stats_sql);
 if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $total_readings = (int) ($row['total'] ?? 0);
@@ -174,9 +182,13 @@ if ($stats_result && $row = $stats_result->fetch_assoc()) {
 
 // OCR Processed = only readings that actually went through OCR (have ocr_reading or extracted_text).
 // Excludes pending and manually added readings that never had OCR run.
-$ocr_attempts_sql = "SELECT COUNT(*) as cnt FROM pending_meter_readings 
-    WHERE status IN ('needs_review','verified','processed') 
+$ocr_where = "status IN ('needs_review','verified','processed') 
     AND (ocr_reading IS NOT NULL OR (extracted_text IS NOT NULL AND TRIM(COALESCE(extracted_text,'')) != ''))";
+if ($active_cycle && isset($active_cycle['id'])) {
+    $cycle_id = (int)$active_cycle['id'];
+    $ocr_where .= " AND billing_cycle_id = {$cycle_id}";
+}
+$ocr_attempts_sql = "SELECT COUNT(*) as cnt FROM pending_meter_readings WHERE {$ocr_where}";
 $ocr_attempts_result = $conn->query($ocr_attempts_sql);
 if ($ocr_attempts_result && $ocr_row = $ocr_attempts_result->fetch_assoc()) {
     $ocr_processed_count = (int) ($ocr_row['cnt'] ?? 0);
@@ -1880,7 +1892,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['processed_at_converted'] ?? $row['processed_at'] ?? $row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
@@ -2050,7 +2062,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['processed_at_converted'] ?? $row['processed_at'] ?? $row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-info">
@@ -2192,7 +2204,7 @@ function pendingFormatDT($dt) {
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['processed_at_converted'] ?? $row['processed_at'] ?? $row['processed_date_converted'] ?? $row['processed_date'] ?? $row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-processed">
                                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -2304,7 +2316,7 @@ function pendingFormatDT($dt) {
                                                     <span class="text-muted">No error details</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['processed_at_converted'] ?? $row['processed_at'] ?? $row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-failed">
                                                     <i class="fas fa-exclamation-circle"></i>
