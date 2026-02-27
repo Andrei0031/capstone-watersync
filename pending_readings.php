@@ -1877,7 +1877,7 @@ function pendingFormatDT($dt) {
                                                     </button>
                                                     <button 
                                                         class="btn btn-sm btn-outline-success" 
-                                                        onclick="quickVerifyReading(<?php echo $row['id']; ?>, <?php echo json_encode($reading); ?>)" 
+                                                        onclick="quickVerifyReading(<?php echo $row['id']; ?>, <?php echo floatval($reading); ?>)" 
                                                         title="Mark as verified using this reading">
                                                         <i class="fas fa-check"></i>
                                                     </button>
