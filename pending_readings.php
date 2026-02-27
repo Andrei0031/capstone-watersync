@@ -756,12 +756,17 @@ function pendingFormatDT($dt) {
     if (empty($dt)) return 'N/A';
     
     try {
-        // Parse the datetime string as-is (already in Manila time from SQL CONVERT_TZ)
-        // Don't use strtotime as it may misinterpret timezone
+        // Create DateTime from the string (already in Manila time from SQL CONVERT_TZ)
         $datetime = new DateTime($dt);
-        // Return formatted datetime without timezone conversion
+        
+        // Ensure we're working in Asia/Manila timezone
+        $timezone = new DateTimeZone('Asia/Manila');
+        $datetime->setTimezone($timezone);
+        
+        // Format and return - should now show correct Manila time
         return $datetime->format('M d, Y g:i A');
     } catch (Exception $e) {
+        error_log("DateTime parsing error: " . $e->getMessage() . " for input: " . $dt);
         return is_string($dt) ? $dt : 'N/A';
     }
 }
