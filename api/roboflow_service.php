@@ -951,10 +951,10 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.05 (5%) - extremely low to catch ALL detections
-            // Version 7 trained model - accept any digit detection with minimal confidence
-            // This ensures we catch all digits from your trained YOLOv8 model
-            if ($isDigit && $confidence > 0.05) {
+            // Use confidence threshold of 0.15 (15%) - higher to filter out false detections
+            // Version 7 trained model - balance catching all digits vs avoiding garbage detections
+            // This filters low-confidence erroneous detections while keeping legitimate digits
+            if ($isDigit && $confidence > 0.15) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -964,8 +964,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.05) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.05)");
+            } elseif ($isDigit && $confidence <= 0.15) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.15)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
@@ -1092,33 +1092,38 @@ function detectDigitsWithRoboflow($imagePath) {
  * @return string|null 5-digit reading or null if not enough digits
  */
 function extractMeterReadingFromDigits($digits) {
-    if (empty($digits) || count($digits) < 3) {
+    if (empty($digits) || count($digits) < 4) {
+        // Require at least 4 digits to form a valid meter reading (instead of 3)
+        // This prevents incomplete or erroneous readings from single/double digit detections
         return null;
     }
     
     // Step 1: Filter digits by confidence (remove very low-confidence detections)
-    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.05)
-    // We already filtered to 0.05 in detectDigitsWithRoboflow, so we can be more lenient here
-    $minConfidence = 0.05; // Match the detection threshold - accept all digits that passed initial filter
+    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.15)
+    // We already filtered to 0.15 in detectDigitsWithRoboflow, so we can be more lenient here
+    $minConfidence = 0.15; // Match the detection threshold (15%) - filters out low-confidence garbage
     $filteredDigits = array_filter($digits, function($digit) use ($minConfidence) {
         return isset($digit['confidence']) && $digit['confidence'] >= $minConfidence;
     });
     
-    if (count($filteredDigits) < 3) {
+    if (count($filteredDigits) < 4) {
         error_log("⚠ Not enough digits after confidence filter. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
         error_log("   Original digits count: " . count($digits));
         if (count($digits) > 0) {
             $confidences = array_map(function($d) { return round($d['confidence'] ?? 0, 3); }, $digits);
             error_log("   Digit confidences: " . implode(', ', $confidences));
         }
-        // Fallback: use all digits if we don't have enough high-confidence ones
-        $filteredDigits = $digits;
+        // Only use filtered digits - don't include low-confidence garbage detections
+        if (count($filteredDigits) < 3) {
+            // Less than 3 high-confidence digits = can't form valid reading
+            return null;
+        }
     }
     
     // Step 2: Remove duplicate/overlapping detections
-    // If two digits have very similar positions and same value, keep the one with higher confidence
+    // If two digits have very similar positions, keep the one with higher confidence
     $deduplicatedDigits = [];
-    $positionTolerance = 30; // Pixels - digits closer than this are considered overlapping
+    $positionTolerance = 20; // Pixels - digits closer than this are considered overlapping (reduced from 30)
     
     foreach ($filteredDigits as $digit) {
         $isDuplicate = false;
