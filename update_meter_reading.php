@@ -94,8 +94,8 @@ try {
     }
     
     if ($update_stmt->execute()) {
-        // Delete image after reading is updated/verified
-        deleteImageAfterProcessing($reading_id, $conn);
+        // Keep image for now - only delete after bill is created
+        // deleteImageAfterProcessing($reading_id, $conn);
         
         echo json_encode([
             'success' => true,

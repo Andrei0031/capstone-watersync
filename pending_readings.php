@@ -1989,11 +1989,22 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <img src="<?php echo htmlspecialchars($row['image_path']); ?>" 
-                                                     class="meter-image" 
-                                                     data-bs-toggle="modal" 
-                                                     data-bs-target="#imageModal"
-                                                     data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
+                                                <?php 
+                                                    $imgPath = $row['image_path'] ?? '';
+                                                    $imgExists = !empty($imgPath) && file_exists($imgPath);
+                                                ?>
+                                                <?php if ($imgExists): ?>
+                                                    <img src="<?php echo htmlspecialchars($imgPath); ?>" 
+                                                         class="meter-image" 
+                                                         data-bs-toggle="modal" 
+                                                         data-bs-target="#imageModal"
+                                                         data-image="<?php echo htmlspecialchars($imgPath); ?>">
+                                                <?php else: ?>
+                                                    <div class="meter-image d-flex align-items-center justify-content-center bg-secondary text-white" 
+                                                         style="width:60px;height:60px;border-radius:8px;font-size:0.7rem;text-align:center;">
+                                                        <i class="fas fa-image"></i>
+                                                    </div>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php 
@@ -2114,11 +2125,22 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <img src="<?php echo htmlspecialchars($row['image_path']); ?>" 
-                                                     class="meter-image" 
-                                                     data-bs-toggle="modal" 
-                                                     data-bs-target="#imageModal"
-                                                     data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
+                                                <?php 
+                                                    $imgPath = $row['image_path'] ?? '';
+                                                    $imgExists = !empty($imgPath) && file_exists($imgPath);
+                                                ?>
+                                                <?php if ($imgExists): ?>
+                                                    <img src="<?php echo htmlspecialchars($imgPath); ?>" 
+                                                         class="meter-image" 
+                                                         data-bs-toggle="modal" 
+                                                         data-bs-target="#imageModal"
+                                                         data-image="<?php echo htmlspecialchars($imgPath); ?>">
+                                                <?php else: ?>
+                                                    <div class="meter-image d-flex align-items-center justify-content-center bg-secondary text-white" 
+                                                         style="width:60px;height:60px;border-radius:8px;font-size:0.7rem;text-align:center;">
+                                                        <i class="fas fa-image"></i>
+                                                    </div>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php 
