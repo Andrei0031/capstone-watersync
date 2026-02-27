@@ -155,8 +155,8 @@ try {
         throw new Exception('Failed to update reading status: ' . $update->error);
     }
 
-    // Delete image after successful retry processing
-    deleteImageAfterProcessing($reading_id, $conn);
+    // Keep image - don't delete after retry processing
+    // deleteImageAfterProcessing($reading_id, $conn);
 
     echo json_encode([
         'success' => true,

@@ -594,8 +594,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
                 $update->bind_param("i", $reading_id);
                 $update->execute();
                 
-                // Delete image after bill is created
-                deleteImageAfterProcessing($reading_id, $conn);
+                // Keep image - don't delete after bill is created
+                // deleteImageAfterProcessing($reading_id, $conn);
             }
         }
     }
