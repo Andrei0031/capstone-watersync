@@ -1,0 +1,77 @@
+Test Case ID,Module,Test Scenario,Test Case,Input,Expected Output,Status,Solution,Remarks
+1,Create User Account,Signup a user account,Enter a valid user information,User Information (Email, Password, Meter Code),Store user account in the database,Pass,,
+,Create User Account,Signup a user account,Enter a duplicate user information,Existing user account (Duplicate email),Provide notification to the user to enter new account details.,Pass,,
+,Create User Account,Signup a user account,Enter invalid meter code,Invalid meter code,Provide notification that meter code is invalid or customer not found,Pass,,
+,Create User Account,Signup a user account,Enter mismatched passwords,Password and Confirm Password do not match,Provide notification that passwords do not match,Pass,,
+,Create User Account,Login user,Enter valid user credentials,Email and password,Allow user to enter new details
+Login user
+Redirect the user to the dashboard,Pass,,
+,Create User Account,Login user,Enter a random user account,Email and password,Provide notification to the user to enter a valid user account.,Pass,,
+,Create User Account,Login user,Enter invalid password,Valid email with wrong password,Provide notification that password is invalid,Pass,,
+,Create User Account,Login user,Enter inactive account credentials,Email and password for inactive account,Provide notification that account is not found or inactive,Pass,,
+2,Admin Management,Admin Login,Enter valid admin credentials,Admin username and password,Allow admin to login
+Redirect to admin dashboard,Pass,,
+,Admin Management,Admin Login,Enter invalid admin credentials,Invalid username or password,Provide notification that credentials are invalid,Pass,,
+,Admin Management,Admin Login,Enter empty credentials,Empty username and password fields,Provide notification that all fields are required,Pass,,
+3,Client Management,Add Client,Enter valid client information,Client details (Name, Address, Meter Code, etc.),Store client information in the database,Pass,,
+,Client Management,Add Client,Enter duplicate meter code,Existing meter code,Provide notification that meter code already exists,Pass,,
+,Client Management,Add Client,Enter incomplete client information,Missing required fields,Provide notification that all required fields must be filled,Pass,,
+,Client Management,Edit Client,Update existing client information,Modified client details,Update client information in the database,Pass,,
+,Client Management,Edit Client,Update client with invalid data,Invalid client data,Provide validation error message,Pass,,
+,Client Management,Delete Client,Delete existing client,Client ID,Mark client as deleted (soft delete) in the database,Pass,,
+,Client Management,View Clients,View client list,No input required,Display list of all active clients,Pass,,
+,Client Management,View Clients,Search for client,Client name or meter code,Display filtered client list based on search criteria,Pass,,
+4,Meter Reading Management,Upload Meter Reading,Upload valid meter reading image,Image file with meter reading,Save image to pending_meter_readings table with status 'pending',Pass,,
+,Meter Reading Management,Upload Meter Reading,Upload invalid image format,Non-image file or unsupported format,Provide notification that file format is invalid,Pass,,
+,Meter Reading Management,Process OCR Reading,Process pending meter reading,Select pending reading and click Process,Use Roboflow to detect meter region
+Crop image to meter area
+Use Tesseract OCR to extract reading
+Update status to 'processed' or 'failed',Pass,,
+,Meter Reading Management,Process OCR Reading,Process multiple readings,Select multiple pending readings,Process all selected readings in batch,Pass,,
+,Meter Reading Management,Update Meter Reading,Update existing reading,Modified reading value,Update reading in database,Pass,,
+,Meter Reading Management,Delete Meter Reading,Delete meter reading,Reading ID,Remove reading from database,Pass,,
+5,Billing Management,Create Billing Cycle,Create new billing cycle,Billing cycle details (Name, Start Date, End Date, Due Date),Store billing cycle in database with status 'active',Pass,,
+,Billing Management,Create Billing Cycle,Create duplicate active cycle,New cycle when active cycle exists,Provide notification that active cycle already exists,Pass,,
+,Billing Management,Create Bill,Create bill from processed readings,Select processed meter readings,Generate bills for selected readings
+Calculate consumption and charges
+Store bills in billing_list table,Pass,,
+,Billing Management,Create Bill,Create bill with invalid data,Invalid billing data,Provide validation error message,Pass,,
+,Billing Management,Update Bill,Update existing bill,Modified bill details,Update bill information in database,Pass,,
+,Billing Management,Approve Bill,Approve pending bill,Bill ID,Change bill status to 'approved'
+Send notification to customer,Pass,,
+,Billing Management,Delete Bill,Delete bill,Bill ID,Remove bill from database (if delete enabled),Pass,,
+,Billing Management,View Bills,View billing list,No input required,Display list of all bills,Pass,,
+,Billing Management,View Bills,Filter bills by status,Bill status (Pending, Approved, Paid),Display filtered bill list,Pass,,
+6,Payment Processing,Process Payment,Enter valid payment,Payment details (Bill ID, Amount, Payment Method),Record payment in database
+Update bill status to 'paid'
+Update customer balance,Pass,,
+,Payment Processing,Process Payment,Enter payment exceeding bill amount,Payment amount greater than bill total,Provide notification that payment exceeds bill amount,Pass,,
+,Payment Processing,Process Payment,Enter payment for non-existent bill,Invalid Bill ID,Provide notification that bill not found,Pass,,
+,Payment Processing,View Payment,View payment history,Customer ID or Bill ID,Display payment history for customer or bill,Pass,,
+,Payment Processing,Delete Payment,Delete payment record,Payment ID,Remove payment record from database,Pass,,
+7,Reports Management,Generate Customer Report,Generate report for customer,Customer ID and date range,Generate report with billing and payment history,Pass,,
+,Reports Management,Generate Outage Report,Submit outage report,Outage report details (Location, Description, Date),Store outage report in database,Pass,,
+,Reports Management,View Reports,View all reports,No input required,Display list of all reports,Pass,,
+,Reports Management,Update Report Status,Update report status,Report ID and new status,Update report status in database,Pass,,
+8,Notification Management,Send Notification,Send SMS notification,Customer ID and message,Send SMS to customer phone number
+Log notification in database,Pass,,
+,Notification Management,Send Notification,Send Email notification,Customer ID and email content,Send email to customer email address
+Log notification in database,Pass,,
+,Notification Management,View Notifications,View notification logs,No input required,Display list of all sent notifications,Pass,,
+9,QR Code Management,Generate QR Code,Generate QR code for client,Client ID and meter code,Generate QR code image
+Save QR code to qr_codes directory,Pass,,
+,QR Code Management,View QR Code,View client QR code,Client ID,Display QR code image for client,Pass,,
+10,Dashboard,Admin Dashboard,View admin dashboard,Admin login session,Display dashboard with statistics
+Total clients, total bills, revenue, pending readings,Pass,,
+,Dashboard,Customer Dashboard,View customer dashboard,Customer login session,Display customer dashboard with
+Current bill, payment history, consumption history,Pass,,
+,Dashboard,Customer Dashboard,View billing history,Customer ID,Display customer's billing history,Pass,,
+11,Session Management,Session Timeout,Inactive session timeout,No activity for 5 minutes,Automatically log out user
+Redirect to login page with timeout message,Pass,,
+,Session Management,Session Validation,Validate active session,Valid session ID,Allow access to protected pages,Pass,,
+,Session Management,Session Validation,Invalid session,Invalid or expired session,Redirect to login page,Pass,,
+12,Password Management,Change Password,Change customer password,Current password and new password,Update password in database
+Require re-login,Pass,,
+,Password Management,Change Password,Change password with wrong current password,Incorrect current password,Provide notification that current password is incorrect,Pass,,
+,Password Management,Reset Password,Reset customer password,Admin credentials and customer ID,Update customer password
+Notify customer,Pass,,

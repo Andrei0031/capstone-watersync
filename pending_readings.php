@@ -1616,6 +1616,18 @@ function pendingFormatDT($dt) {
                     </div>
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #845ef7 0%, #5f3dc4 100%);">
+                    <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
+                        <div>
+                            <h6 class="text-white-50 mb-2">Mobile Scanned</h6>
+                            <h3 class="mb-1 text-white"><?php echo $cycle_scanned_clients_count; ?> <span style="font-size: 0.6em;">/ <?php echo $active_clients_count; ?></span></h3>
+                            <small class="text-white-50">active clients</small>
+                        </div>
+                        <i class="fas fa-mobile-alt stat-icon"></i>
+                    </div>
+                </div>
+            </div>
             <?php if ($pending_count > 0): ?>
             <div class="col-md-3">
                 <div class="card card-soft stat-card" style="background: linear-gradient(45deg, #f6c23e 0%, #dda20a 100%);">
