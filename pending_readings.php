@@ -409,44 +409,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 }
                 
                 // Check if reading needs review based on consumption
+                // Default behavior: trust the OCR reading and mark as VERIFIED.
+                // We no longer auto-flag readings as \"Needs Verification\" based on high usage spikes.
+                // Admins will manually move/keep readings in the appropriate tab:
+                // - If the OCR reading is accurate, keep it as VERIFIED.
+                // - If it looks wrong, use the edit/quick actions to correct or delete.
                 $needsReview = false;
-                $statusToSet = 'verified'; // Default: verified (ready for billing)
-                
-                // Get previous reading to check consumption
-                $prev_stmt = $conn->prepare("SELECT reading FROM billing_list 
-                    WHERE client_id = (SELECT client_id FROM pending_meter_readings WHERE id = ?) 
-                    ORDER BY reading_date DESC LIMIT 1");
-                $prev_stmt->bind_param("i", $reading_id);
-                $prev_stmt->execute();
-                $prev_result = $prev_stmt->get_result();
-                $previous = $prev_result->fetch_assoc()['reading'] ?? 0;
-                
-                // Calculate consumption
-                $consumption = floatval($ocrReading) - floatval($previous);
-                
-                // Flag as "Needs Review" if consumption looks suspicious.
-                // Rules:
-                // - Negative (meter reset), or zero (no usage) are suspicious
-                // - Very large spikes are suspicious, but allow bigger jumps to reduce false positives
-                //   We now flag only if consumption is BOTH:
-                //   * greater than 500 cu.m AND
-                //   * greater than 600% of previous reading
-                $suspicious = false;
-                if ($consumption < 0) {
-                    // Negative consumption = meter reset or error
-                    $suspicious = true;
-                } elseif ($consumption == 0) {
-                    // No consumption = duplicate reading or stuck meter
-                    $suspicious = true;
-                } elseif ($previous > 0 && $consumption > 500 && $consumption > ($previous * 6)) {
-                    // Very large spike: >500 cu.m and >600% of previous reading
-                    $suspicious = true;
-                }
-                
-                if ($suspicious) {
-                    $needsReview = true;
-                    $statusToSet = 'needs_review';
-                }
+                $statusToSet = 'verified'; // Always start as verified; manual review handles edge cases
                 
                 // Update reading status (force Asia/Manila timestamp via PHP)
                 $processedAt = date('Y-m-d H:i:s');
