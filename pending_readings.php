@@ -409,13 +409,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 }
                 
                 // Check if reading needs review based on consumption
-                // Default behavior: trust the OCR reading and mark as VERIFIED.
-                // We no longer auto-flag readings as \"Needs Verification\" based on high usage spikes.
-                // Admins will manually move/keep readings in the appropriate tab:
-                // - If the OCR reading is accurate, keep it as VERIFIED.
-                // - If it looks wrong, use the edit/quick actions to correct or delete.
-                $needsReview = false;
-                $statusToSet = 'verified'; // Always start as verified; manual review handles edge cases
+                // Default behavior: OCR readings require human confirmation.
+                // Start all OCR-processed readings in Needs Verification.
+                // Admins promote accurate readings to VERIFIED using the quick check or edit actions.
+                $needsReview = true;
+                $statusToSet = 'needs_review';
                 
                 // Update reading status (force Asia/Manila timestamp via PHP)
                 $processedAt = date('Y-m-d H:i:s');
