@@ -2044,6 +2044,11 @@ function pendingFormatDT($dt) {
                                                 <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
+                                                <?php if ($delete_password_configured): ?>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>

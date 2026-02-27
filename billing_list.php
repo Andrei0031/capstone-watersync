@@ -95,19 +95,6 @@ if ($overdue_result && $row = $overdue_result->fetch_assoc()) {
 $sql_clients = "SELECT id, firstname, lastname, category_id FROM client_list WHERE status = 1";
 $result_clients = $conn->query($sql_clients);
 
-// Safety net: ensure existing bills are linked to billing cycles based on reading_date
-// This helps older bills (created before billing_cycle_id column) appear in cycle filters.
-if ($conn instanceof mysqli) {
-    $conn->query("
-        UPDATE billing_list b
-        LEFT JOIN billing_cycles bc 
-            ON b.reading_date BETWEEN bc.start_date AND bc.end_date
-        SET b.billing_cycle_id = bc.id
-        WHERE b.billing_cycle_id IS NULL
-          AND bc.id IS NOT NULL
-    ");
-}
-
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
         // Debug log
@@ -477,6 +464,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Get filter parameters
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
+$billing_month = isset($_GET['billing_month']) ? $_GET['billing_month'] : '';
 $billing_cycle_filter = isset($_GET['billing_cycle']) ? intval($_GET['billing_cycle']) : 0;
 
 // Build the WHERE clause based on filters
@@ -505,6 +493,12 @@ if ($status_filter) {
             $where_conditions[] = "b.status = 0 AND b.due_date < CURRENT_DATE()";
             break;
     }
+}
+
+if ($billing_month) {
+    $where_conditions[] = "DATE_FORMAT(b.reading_date, '%Y-%m') = ?";
+    $params[] = $billing_month;
+    $types .= 's';
 }
 
 if ($billing_cycle_filter) {
@@ -1407,18 +1401,16 @@ if ($params) {
     <!-- Filter Section -->
     <div class="card card-soft mb-4">
         <div class="card-body">
-            <form id="filterForm" class="row g-3 align-items-end" method="GET" action="billing_list.php">
-                <div class="col-md-4">
-                    <label for="searchInput" class="form-label mb-1">Search</label>
+            <form id="filterForm" class="row g-3" method="GET" action="billing_list.php">
+                <div class="col-md-6">
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, code..." name="search" value="<?php echo htmlspecialchars($search); ?>">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search bills..." name="search" value="<?php echo htmlspecialchars($search); ?>">
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <label for="billingCycleSelect" class="form-label mb-1">Billing Cycle</label>
+                <div class="col-md-4">
                     <select class="form-select" id="billingCycleSelect" name="billing_cycle">
-                        <option value="">All Cycles</option>
+                        <option value="">All Billing Cycles</option>
                         <?php
                         $cycles_query = "SELECT id, cycle_name, status FROM billing_cycles ORDER BY created_at DESC";
                         $cycles_result = $conn->query($cycles_query);
@@ -1432,21 +1424,9 @@ if ($params) {
                         ?>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label for="statusFilter" class="form-label mb-1">Status</label>
-                    <select class="form-select" id="statusFilter" name="status">
-                        <option value="">All Status</option>
-                        <option value="paid" <?php echo $status_filter === 'paid' ? 'selected' : ''; ?>>Paid</option>
-                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
-                        <option value="overdue" <?php echo $status_filter === 'overdue' ? 'selected' : ''; ?>>Overdue</option>
-                    </select>
-                </div>
-                <div class="col-12 d-flex justify-content-end gap-2">
-                    <a href="billing_list.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-undo me-1"></i>Reset
-                    </a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-filter me-2"></i>Apply Filters
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Filter
                     </button>
                 </div>
             </form>

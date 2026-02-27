@@ -799,6 +799,49 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                     <?php endif; ?>
                 </div>
             </div>
+
+            <!-- Reports Status -->
+            <div class="report-stats mt-3">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <h5 class="card-title mb-0">Client Reports Status</h5>
+                </div>
+                <div class="row justify-content-center">
+                    <?php $reports_status = $dashboard->getReportsStatus(); ?>
+                    <div class="col-12">
+                        <div class="stat-box total-reports">
+                            <div class="stat-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $reports_status['total_reports']; ?></h3>
+                                <p>Total Reports</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="stat-box resolved-reports">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $reports_status['resolved_reports']; ?></h3>
+                                <p>Resolved</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="stat-box pending-reports mb-0">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3><?php echo $reports_status['pending_reports']; ?></h3>
+                                <p>Pending</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -846,51 +889,6 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reports Status -->
-    <div class="report-stats">
-        <div class="d-flex justify-content-center align-items-center mb-4">
-            <h5 class="card-title mb-0">Client Reports Status</h5>
-        </div>
-        <div class="row justify-content-center">
-            <?php 
-            $reports_status = $dashboard->getReportsStatus();
-            ?>
-            <div class="col-md-3">
-                <div class="stat-box total-reports">
-                    <div class="stat-icon">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $reports_status['total_reports']; ?></h3>
-                        <p>Total Reports</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box resolved-reports">
-                    <div class="stat-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $reports_status['resolved_reports']; ?></h3>
-                        <p>Resolved</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box pending-reports">
-                    <div class="stat-icon">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $reports_status['pending_reports']; ?></h3>
-                        <p>Pending</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
