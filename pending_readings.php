@@ -424,11 +424,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 // Calculate consumption
                 $consumption = floatval($ocrReading) - floatval($previous);
                 
-                // Flag as "Needs Review" if consumption looks suspicious using percentage-based check
-                // Flag if: negative (meter reset), zero (no usage), or exceeds 300% of previous consumption
-                // This adapts to each customer's normal usage pattern rather than a fixed threshold
-                // Example: If previous was 100, flag if new consumption > 300
-                // Example: If previous was 500, flag if new consumption > 1500
+                // Flag as "Needs Review" if consumption looks suspicious.
+                // Rules:
+                // - Negative (meter reset), or zero (no usage) are suspicious
+                // - Very large spikes are suspicious, but allow bigger jumps to reduce false positives
+                //   We now flag only if consumption is BOTH:
+                //   * greater than 500 cu.m AND
+                //   * greater than 600% of previous reading
                 $suspicious = false;
                 if ($consumption < 0) {
                     // Negative consumption = meter reset or error
@@ -436,8 +438,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 } elseif ($consumption == 0) {
                     // No consumption = duplicate reading or stuck meter
                     $suspicious = true;
-                } elseif ($previous > 0 && $consumption > ($previous * 3)) {
-                    // Consumption exceeds 300% of previous reading = suspicious spike
+                } elseif ($previous > 0 && $consumption > 500 && $consumption > ($previous * 6)) {
+                    // Very large spike: >500 cu.m and >600% of previous reading
                     $suspicious = true;
                 }
                 
