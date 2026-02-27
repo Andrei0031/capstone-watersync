@@ -424,10 +424,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 // Calculate consumption
                 $consumption = floatval($ocrReading) - floatval($previous);
                 
-                // Flag as "Needs Review" if consumption looks suspicious
-                // Only flag if: negative (meter reset), zero (no usage), or extremely high (>1000 units in one billing cycle)
-                // Consumption of 204 units per month is reasonable for typical water customers
-                if ($consumption < 0 || $consumption == 0 || $consumption > 1000) {
+                // Flag as "Needs Review" if consumption looks suspicious using percentage-based check
+                // Flag if: negative (meter reset), zero (no usage), or exceeds 300% of previous consumption
+                // This adapts to each customer's normal usage pattern rather than a fixed threshold
+                // Example: If previous was 100, flag if new consumption > 300
+                // Example: If previous was 500, flag if new consumption > 1500
+                $suspicious = false;
+                if ($consumption < 0) {
+                    // Negative consumption = meter reset or error
+                    $suspicious = true;
+                } elseif ($consumption == 0) {
+                    // No consumption = duplicate reading or stuck meter
+                    $suspicious = true;
+                } elseif ($previous > 0 && $consumption > ($previous * 3)) {
+                    // Consumption exceeds 300% of previous reading = suspicious spike
+                    $suspicious = true;
+                }
+                
+                if ($suspicious) {
                     $needsReview = true;
                     $statusToSet = 'needs_review';
                 }
