@@ -425,7 +425,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 $consumption = floatval($ocrReading) - floatval($previous);
                 
                 // Flag as "Needs Review" if consumption looks suspicious
-                if ($consumption < 0 || $consumption == 0 || $consumption > 200) {
+                // Only flag if: negative (meter reset), zero (no usage), or extremely high (>1000 units in one billing cycle)
+                // Consumption of 204 units per month is reasonable for typical water customers
+                if ($consumption < 0 || $consumption == 0 || $consumption > 1000) {
                     $needsReview = true;
                     $statusToSet = 'needs_review';
                 }
