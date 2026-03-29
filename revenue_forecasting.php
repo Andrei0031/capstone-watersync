@@ -250,9 +250,8 @@ class RevenueForecast {
      * Considers seasonal patterns and growth trends
      */
     public function seasonalForecast($historicalData, $forecastMonths = 6) {
-        if (count($historicalData) < 12) {
-            // If less than a year of data, fall back to linear forecast
-            return $this->linearForecast($historicalData, $forecastMonths);
+        if (count($historicalData) < 1) {
+            return [];
         }
         
         // Calculate seasonal indices
@@ -280,26 +279,37 @@ class RevenueForecast {
         for ($month = 1; $month <= 12; $month++) {
             if (isset($monthlyTotals[$month]) && $monthlyCount[$month] > 0) {
                 $monthlyAvg = $monthlyTotals[$month] / $monthlyCount[$month];
-                $seasonalIndices[$month] = $monthlyAvg / $overallAvg;
+                $seasonalIndices[$month] = ($overallAvg > 0) ? ($monthlyAvg / $overallAvg) : 1.0;
             } else {
                 $seasonalIndices[$month] = 1.0; // No seasonal effect
             }
         }
         
-        // Calculate growth trend
-        $recentData = array_slice($historicalData, -6); // Last 6 months
-        $earlierData = array_slice($historicalData, -12, 6); // 6 months before that
-        
-        $recentAvg = array_sum(array_column($recentData, 'revenue')) / count($recentData);
-        $earlierAvg = array_sum(array_column($earlierData, 'revenue')) / count($earlierData);
-        
-        $growthRate = ($recentAvg - $earlierAvg) / $earlierAvg;
-        $monthlyGrowthRate = $growthRate / 6; // Monthly growth rate
+        // Calculate growth trend with adaptive windows for short history
+        $historyCount = count($historicalData);
+        $windowSize = min(6, $historyCount);
+        $recentData = array_slice($historicalData, -$windowSize);
+        $earlierData = array_slice($historicalData, -2 * $windowSize, $windowSize);
+
+        $recentAvg = $windowSize > 0
+            ? (array_sum(array_column($recentData, 'revenue')) / $windowSize)
+            : 0;
+        $earlierAvg = count($earlierData) > 0
+            ? (array_sum(array_column($earlierData, 'revenue')) / count($earlierData))
+            : 0;
+
+        if ($earlierAvg > 0) {
+            $growthRate = ($recentAvg - $earlierAvg) / $earlierAvg;
+            $monthlyGrowthRate = $growthRate / max(1, $windowSize);
+        } else {
+            // Not enough prior baseline; keep trend neutral
+            $monthlyGrowthRate = 0;
+        }
         
         // Generate seasonal forecasts
         $forecasts = [];
         $lastPeriod = end($historicalData)['period'];
-        $baseRevenue = end($historicalData)['revenue'];
+        $baseRevenue = floatval(end($historicalData)['revenue']);
         
         for ($i = 1; $i <= $forecastMonths; $i++) {
             $nextPeriod = date('Y-m', strtotime($lastPeriod . '-01 +' . $i . ' month'));

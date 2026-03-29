@@ -706,7 +706,7 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group me-2">
                             <button class="btn btn-sm btn-outline-primary active" data-period="monthly">Monthly</button>
-                            <button class="btn btn-sm btn-outline-primary" data-period="quarterly">Quarterly</button>
+                            <button class="btn btn-sm btn-outline-primary" data-period="quarterly">Months</button>
                             <button class="btn btn-sm btn-outline-primary" data-period="yearly">Yearly</button>
                             </div>
                                     <select id="forecastHorizon" class="form-select form-select-sm" style="width: auto;">
@@ -1239,11 +1239,16 @@ $(document).ready(function() {
 
 
     
+    // Ensure horizon selector matches active period on first load
+    updateForecastHorizonControl('monthly');
+
     // Handle revenue period buttons
     $('.btn-group button').click(function() {
         $('.btn-group button').removeClass('active');
         $(this).addClass('active');
-        updateRevenueChart($(this).data('period'));
+        const selectedPeriod = $(this).data('period');
+        updateForecastHorizonControl(selectedPeriod);
+        updateRevenueChart(selectedPeriod);
     });
 
                 // Handle forecast horizon change
@@ -1262,14 +1267,15 @@ function updateRevenueChart(period) {
     }
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
-    const forecastMethod = 'seasonal'; // Use seasonal time-series forecasting
+    const forecastMonths = convertHorizonToMonths(horizon, period);
+    const forecastMethod = 'seasonal';
 
-    // Fetch paid revenue forecast using Seasonal Time Series model
-    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Seasonal Time Series');
+    // Fetch paid revenue forecast using time-series forecasting only
+    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Time Series');
     $.ajax({
         url: 'dashboard_data.php',
         method: 'GET',
-        data: { action: 'revenue_forecast', period: period, forecast_method: forecastMethod, forecast_months: horizon },
+        data: { action: 'revenue_forecast', period: period, forecast_method: forecastMethod, forecast_months: forecastMonths },
         dataType: 'json'
     })
     .done(function(paidData) {
@@ -1282,7 +1288,7 @@ function updateRevenueChart(period) {
         });
         
         const actual = paidData.actual || [];
-        const forecast = paidData.forecast || [];
+        const forecast = normalizeForecastByPeriod(paidData.forecast || [], period);
         
         console.log('🔍 After assignment - Actual:', actual.length, 'Forecast:', forecast.length);
         
@@ -1293,15 +1299,14 @@ function updateRevenueChart(period) {
             return;
         }
         
-        // If no forecast but have actual, show chart with actual only  
+        // If no forecast but have actual, show chart with actual only
         if (forecast.length === 0) {
             console.warn('⚠️ No forecast data, but we have actual data. Showing actual only.');
-            // Don't call loadActualDataOnly, just use the actual data we already have
             renderChartWithActualOnly(actual, period);
             return;
         }
         
-        console.log('✅ Both actual and forecast data available. Rendering full chart.');
+        console.log('✅ Both actual and forecast data available. Rendering separate lines.');
 
         const actualLabels = actual.map(i => i.period);
         const actualValues = actual.map(i => parseFloat(i.revenue) || 0);
@@ -1318,23 +1323,26 @@ function updateRevenueChart(period) {
         const paidForecastMap = {};
         forecastLabels.forEach((label, idx) => { paidForecastMap[label] = forecastValues[idx]; });
         
-        // Build aligned series
-        const actualSeries = allLabels.map(label => paidActualMap[label] || null);
-        const forecastSeries = allLabels.map(label => paidForecastMap[label] || null);
-        
-        // Find last actual value for paid to connect with forecast
-        const lastActual = actualValues[actualValues.length - 1] || 0;
-        const lastActualIndex = actualLabels.length > 0 ? allLabels.indexOf(actualLabels[actualLabels.length - 1]) : -1;
-        if (lastActualIndex >= 0 && forecastValues.length > 0) {
-            forecastSeries[lastActualIndex] = lastActual;
-        }
+        // Build aligned series and keep overlapping lines on the same timeline
+        const actualSeries = allLabels.map(label => (
+            Object.prototype.hasOwnProperty.call(paidActualMap, label) ? paidActualMap[label] : null
+        ));
+        const forecastSeries = allLabels.map(label => {
+            if (Object.prototype.hasOwnProperty.call(paidForecastMap, label)) {
+                return paidForecastMap[label];
+            }
+            if (Object.prototype.hasOwnProperty.call(paidActualMap, label)) {
+                return paidActualMap[label];
+            }
+            return null;
+        });
 
         const datasets = [
             { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
-            { label: 'Forecasted Revenue (Seasonal Time Series)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
+            { label: 'Forecasted Revenue (Time Series)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
         ];
         
-        console.log('LINEAR REGRESSION forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
+        console.log('TIME SERIES forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
         console.log('All labels:', allLabels);
         console.log('Actual series (first 5):', actualSeries.slice(0, 5));
         console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
@@ -1407,6 +1415,10 @@ function updateRevenueChart(period) {
                         },
                         x: {
                             ticks: {
+                                callback: function(value) {
+                                    const rawLabel = this.getLabelForValue(value);
+                                    return formatRevenuePeriodLabel(rawLabel, period, false);
+                                },
                                 color: '#6c757d',
                                 font: { size: 11 }
                             },
@@ -1429,6 +1441,10 @@ function updateRevenueChart(period) {
                             displayColors: true,
                             filter: function(ti){ return ti.raw !== null; }, 
                             callbacks: { 
+                                title: function(items){
+                                    const rawLabel = items?.[0]?.label || '';
+                                    return formatRevenuePeriodLabel(rawLabel, period, true);
+                                },
                                 label: function(ctx){ 
                                     const v = ctx.raw; 
                                     if (v === null) return null;
@@ -1440,7 +1456,7 @@ function updateRevenueChart(period) {
                     elements: {
                         line: {
                             borderWidth: 2,
-                            spanGaps: true
+                            spanGaps: false
                         },
                         point: {
                             hitRadius: 8
@@ -1466,100 +1482,139 @@ function updateRevenueChart(period) {
         }
     })
     .fail(function(xhr, status, error){
-        console.error('Linear Regression forecast failed:', error);
+        console.error('Time Series forecast failed:', error);
         console.error('Response:', xhr.responseText);
         console.log('Attempting to load actual data only as fallback');
-        $.ajax({
-            url: 'dashboard_data.php',
-            method: 'GET',
-            data: { action: 'revenue_forecast', period: period, forecast_method: 'linear', forecast_months: horizon },
-            dataType: 'json'
-        })
-        .done(function(paidData) {
-            console.log('Ensemble forecast data received:', paidData);
-            const actual = paidData.actual || [];
-            const forecast = paidData.forecast || [];
-            
-            console.log('Ensemble - Actual:', actual.length, 'Forecast:', forecast.length);
-            
-            // If no forecast data but have actual, still show chart with actual only
-            if (forecast.length === 0 && actual.length > 0) {
-                console.warn('No ensemble forecast data, showing actual data only');
-                loadActualDataOnly(period);
-                return;
-            }
-            
-            if (actual.length === 0 && forecast.length === 0) {
-                console.warn('No data at all in ensemble forecast');
-                loadActualDataOnly(period);
-                return;
-            }
-            
-            // Use same chart rendering logic as ML method
-            const actualLabels = actual.map(i => i.period);
-            const actualValues = actual.map(i => parseFloat(i.revenue) || 0);
-            const forecastLabels = forecast.map(i => i.period);
-            const forecastValues = forecast.map(i => parseFloat(i.revenue) || 0);
-            
-            const allLabelsSet = new Set([...actualLabels, ...forecastLabels]);
-            const allLabels = Array.from(allLabelsSet).sort();
-            
-            const paidActualMap = {};
-            actualLabels.forEach((label, idx) => { paidActualMap[label] = actualValues[idx]; });
-            const paidForecastMap = {};
-            forecastLabels.forEach((label, idx) => { paidForecastMap[label] = forecastValues[idx]; });
-            
-            const actualSeries = allLabels.map(label => paidActualMap[label] || null);
-            const forecastSeries = allLabels.map(label => paidForecastMap[label] || null);
-            
-            const lastActual = actualValues[actualValues.length - 1] || 0;
-            const lastActualIndex = actualLabels.length > 0 ? allLabels.indexOf(actualLabels[actualLabels.length - 1]) : -1;
-            if (lastActualIndex >= 0 && forecastValues.length > 0) {
-                forecastSeries[lastActualIndex] = lastActual;
-            }
-            
-            const datasets = [
-                { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
-                { label: 'Forecasted Revenue (Linear Regression - Fallback)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
-            ];
-            
-            console.log('Linear forecast (fallback) - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
-            console.log('Actual series:', actualSeries);
-            console.log('Forecast series:', forecastSeries);
-            
-            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-            revenueChart = new Chart(revenueCtx, {
-                type: 'line',
-                data: { labels: allLabels, datasets: datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { callback: function(value){ return '₱' + value.toLocaleString(); } }, grid: { color: 'rgba(0,0,0,0.1)' } },
-                        x: { grid: { color: 'rgba(0,0,0,0.1)' } }
-                    },
-                    plugins: {
-                        legend: { display: true, position: 'top' },
-                        tooltip: { 
-                            filter: function(ti){ return ti.raw !== null; }, 
-                            callbacks: { 
-                                label: function(ctx){ 
-                                    const v = ctx.raw; 
-                                    if (v === null) return null;
-                                    return ctx.dataset.label + ': ₱' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); 
-                                } 
-                            } 
-                        }
-                    },
-                    elements: { line: { spanGaps: true } }
-                }
-            });
-        })
-        .fail(function(){ 
-            loadActualDataOnly(period); 
-        });
+        loadActualDataOnly(period);
     });
+}
+
+function updateForecastHorizonControl(period) {
+    const horizonSelect = document.getElementById('forecastHorizon');
+    if (!horizonSelect) {
+        return;
+    }
+
+    const optionsByPeriod = {
+        monthly: [
+            { value: '6', label: '6 months' },
+            { value: '12', label: '12 months' }
+        ],
+        quarterly: [
+            { value: '2', label: '6 months' },
+            { value: '4', label: '12 months' }
+        ],
+        yearly: [
+            { value: '1', label: '1 year' },
+            { value: '2', label: '2 years' }
+        ]
+    };
+
+    const options = optionsByPeriod[period] || optionsByPeriod.monthly;
+    const currentValue = horizonSelect.value;
+
+    horizonSelect.innerHTML = options
+        .map(option => `<option value="${option.value}">${option.label}</option>`)
+        .join('');
+
+    const hasCurrentValue = options.some(option => option.value === currentValue);
+    horizonSelect.value = hasCurrentValue ? currentValue : options[0].value;
+}
+
+function convertHorizonToMonths(horizonValue, period) {
+    if (period === 'quarterly') {
+        return horizonValue * 3;
+    }
+    if (period === 'yearly') {
+        return horizonValue * 12;
+    }
+    return horizonValue;
+}
+
+function formatRevenuePeriodLabel(rawLabel, period, verbose = false) {
+    const label = String(rawLabel || '');
+
+    if (period === 'quarterly') {
+        const match = label.match(/^(\d{4})-Q([1-4])$/);
+        if (match) {
+            const year = match[1];
+            const quarter = match[2];
+            const quarterRanges = {
+                '1': 'Jan–Mar',
+                '2': 'Apr–Jun',
+                '3': 'Jul–Sep',
+                '4': 'Oct–Dec'
+            };
+            const rangeText = quarterRanges[quarter] || '';
+            return verbose ? `${rangeText} ${year} (3 months)` : `${rangeText} ${year}`;
+        }
+    }
+
+    if (period === 'yearly') {
+        if (/^\d{4}$/.test(label)) {
+            return verbose ? `${label} (Full Year)` : label;
+        }
+    }
+
+    return label;
+}
+
+function normalizeForecastByPeriod(forecastData, period) {
+    if (!Array.isArray(forecastData) || forecastData.length === 0) {
+        return [];
+    }
+
+    if (period === 'monthly') {
+        return forecastData;
+    }
+
+    const groupedForecast = {};
+
+    forecastData.forEach(item => {
+        const periodLabel = item?.period;
+        const revenue = parseFloat(item?.revenue) || 0;
+
+        if (!periodLabel) {
+            return;
+        }
+
+        if (period === 'quarterly') {
+            let quarterLabel = null;
+
+            if (/^\d{4}-Q[1-4]$/.test(periodLabel)) {
+                quarterLabel = periodLabel;
+            } else {
+                const parts = periodLabel.split('-');
+                if (parts.length >= 2) {
+                    const year = parts[0];
+                    const month = parseInt(parts[1], 10);
+                    if (!Number.isNaN(month) && month >= 1 && month <= 12) {
+                        const quarter = Math.ceil(month / 3);
+                        quarterLabel = `${year}-Q${quarter}`;
+                    }
+                }
+            }
+
+            if (quarterLabel) {
+                groupedForecast[quarterLabel] = (groupedForecast[quarterLabel] || 0) + revenue;
+            }
+            return;
+        }
+
+        if (period === 'yearly') {
+            const year = periodLabel.split('-')[0];
+            if (year) {
+                groupedForecast[year] = (groupedForecast[year] || 0) + revenue;
+            }
+        }
+    });
+
+    return Object.keys(groupedForecast)
+        .sort()
+        .map(label => ({
+            period: label,
+            revenue: groupedForecast[label]
+        }));
 }
 
 function renderChartWithActualOnly(actualData, period) {

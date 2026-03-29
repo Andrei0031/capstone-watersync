@@ -572,7 +572,7 @@ class DashboardData {
         ];
     }
     
-    public function getRevenueWithForecast($period = 'monthly', $forecastMethod = 'ensemble', $forecastMonths = 6) {
+    public function getRevenueWithForecast($period = 'monthly', $forecastMethod = 'seasonal', $forecastMonths = 6) {
         try {
             $forecast = new RevenueForecast($this->conn);
             // Always provide actuals
@@ -769,7 +769,7 @@ if(isset($_GET['action'])) {
             break;
         case 'revenue_forecast':
             $period = $_GET['period'] ?? 'monthly';
-            $forecastMethod = $_GET['forecast_method'] ?? 'ensemble';
+            $forecastMethod = $_GET['forecast_method'] ?? 'seasonal';
             $forecastMonths = intval($_GET['forecast_months'] ?? 6);
             try {
                 $response = $dashboard->getRevenueWithForecast($period, $forecastMethod, $forecastMonths);
