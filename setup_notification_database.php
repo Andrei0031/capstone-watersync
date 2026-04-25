@@ -103,7 +103,7 @@ try {
         ['sms_api_key', '', 'SMS API key'],
         ['sms_sender_name', 'WaterSync', 'SMS sender name'],
         ['sms_test_mode', '0', 'SMS test mode (1=log only, 0=send real)'],
-        ['smtp_host', 'smtp.gmail.com', 'SMTP host'],
+        ['smtp_host', 'mail.yourdomain.com', 'SMTP host'],
         ['smtp_port', '587', 'SMTP port'],
         ['smtp_username', '', 'SMTP username'],
         ['smtp_password', '', 'SMTP password'],

@@ -1,7 +1,7 @@
 <?php
 /**
- * Email Workaround for XAMPP
- * Provides alternative email solutions when local mail server is not available
+ * Email Workaround for local development
+ * Provides alternative email solutions when a local mail server is not available
  */
 
 class EmailWorkaround {
@@ -35,7 +35,7 @@ class EmailWorkaround {
                 'status' => 'development_limitation',
                 'message' => 'Email sending limited in development environment',
                 'error' => 'This will work when deployed to web hosting with proper SMTP configuration.',
-                'suggestion' => 'Deploy to web hosting for full email functionality',
+                'suggestion' => 'Deploy to Namecheap/cPanel hosting for full email functionality',
                 'details' => "Email would be sent to: $to\nSubject: $subject\nFrom: $from_name <$from_email>"
             ];
         }
@@ -74,11 +74,11 @@ class EmailWorkaround {
     public static function getXAMPPGuidance() {
         return [
             'title' => 'XAMPP Email Configuration',
-            'message' => 'XAMPP doesn\'t include a mail server by default.',
+            'message' => 'Local development does not include a mail server by default.',
             'solutions' => [
                 [
                     'title' => 'Use Web Hosting (Recommended)',
-                    'description' => 'Deploy your application to a web hosting service that supports SMTP',
+                    'description' => 'Deploy your application to Namecheap/cPanel hosting that supports SMTP',
                     'steps' => [
                         'Upload your files to web hosting',
                         'Configure SMTP settings in the admin panel',

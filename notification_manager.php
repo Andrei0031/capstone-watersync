@@ -36,7 +36,7 @@ class NotificationManager {
             ],
             'email' => [
                 'provider' => $this->getSetting('email_provider', 'smtp'),
-                'smtp_host' => $this->getSetting('smtp_host', 'smtp.gmail.com'),
+                'smtp_host' => $this->getSetting('smtp_host', 'mail.yourdomain.com'),
                 'smtp_port' => intval($this->getSetting('smtp_port', '587')),
                 'smtp_username' => $this->getSetting('smtp_username', ''),
                 'smtp_password' => $this->getSetting('smtp_password', ''),

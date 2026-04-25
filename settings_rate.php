@@ -4009,7 +4009,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="emailSettingsModalLabel">
-                    <i class="fas fa-envelope me-2"></i>Email Settings (Verpex/cPanel)
+                    <i class="fas fa-envelope me-2"></i>Email Settings (Namecheap/cPanel)
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -4043,8 +4043,8 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                         <label for="smtp_host" class="form-label">SMTP Host</label>
                                         <input type="text" class="form-control" id="smtp_host" name="smtp_host" 
                                                value="<?php echo htmlspecialchars($smtp_host); ?>" 
-                                               placeholder="mail.yourdomain.com or localhost">
-                                        <small class="form-text text-muted">For Verpex: Usually <code>mail.yourdomain.com</code> or <code>localhost</code></small>
+                                                 placeholder="mail.yourdomain.com">
+                                             <small class="form-text text-muted">For Namecheap/cPanel: usually <code>mail.yourdomain.com</code></small>
                                     </div>
                                     
                                     <div class="mb-3">
@@ -4102,7 +4102,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                             
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
-                                <strong>Verpex/cPanel Setup:</strong><br>
+                                <strong>Namecheap/cPanel Setup:</strong><br>
                                 1. Create an email account in cPanel (e.g., <code>billing@yourdomain.com</code>)<br>
                                 2. Use SMTP Host: <code>mail.yourdomain.com</code> or <code>localhost</code><br>
                                 3. Port: <code>587</code> (TLS) or <code>465</code> (SSL)<br>

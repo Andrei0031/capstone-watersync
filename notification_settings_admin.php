@@ -182,7 +182,7 @@ $sms_test_mode = getSetting('sms_test_mode', '0');
 
 $email_enabled = getSetting('email_enabled', '1');
 $email_provider = getSetting('email_provider', 'smtp');
-$smtp_host = getSetting('smtp_host', 'smtp.gmail.com');
+$smtp_host = getSetting('smtp_host', 'mail.yourdomain.com');
 $smtp_port = getSetting('smtp_port', '587');
 $smtp_username = getSetting('smtp_username', '');
 $smtp_password = getSetting('smtp_password', '');
@@ -321,7 +321,7 @@ $email_test_mode = getSetting('email_test_mode', '0');
                                     <div class="mb-3">
                                         <label for="smtp_host" class="form-label">SMTP Host</label>
                                         <input type="text" class="form-control" id="smtp_host" name="smtp_host" 
-                                               value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="smtp.gmail.com">
+                                               value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="mail.yourdomain.com">
                                     </div>
                                     
                                     <div class="mb-3">
@@ -335,14 +335,14 @@ $email_test_mode = getSetting('email_test_mode', '0');
                                     <div class="mb-3">
                                         <label for="smtp_username" class="form-label">Email Address</label>
                                         <input type="email" class="form-control" id="smtp_username" name="smtp_username" 
-                                               value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="your-email@gmail.com">
+                                               value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="billing@yourdomain.com">
                                     </div>
                                     
                                     <div class="mb-3">
                                         <label for="smtp_password" class="form-label">Password/App Password</label>
                                         <input type="password" class="form-control" id="smtp_password" name="smtp_password" 
-                                               value="<?php echo htmlspecialchars($smtp_password); ?>" placeholder="Your email password or app password">
-                                        <small class="form-text text-muted">For Gmail, use App Password (not regular password)</small>
+                                                 value="<?php echo htmlspecialchars($smtp_password); ?>" placeholder="Your email password">
+                                             <small class="form-text text-muted">Use the password for your cPanel email account</small>
                                     </div>
                                     
                                     <div class="mb-3">
@@ -489,7 +489,7 @@ $email_test_mode = getSetting('email_test_mode', '0');
             
             switch(provider) {
                 case 'smtp':
-                    hostField.placeholder = 'smtp.gmail.com';
+                    hostField.placeholder = 'mail.yourdomain.com';
                     portField.value = '587';
                     break;
                 case 'sendgrid':
