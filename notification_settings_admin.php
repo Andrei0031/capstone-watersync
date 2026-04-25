@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if (isset($_POST['test_notification'])) {
-        $test_email = $_POST['test_email'];
+        $test_email = $_POST['test_email_address'] ?? '';
         $test_phone = $_POST['test_phone'];
         $test_name = $_POST['test_name'];
         $test_sms = isset($_POST['test_sms']);
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Handle quick test buttons
     if (isset($_POST['test_sms_only'])) {
-        $test_email = $_POST['test_email'];
+        $test_email = $_POST['test_email_address'] ?? '';
         $test_phone = $_POST['test_phone'];
         $test_name = $_POST['test_name'];
         
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if (isset($_POST['test_email_only'])) {
-        $test_email = $_POST['test_email'];
+        $test_email = $_POST['test_email_address'] ?? '';
         $test_phone = $_POST['test_phone'];
         $test_name = $_POST['test_name'];
         
@@ -397,7 +397,7 @@ $email_test_mode = getSetting('email_test_mode', '0');
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="test_email" class="form-label">Test Email</label>
-                                        <input type="email" class="form-control" id="test_email" name="test_email" 
+                                             <input type="email" class="form-control" id="test_email" name="test_email_address" 
                                                placeholder="test@example.com">
                                     </div>
                                 </div>
@@ -429,15 +429,15 @@ $email_test_mode = getSetting('email_test_mode', '0');
                             
                             <div class="row">
                                 <div class="col-md-12">
-                                    <button type="submit" name="test_notification" class="btn btn-success">
+                                    <button type="submit" name="test_notification" value="1" class="btn btn-success">
                                         <i class="fas fa-paper-plane me-2"></i>Send Test Notifications
                                     </button>
                                     
-                                    <button type="submit" name="test_sms_only" class="btn btn-info ms-2">
+                                    <button type="submit" name="test_sms_only" value="1" class="btn btn-info ms-2">
                                         <i class="fas fa-sms me-2"></i>Test SMS Only
                                     </button>
                                     
-                                    <button type="submit" name="test_email_only" class="btn btn-warning ms-2">
+                                    <button type="submit" name="test_email_only" value="1" class="btn btn-warning ms-2">
                                         <i class="fas fa-envelope me-2"></i>Test Email Only
                                     </button>
                                 </div>

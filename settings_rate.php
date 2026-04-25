@@ -664,8 +664,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     // Handle email test
-    if (isset($_POST['test_email'])) {
-        $test_email = $_POST['test_email'] ?? '';
+    if (isset($_POST['send_test_email'])) {
+        $test_email = $_POST['test_email_address'] ?? '';
         $test_name = $_POST['test_name'] ?? 'Test User';
         
         if (!empty($test_email)) {
@@ -692,8 +692,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     // Handle overdue email test
-    if (isset($_POST['test_overdue_email'])) {
-        $test_email = $_POST['test_overdue_email'] ?? '';
+    if (isset($_POST['send_test_overdue_email'])) {
+        $test_email = $_POST['test_overdue_email_address'] ?? '';
         $test_name = $_POST['test_overdue_name'] ?? 'Test User';
         $test_amount = $_POST['test_overdue_amount'] ?? '1,500.00';
         $test_days_overdue = intval($_POST['test_overdue_days'] ?? 5);
@@ -4161,12 +4161,12 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="test_email" class="form-label">Test Email</label>
-                                        <input type="email" class="form-control" id="test_email" name="test_email" 
+                                             <input type="email" class="form-control" id="test_email" name="test_email_address" 
                                                placeholder="test@example.com">
                                     </div>
                                 </div>
                             </div>
-                            <button type="submit" name="test_email" class="btn btn-success">
+                            <button type="submit" name="send_test_email" value="1" class="btn btn-success">
                                 <i class="fas fa-paper-plane me-2"></i>Send Test Email
                             </button>
                         </div>
@@ -4189,7 +4189,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="test_overdue_email" class="form-label">Test Email</label>
-                                        <input type="email" class="form-control" id="test_overdue_email" name="test_overdue_email" 
+                                             <input type="email" class="form-control" id="test_overdue_email" name="test_overdue_email_address" 
                                                placeholder="test@example.com">
                                     </div>
                                 </div>
@@ -4210,7 +4210,7 @@ document.addEventListener('DOMContentLoaded', initNotificationSchedulerFields);
                                     </div>
                                 </div>
                             </div>
-                            <button type="submit" name="test_overdue_email" class="btn btn-danger">
+                            <button type="submit" name="send_test_overdue_email" value="1" class="btn btn-danger">
                                 <i class="fas fa-paper-plane me-2"></i>Send Overdue Email Test
                             </button>
                         </div>
