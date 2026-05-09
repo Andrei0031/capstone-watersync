@@ -8,17 +8,17 @@ if (!isset($_SESSION['admin_id'])) {
 include 'db.php';
 
 // Check records with delete_flag = 1 (soft deleted)
-$sql = "SELECT id, firstname, lastname, meter_code, delete_flag, status, updated_at, date_created 
+$sql = "SELECT id, firstname, lastname, meter_code, delete_flag, status, date_created
         FROM client_list 
         WHERE delete_flag = 1
-        ORDER BY updated_at DESC
+        ORDER BY id DESC
         LIMIT 20";
 
 $result = $conn->query($sql);
 
 echo "<h2>Soft Deleted Records (delete_flag = 1):</h2>";
 echo "<table border='1' cellpadding='10'>";
-echo "<tr><th>ID</th><th>Name</th><th>Meter Code</th><th>Delete Flag</th><th>Status</th><th>Updated</th></tr>";
+echo "<tr><th>ID</th><th>Name</th><th>Meter Code</th><th>Delete Flag</th><th>Status</th><th>Created</th></tr>";
 
 if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
@@ -28,7 +28,7 @@ if ($result && $result->num_rows > 0) {
         echo "<td>" . $row['meter_code'] . "</td>";
         echo "<td>" . $row['delete_flag'] . "</td>";
         echo "<td>" . $row['status'] . "</td>";
-        echo "<td>" . $row['updated_at'] . "</td>";
+        echo "<td>" . $row['date_created'] . "</td>";
         echo "</tr>";
     }
 } else {
