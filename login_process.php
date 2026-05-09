@@ -43,8 +43,8 @@ if (isset($_SERVER["REQUEST_METHOD"]) && $_SERVER["REQUEST_METHOD"] == "POST") {
         if ($result->num_rows === 1) {
             $admin = $result->fetch_assoc();
 
-            // Check if the password is correct (plain text comparison)
-            if ($admin['password'] === $password) {
+            // Check if the password is correct using password_verify for bcrypt hashes
+            if (password_verify($password, $admin['password'])) {
                 // Successful login, set session variables
                 $_SESSION['admin_id'] = $admin['id'];
                 $_SESSION['admin_username'] = $admin['username'];
