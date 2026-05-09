@@ -37,18 +37,21 @@ try {
                WHERE meter_code REGEXP '^[0-9]+$'
                  AND delete_flag = 0";
     $result = $conn->query($maxSql);
-    if ($result && $row = $result->fetch_assoc() && $row['max_code'] !== null) {
-        $last_meter_code = $row['max_code'];
-        $next_meter_code = strval(intval($last_meter_code) + 1);
-        echo json_encode([
-            'success' => true,
-            'last_meter_code' => strval($last_meter_code),
-            'next_meter_code' => $next_meter_code
-        ]);
-        exit;
+    if ($result) {
+        $row = $result->fetch_assoc();
+        if ($row && $row['max_code'] !== null) {
+            $last_meter_code = $row['max_code'];
+            $next_meter_code = strval(intval($last_meter_code) + 1);
+            echo json_encode([
+                'success' => true,
+                'last_meter_code' => strval($last_meter_code),
+                'next_meter_code' => $next_meter_code
+            ]);
+            exit;
+        }
     }
 
-    // No numeric meter codes found
+    // No numeric meter codes found - start from 1
     echo json_encode([
         'success' => true,
         'last_meter_code' => null,

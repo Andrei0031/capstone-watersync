@@ -3138,21 +3138,22 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('get_last_meter_code.php')
             .then(res => res.json())
             .then(data => {
-                if (data.success) {
-                    if (data.next_meter_code) {
-                        meterCodeInputAuto.value = data.next_meter_code;
-                        if (focusInput) {
-                            meterCodeInputAuto.focus();
-                            meterCodeInputAuto.select();
-                        }
+                if (data.success && data.next_meter_code) {
+                    meterCodeInputAuto.value = data.next_meter_code;
+                    if (focusInput) {
+                        meterCodeInputAuto.focus();
+                        meterCodeInputAuto.select();
                     }
                     if (meterCodeError) {
                         meterCodeError.textContent = '';
                         meterCodeError.style.display = 'none';
                     }
-                } else if (meterCodeError) {
+                } else if (!data.success && meterCodeError) {
                     meterCodeError.textContent = data.message || 'Unable to fetch meter code.';
                     meterCodeError.style.display = 'block';
+                } else if (meterCodeError) {
+                    meterCodeError.textContent = '';
+                    meterCodeError.style.display = 'none';
                 }
             })
             .catch(() => {
