@@ -690,6 +690,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         if ($stmt->execute()) {
                             $client_id = $conn->insert_id;
                             $success_count++;
+                            
+                            // Auto-create customer account
+                            try {
+                                // Generate email from client name and meter code
+                                $email = strtolower($customer_info['firstname']) . "." . strtolower($customer_info['lastname']) . "@watersync.local";
+                                
+                                // Use meter code as temporary password
+                                $temp_password = $meter_code;
+                                $hashed_password = password_hash($temp_password, PASSWORD_BCRYPT);
+                                
+                                // Check if email already exists
+                                $email_check = "SELECT id FROM customer_accounts WHERE email = ?";
+                                $email_stmt = $conn->prepare($email_check);
+                                $email_stmt->bind_param("s", $email);
+                                $email_stmt->execute();
+                                $email_exists = $email_stmt->get_result()->num_rows > 0;
+                                $email_stmt->close();
+                                
+                                if (!$email_exists) {
+                                    // Insert into customer_accounts
+                                    $ca_insert = "INSERT INTO customer_accounts (client_id, email, password, status) VALUES (?, ?, ?, 1)";
+                                    $ca_stmt = $conn->prepare($ca_insert);
+                                    $ca_stmt->bind_param("iss", $client_id, $email, $hashed_password);
+                                    $ca_stmt->execute();
+                                    $ca_stmt->close();
+                                }
+                            } catch (Exception $e) {
+                                // Log but don't fail - client was created successfully
+                                error_log("Bulk Import: Failed to create customer account for meter $meter_code: " . $e->getMessage());
+                            }
                         } else {
                             $errors[] = "Meter Code {$meter_code}: " . $stmt->error;
                             $skip_count++;

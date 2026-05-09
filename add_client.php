@@ -74,8 +74,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("sisssssdii", $code, $category_id, $firstname, $middlename, $lastname, $contact, $address, $meter_code, $status, $delete_flag);
 
         if ($stmt->execute()) {
-            $message = "New client added successfully";
-            $messageClass = "alert alert-success";
+            $client_id = $stmt->insert_id; // Get the inserted client ID
+            
+            // Auto-create customer account
+            try {
+                // Generate email from client name and meter code
+                $email = strtolower($firstname) . "." . strtolower($lastname) . "@watersync.local";
+                
+                // Use meter code as temporary password
+                $temp_password = $meter_code;
+                $hashed_password = password_hash($temp_password, PASSWORD_BCRYPT);
+                
+                // Check if email already exists (unlikely but safe)
+                $email_check = "SELECT id FROM customer_accounts WHERE email = ?";
+                $email_stmt = $conn->prepare($email_check);
+                $email_stmt->bind_param("s", $email);
+                $email_stmt->execute();
+                $email_exists = $email_stmt->get_result()->num_rows > 0;
+                $email_stmt->close();
+                
+                if (!$email_exists) {
+                    // Insert into customer_accounts
+                    $ca_insert = "INSERT INTO customer_accounts (client_id, email, password, status) VALUES (?, ?, ?, 1)";
+                    $ca_stmt = $conn->prepare($ca_insert);
+                    $ca_stmt->bind_param("iss", $client_id, $email, $hashed_password);
+                    
+                    if ($ca_stmt->execute()) {
+                        $message = "New client added successfully. Customer account auto-created with email: $email";
+                        $messageClass = "alert alert-success";
+                    } else {
+                        $message = "Client added but failed to create customer account: " . $ca_stmt->error;
+                        $messageClass = "alert alert-warning";
+                    }
+                    $ca_stmt->close();
+                } else {
+                    $message = "Client added but customer account email already exists: $email";
+                    $messageClass = "alert alert-warning";
+                }
+            } catch (Exception $e) {
+                $message = "Client added but error creating customer account: " . $e->getMessage();
+                $messageClass = "alert alert-warning";
+            }
+            
             // Regenerate next code for next client
             $last_number++;
             if ($last_number <= 999) {
