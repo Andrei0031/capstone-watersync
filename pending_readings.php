@@ -1884,7 +1884,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
@@ -2054,7 +2054,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-info">
@@ -2196,7 +2196,7 @@ function pendingFormatDT($dt) {
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['processed_at'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-processed">
                                                     <i class="fas fa-file-invoice-dollar"></i>
