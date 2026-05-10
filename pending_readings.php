@@ -319,17 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
             $ocrReading = $ocrResult['meter_reading'];
             $extractedText = $ocrResult['extracted_text'] ?? '';
 
-            $statusToSet = 'needs_review';
-            if (empty($ocrResult['requires_review'])) {
-                $digitStats = $ocrResult['digit_stats'] ?? null;
-                if ($digitStats) {
-                    $digitCount = (int) ($digitStats['count'] ?? 0);
-                    $minConf = (float) ($digitStats['min_confidence'] ?? 0.0);
-                    if ($digitCount >= 5 && $minConf >= 0.5) {
-                        $statusToSet = 'verified';
-                    }
-                }
-            }
+            $statusToSet = ocrResultQualifiesForAutoVerify($ocrResult) ? 'verified' : 'needs_review';
 
             $processedAt = date('Y-m-d H:i:s');
             $update = $conn->prepare("UPDATE pending_meter_readings SET 

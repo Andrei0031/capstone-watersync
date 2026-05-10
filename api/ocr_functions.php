@@ -7,6 +7,153 @@
  * Now uses Roboflow YOLOv8 for digit detection instead of Tesseract OCR
  */
 
+/** Minimum weakest-digit confidence (0–1) to auto-verify pending readings without manual review. */
+if (!defined('OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE')) {
+    define('OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE', 0.76);
+}
+/** Minimum mean digit confidence for auto-verify (both bars must pass). */
+if (!defined('OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE')) {
+    define('OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE', 0.70);
+}
+/**
+ * Laplacian variance (on a downscaled grayscale copy) below this ⇒ image treated as too blurry for auto-verify.
+ * Tune on real samples: lower ⇒ more rows go to needs_review.
+ */
+if (!defined('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD')) {
+    define('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD', 110.0);
+}
+/** Longest edge (px) when measuring blur (smaller = faster, threshold is calibrated for this). */
+if (!defined('METER_IMAGE_BLUR_MAX_EDGE')) {
+    define('METER_IMAGE_BLUR_MAX_EDGE', 320);
+}
+
+/**
+ * True when OCR is strong enough to set status to verified without admin review.
+ */
+function ocrResultQualifiesForAutoVerify(array $ocrResult) {
+    if (!empty($ocrResult['requires_review'])) {
+        return false;
+    }
+    $digitStats = $ocrResult['digit_stats'] ?? null;
+    if (!$digitStats || !is_array($digitStats)) {
+        return false;
+    }
+    $digitCount = (int) ($digitStats['count'] ?? 0);
+    $minConf = (float) ($digitStats['min_confidence'] ?? 0.0);
+    $avgConf = (float) ($digitStats['avg_confidence'] ?? 0.0);
+    return $digitCount >= 5
+        && $minConf >= OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE
+        && $avgConf >= OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE;
+}
+
+/**
+ * Grayscale luminance 0-255 at one pixel (truecolor image).
+ */
+function ocrGrayAt($im, $x, $y) {
+    $rgb = imagecolorat($im, $x, $y);
+    $r = ($rgb >> 16) & 0xFF;
+    $g = ($rgb >> 8) & 0xFF;
+    $b = $rgb & 0xFF;
+    return (int) round(0.299 * $r + 0.587 * $g + 0.114 * $b);
+}
+
+/**
+ * Blur / focus hint via variance of Laplacian (higher = sharper). Used to force needs_review on soft photos.
+ *
+ * @return array{variance: ?float, is_blurry: bool, skipped: bool}
+ */
+function assessMeterImageBlurFromPath($imagePath) {
+    $out = ['variance' => null, 'is_blurry' => false, 'skipped' => true];
+    if (!extension_loaded('gd') || !is_readable($imagePath)) {
+        return $out;
+    }
+    $info = @getimagesize($imagePath);
+    if ($info === false) {
+        return $out;
+    }
+    $type = $info[2];
+    $src = null;
+    switch ($type) {
+        case IMAGETYPE_JPEG:
+            $src = @imagecreatefromjpeg($imagePath);
+            break;
+        case IMAGETYPE_PNG:
+            $src = @imagecreatefrompng($imagePath);
+            break;
+        case IMAGETYPE_GIF:
+            $src = @imagecreatefromgif($imagePath);
+            break;
+        default:
+            return $out;
+    }
+    if (!$src) {
+        return $out;
+    }
+
+    $w0 = imagesx($src);
+    $h0 = imagesy($src);
+    if ($w0 < 3 || $h0 < 3) {
+        imagedestroy($src);
+        return $out;
+    }
+
+    $maxEdge = (int) METER_IMAGE_BLUR_MAX_EDGE;
+    $scale = min(1.0, $maxEdge / max($w0, $h0));
+    $w = max(8, (int) round($w0 * $scale));
+    $h = max(8, (int) round($h0 * $scale));
+
+    $gray = imagecreatetruecolor($w, $h);
+    if (!$gray) {
+        imagedestroy($src);
+        return $out;
+    }
+    imagecopyresampled($gray, $src, 0, 0, 0, 0, $w, $h, $w0, $h0);
+    imagedestroy($src);
+
+    $lap = [];
+    for ($y = 1; $y < $h - 1; $y++) {
+        for ($x = 1; $x < $w - 1; $x++) {
+            $c = ocrGrayAt($gray, $x, $y);
+            $t = ocrGrayAt($gray, $x, $y - 1);
+            $b = ocrGrayAt($gray, $x, $y + 1);
+            $l = ocrGrayAt($gray, $x - 1, $y);
+            $r = ocrGrayAt($gray, $x + 1, $y);
+            $lap[] = (float) (4 * $c - $t - $b - $l - $r);
+        }
+    }
+    imagedestroy($gray);
+
+    $n = count($lap);
+    if ($n < 1) {
+        return $out;
+    }
+    $mean = array_sum($lap) / $n;
+    $var = 0.0;
+    foreach ($lap as $v) {
+        $d = $v - $mean;
+        $var += $d * $d;
+    }
+    $var /= $n;
+
+    $out['variance'] = $var;
+    $out['skipped'] = false;
+    $out['is_blurry'] = $var < (float) METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD;
+    return $out;
+}
+
+/**
+ * @param array $result OCR result (mutated)
+ */
+function ocrAttachBlurReviewFlags(array &$result, $imagePathUsed) {
+    $blur = assessMeterImageBlurFromPath($imagePathUsed);
+    $result['blur_laplacian_variance'] = $blur['variance'];
+    $result['image_likely_blurry'] = !empty($blur['is_blurry']);
+    if (!empty($blur['is_blurry'])) {
+        $result['requires_review'] = true;
+        error_log('OCR: requires_review (likely blurry image) laplacian_var=' . ($blur['variance'] !== null ? round($blur['variance'], 2) : 'null') . ' path=' . basename((string) $imagePathUsed));
+    }
+}
+
 /**
  * Preprocess image for better OCR accuracy
  * Enhances contrast, converts to grayscale, and sharpens
@@ -270,7 +417,7 @@ function processImageWithOcrSpace($imagePath) {
         $meterReading = extractMeterReadingFromText($parsedText);
 
         if ($meterReading) {
-            return [
+            $ocrSpaceOk = [
                 'success' => true,
                 'extracted_text' => $parsedText,
                 'meter_reading' => $meterReading,
@@ -281,6 +428,8 @@ function processImageWithOcrSpace($imagePath) {
                 ],
                 'requires_review' => true,
             ];
+            ocrAttachBlurReviewFlags($ocrSpaceOk, $imagePath);
+            return $ocrSpaceOk;
         }
 
         return [
@@ -572,12 +721,16 @@ function processImageWithTesseract($imagePath) {
     
     // Extract meter reading from text
     $meterReading = extractMeterReadingFromText($extractedText);
-    
-    return [
+
+    $tesseractOk = [
         'success' => true,
         'extracted_text' => $extractedText,
-        'meter_reading' => $meterReading
+        'meter_reading' => $meterReading,
     ];
+    if (!empty($meterReading)) {
+        ocrAttachBlurReviewFlags($tesseractOk, $imagePath);
+    }
+    return $tesseractOk;
 }
 
 /**
@@ -925,7 +1078,7 @@ function processImageWithRoboflowDigits($imagePath) {
                 . ']';
 
             error_log("✓ Roboflow OCR: Selected reading $meterReading from model {$candidate['model_id']}");
-            return [
+            $roboflowOk = [
                 'success' => true,
                 'extracted_text' => $extractedText,
                 'meter_reading' => $meterReading,
@@ -940,6 +1093,8 @@ function processImageWithRoboflowDigits($imagePath) {
                 ],
                 'requires_review' => $requiresReview,
             ];
+            ocrAttachBlurReviewFlags($roboflowOk, $imagePath);
+            return $roboflowOk;
         } else {
             $digits = $digitResult['digits'] ?? [];
             $errorMsg = 'Could not form 5-digit reading from Roboflow model ' . ($digitResult['model_id'] ?? ($modelId ?? 'default'))
