@@ -2493,14 +2493,12 @@ function pendingFormatDT($dt) {
                             `Processing ${index + 1} of ${ids.length} reading(s)...`;
 
                         const formData = new FormData();
-                        formData.append('process_selected', '1');
-                        formData.append('process_single', '1');
                         formData.append('reading_id', ids[index]);
 
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-                        fetch('pending_readings.php', {
+                        fetch('api/process_pending_reading.php', {
                             method: 'POST',
                             body: formData,
                             signal: controller.signal,
