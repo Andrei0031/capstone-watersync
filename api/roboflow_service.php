@@ -441,8 +441,8 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // Increased to 60 seconds - Roboflow API can be slow
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15); // Connection timeout 15 seconds
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Shorter timeout to avoid long blocking
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Shorter connect timeout
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // Force HTTP/1.1
@@ -514,139 +514,7 @@ function detectDigitsWithRoboflow($imagePath) {
             error_log("✗ Roboflow Digit Detection: Method 1 failed - HTTP Code: $httpCode, Error: $error, Response length: " . strlen($response ?? ''));
         }
         
-        // If Method 1 failed or returned empty predictions, try Method 2: Multipart form-data
-        if (!$method1Success) {
-            error_log("Roboflow Digit Detection: Method 1 failed or no predictions, trying Method 2 - Multipart form-data");
-            $methodUsed = 'multipart';
-            
-            $boundary = uniqid();
-            $delimiter = '-------------' . $boundary;
-            
-            $postData = '';
-            $postData .= '--' . $delimiter . "\r\n";
-            $postData .= 'Content-Disposition: form-data; name="file"; filename="meter_image.jpg"' . "\r\n";
-            $postData .= 'Content-Type: image/jpeg' . "\r\n\r\n";
-            $postData .= $imageData . "\r\n";
-            $postData .= '--' . $delimiter . '--';
-            
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: multipart/form-data; boundary=' . $delimiter
-            ]);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
-            
-            // Check if Method 2 returned valid predictions
-            $method2Success = false;
-            if ($httpCode === 200 && !$error && !empty($response)) {
-                $testData = json_decode($response, true);
-                if ($testData) {
-                    // Check multiple possible response formats
-                    $hasPredictions = false;
-                    $predictionCount = 0;
-                    
-                    if (isset($testData['predictions']) && is_array($testData['predictions'])) {
-                        $hasPredictions = true;
-                        $predictionCount = count($testData['predictions']);
-                    } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
-                        $hasPredictions = true;
-                        $predictionCount = count($testData['detections']);
-                    } elseif (isset($testData['results']) && is_array($testData['results'])) {
-                        $hasPredictions = true;
-                        $predictionCount = count($testData['results']);
-                    }
-                    
-                    if ($hasPredictions && $predictionCount > 0) {
-                        $method2Success = true;
-                        error_log("Roboflow Digit Detection: Method 2 (multipart) succeeded with $predictionCount predictions");
-                    }
-                }
-            }
-            
-            // If Method 2 also failed, try Method 3: Base64 with text/plain
-            if (!$method2Success) {
-                error_log("Roboflow Digit Detection: Method 2 failed, trying Method 3 - Base64 with text/plain");
-                $methodUsed = 'base64-text';
-                
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    'Content-Type: text/plain'
-                ]);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $error = curl_error($ch);
-                curl_close($ch);
-                
-                // Check if Method 3 returned valid predictions
-                $method3Success = false;
-                if ($httpCode === 200 && !$error && !empty($response)) {
-                    $testData = json_decode($response, true);
-                    if ($testData) {
-                        // Check multiple possible response formats
-                        $hasPredictions = false;
-                        $predictionCount = 0;
-                        
-                        if (isset($testData['predictions']) && is_array($testData['predictions'])) {
-                            $hasPredictions = true;
-                            $predictionCount = count($testData['predictions']);
-                        } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
-                            $hasPredictions = true;
-                            $predictionCount = count($testData['detections']);
-                        } elseif (isset($testData['results']) && is_array($testData['results'])) {
-                            $hasPredictions = true;
-                            $predictionCount = count($testData['results']);
-                        }
-                        
-                        if ($hasPredictions && $predictionCount > 0) {
-                            $method3Success = true;
-                            error_log("Roboflow Digit Detection: Method 3 (base64-text) succeeded with $predictionCount predictions");
-                        }
-                    }
-                }
-                
-                // If Method 3 failed, try Method 4: CURLFile (PHP 5.5+)
-                if (!$method3Success && class_exists('CURLFile')) {
-                    error_log("Roboflow Digit Detection: Method 3 failed, trying Method 4 - CURLFile");
-                    $methodUsed = 'curlfile';
-                    
-                    $cfile = new CURLFile($imagePath, 'image/jpeg', 'meter_image.jpg');
-                    $postData = ['file' => $cfile];
-                    
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                    
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $error = curl_error($ch);
-                    curl_close($ch);
-                }
-                
-            }
-        }
+        // Skip additional upload methods to avoid long retry chains
         
         error_log("=== ROBOFLOW DIGIT DETECTION SUMMARY ===");
         error_log("Final method used: $methodUsed");

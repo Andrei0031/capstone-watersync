@@ -313,38 +313,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                     throw new Exception('Image file not found. Tried: ' . implode(', ', $possiblePaths) . '. Stored path: ' . $storedPath);
                 }
                 
-                // Step 1: Use Roboflow to detect and crop meter region (OPTIONAL - can work without it)
+                // Step 1: Skip meter-region detection to speed up processing
                 $croppedImagePath = $imagePath;
                 $roboflowUsed = false;
                 $roboflowError = null;
                 
-                try {
-                    if (function_exists('detectAndCropMeterWithRoboflow')) {
-                        error_log("Attempting Roboflow detection for reading ID $reading_id, image: $imagePath");
-                        $croppedImagePath = detectAndCropMeterWithRoboflow($imagePath);
-                        
-                        if ($croppedImagePath !== $imagePath && $croppedImagePath !== null && file_exists($croppedImagePath)) {
-                            $roboflowUsed = true;
-                            error_log("✓ Roboflow SUCCESS: Cropped image for reading ID $reading_id: $croppedImagePath");
-                        } else {
-                            // Roboflow didn't crop or returned original path - this is OK, we'll use full image
-                            $roboflowError = "Roboflow returned original image path (no crop detected) - will process full image";
-                            error_log("⚠ Roboflow: $roboflowError for reading ID $reading_id");
-                            $croppedImagePath = $imagePath;
-                        }
-                    } else {
-                        $roboflowError = "detectAndCropMeterWithRoboflow function not found - will process full image";
-                        error_log("⚠ Roboflow: $roboflowError - continuing without Roboflow");
-                        $croppedImagePath = $imagePath;
-                    }
-                } catch (Exception $e) {
-                    // Roboflow failed, continue with original image - this is OK
-                    $roboflowError = "Roboflow exception: " . $e->getMessage() . " - will process full image";
-                    error_log("⚠ Roboflow FAILED for reading ID $reading_id: " . $roboflowError);
-                    $croppedImagePath = $imagePath;
-                }
-                
-                // Step 2: Process OCR with Roboflow YOLOv8 digit detection on cropped image
+                // Step 2: Process OCR with Roboflow YOLOv8 digit detection (single pass)
                 if (!function_exists('processImageWithRoboflowDigits')) {
                     throw new Exception('Roboflow OCR function not available. Make sure ocr_functions.php and roboflow_service.php are included.');
                 }
@@ -367,36 +341,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 $imageUsed = $croppedImagePath;
                 
                 if (function_exists('processImageWithRoboflowDigits')) {
-                    // Try cropped image first (if different from original)
-                    if ($croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
-                        error_log("Attempting OCR on CROPPED image: $croppedImagePath");
-                        $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
-                        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                            $ocrReading = $ocrResult['meter_reading'];
-                            $extractedText = $ocrResult['extracted_text'] ?? '';
-                            $ocrProcessed = true;
-                            $imageUsed = $croppedImagePath;
-                            error_log("✓ OCR SUCCESS (Roboflow on CROPPED): Reading ID $reading_id processed with value: $ocrReading");
-                        } else {
-                            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on cropped image';
-                            error_log("⚠ Roboflow OCR failed on CROPPED image for reading ID $reading_id: $ocrError");
-                            error_log("   Will try ORIGINAL image as fallback...");
-                        }
-                    }
-                    
-                    // If cropped image failed or doesn't exist, try original image
-                    if (!$ocrProcessed && file_exists($imagePath)) {
-                        error_log("Attempting OCR on ORIGINAL (uncropped) image: $imagePath");
+                    if (file_exists($imagePath)) {
+                        error_log("Attempting OCR on ORIGINAL image: $imagePath");
                         $ocrResult = processImageWithRoboflowDigits($imagePath);
                         if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
                             $ocrReading = $ocrResult['meter_reading'];
                             $extractedText = $ocrResult['extracted_text'] ?? '';
                             $ocrProcessed = true;
                             $imageUsed = $imagePath;
-                            error_log("✓ OCR SUCCESS (Roboflow on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
+                            error_log("✓ OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
                         } else {
-                            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
-                            error_log("⚠ Roboflow OCR failed on ORIGINAL image for reading ID $reading_id: $ocrError");
+                            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
+                            error_log("⚠ Roboflow OCR failed for reading ID $reading_id: $ocrError");
                         }
                     }
                 }
@@ -415,10 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 }
                 
                 // Clean up cropped image if it was created by Roboflow
-                if ($roboflowUsed && $croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
-                    // Optionally keep cropped image for debugging, or delete it
-                    // unlink($croppedImagePath); // Uncomment to delete cropped images
-                }
+                // No cropped images are created in the fast path
                 
                 // Check if reading needs review based on consumption
                 // Decide initial status based on digit detection confidence:
