@@ -2502,6 +2502,7 @@ function pendingFormatDT($dt) {
                             method: 'POST',
                             body: formData,
                             signal: controller.signal,
+                            credentials: 'same-origin',
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'Accept': 'application/json'
@@ -2517,9 +2518,10 @@ function pendingFormatDT($dt) {
                                 }
                                 data = JSON.parse(text);
                             } catch (e) {
+                                const snippet = text ? text.slice(0, 200).replace(/\s+/g, ' ').trim() : '';
                                 data = {
                                     success: false,
-                                    message: 'Session expired or server returned HTML. Please refresh and try again.'
+                                    message: `HTML or invalid JSON response (status ${status}). ${snippet ? 'Snippet: ' + snippet : 'Please refresh and try again.'}`
                                 };
                             }
 
@@ -2530,7 +2532,7 @@ function pendingFormatDT($dt) {
                                 if (data && data.message) {
                                     errors.push(data.message);
                                 } else if (status >= 400) {
-                                    errors.push(`Server error (${status}).`);
+                                    errors.push(`Server error (${status}). ${data && data.message ? data.message : ''}`.trim());
                                 } else {
                                     errors.push('Unknown OCR error.');
                                 }
