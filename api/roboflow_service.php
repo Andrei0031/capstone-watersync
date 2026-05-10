@@ -16,8 +16,8 @@ define('ROBOFLOW_WORKSPACE', 'watersync');
 // Meter Detection Model Configuration
 // Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
-define('ROBOFLOW_MODEL_VERSION', '7'); // Using version 7
-define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/7'); // Model ID format: project/version
+define('ROBOFLOW_MODEL_VERSION', '8'); // Using version 8
+define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/8'); // Model ID format: project/version
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
@@ -26,24 +26,9 @@ define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_M
 // Format: "project-name/version" (e.g., "watersync-oekrf/8")
 define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/8'); // Using version 8 - newly trained model
 
-// Option 2: Use separate project and version (alternative format - kept for compatibility)
-define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
-define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Using version 7
-
-// Build inference URL - try both serverless and detect endpoints
+// Build inference URL (serverless endpoint only)
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
-// Alternative: https://detect.roboflow.com/{workspace}/{project}/{version}
-// If model_id is set, use it directly; otherwise use project/version format
-if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
-    // Primary: Use serverless endpoint
-    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
-    // Legacy fallback endpoint (kept for compatibility)
-    define('ROBOFLOW_DIGIT_INFERENCE_URL_ALT', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
-} else {
-    // Use project/version format (legacy)
-    define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
-    define('ROBOFLOW_DIGIT_INFERENCE_URL_ALT', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_DIGIT_PROJECT . '/' . ROBOFLOW_DIGIT_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
-}
+define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 /**
  * Detect meter region using Roboflow API
@@ -660,28 +645,6 @@ function detectDigitsWithRoboflow($imagePath) {
                     curl_close($ch);
                 }
                 
-                // If the primary method failed, try the legacy detect.roboflow.com endpoint
-                if (defined('ROBOFLOW_DIGIT_INFERENCE_URL_ALT')) {
-                    error_log("Roboflow Digit Detection: Primary method failed, trying alternative detect.roboflow.com endpoint");
-                    $methodUsed = 'detect-endpoint-base64';
-                    
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL_ALT);
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                        'Content-Type: application/x-www-form-urlencoded'
-                    ]);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Increased to 90 seconds - Roboflow API can be slow
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                    
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $error = curl_error($ch);
-                    curl_close($ch);
-                }
             }
         }
         
