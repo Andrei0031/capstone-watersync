@@ -23,9 +23,9 @@ define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_M
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
-// Format: "project-name/version" (e.g., "watersync-oekrf/7")
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Using version 7 as primary OCR model for testing
-define('ROBOFLOW_DIGIT_MODEL_ID_SECONDARY', 'watersync-oekrf/4'); // Secondary OCR model
+// Format: "project-name/version" (e.g., "watersync-oekrf/8")
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/8'); // Using version 8 - newly trained model
+define('ROBOFLOW_DIGIT_MODEL_ID_SECONDARY', 'watersync-oekrf/7'); // Secondary OCR model (previous version)
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
