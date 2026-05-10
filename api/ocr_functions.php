@@ -9,29 +9,29 @@
 
 /** Minimum weakest-digit confidence (0–1) to auto-verify pending readings without manual review. */
 if (!defined('OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE')) {
-    define('OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE', 0.76);
+    define('OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE', 0.58);
 }
 /** Minimum mean digit confidence for auto-verify (both bars must pass). */
 if (!defined('OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE')) {
-    define('OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE', 0.70);
+    define('OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE', 0.54);
 }
 /**
  * Laplacian variance (on a downscaled grayscale copy) below this ⇒ image treated as too blurry for auto-verify.
  * Tune on real samples: lower ⇒ more rows go to needs_review.
  */
 if (!defined('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD')) {
-    define('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD', 110.0);
+    define('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD', 90.0);
 }
 /** Longest edge (px) when measuring blur (smaller = faster, threshold is calibrated for this). */
 if (!defined('METER_IMAGE_BLUR_MAX_EDGE')) {
     define('METER_IMAGE_BLUR_MAX_EDGE', 320);
 }
 /**
- * Weakest digit confidence below this ⇒ numbers look blurry/unreliable to the model ⇒ needs manual review.
- * (Stricter than auto-verify min: gap 0.72–0.76 is review-only, not auto-verified.)
+ * Weakest digit confidence below this ⇒ numbers look unreliable to the model ⇒ needs manual review.
+ * Keep below OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE so normal clear photos can still auto-verify.
  */
 if (!defined('OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW')) {
-    define('OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW', 0.72);
+    define('OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW', 0.45);
 }
 
 /**

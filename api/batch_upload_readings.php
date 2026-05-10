@@ -107,8 +107,9 @@ if (!$is_local_network) {
     }
 }
 
-// Include OCR functions for auto-processing
+// Include OCR + meter crop for batch inference
 require_once __DIR__ . '/ocr_functions.php';
+require_once __DIR__ . '/roboflow_service.php';
 
 // Log incoming request for debugging
 $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -286,6 +287,11 @@ try {
     $results = [];
     $success_count = 0;
     $failed_count = 0;
+
+    set_time_limit(0);
+    if (function_exists('ini_set')) {
+        @ini_set('max_execution_time', '3600');
+    }
     
     // Process each reading in the batch
     foreach ($input['readings'] as $index => $reading_data) {
@@ -370,16 +376,12 @@ try {
                 throw new Exception('Failed to save meter image');
             }
             
-            // BATCH UPLOAD: Save as 'pending' status - OCR will be processed manually from web interface
-            // This allows admin to review and process OCR from the pending tab
             $ocrReading = null;
             $extractedText = '';
             $ocrProcessed = false;
             $ocrError = null;
-            $status = 'pending'; // Always 'pending' for batch uploads - manual OCR processing from web
+            $status = 'pending';
             
-            // If manual reading is provided from mobile app, use it but still keep status as 'pending'
-            // Admin can verify and process from web interface
             if (isset($reading_data['meter_reading'])) {
                 $meter_reading = floatval($reading_data['meter_reading']);
                 if ($meter_reading > 0) {
@@ -388,10 +390,40 @@ try {
                     error_log("Batch Upload: Manual reading provided for client $client_id: $meter_reading (status: pending for verification)");
                 }
             }
-            
-            // NOTE: OCR processing is skipped for batch uploads
-            // All readings go to 'pending' status and will be processed manually from web interface
-            // This ensures quality control and allows admin to verify readings before processing
+
+            // Run OCR on upload when no manual reading: pre-fills ocr_reading and sets verified vs needs_review
+            if ($ocrReading === null && function_exists('processMeterImageWithFallbacks')) {
+                $fullImagePath = realpath(__DIR__ . '/' . $filepath);
+                if ($fullImagePath === false) {
+                    $fullImagePath = __DIR__ . '/' . $filepath;
+                }
+                if (file_exists($fullImagePath)) {
+                    $croppedForOcr = $fullImagePath;
+                    try {
+                        if (function_exists('detectAndCropMeterWithRoboflow')) {
+                            $tryCrop = detectAndCropMeterWithRoboflow($fullImagePath);
+                            if ($tryCrop && $tryCrop !== $fullImagePath && file_exists($tryCrop)) {
+                                $croppedForOcr = $tryCrop;
+                            }
+                        }
+                    } catch (Exception $e) {
+                        error_log('Batch upload meter crop: ' . $e->getMessage());
+                    }
+                    try {
+                        $ocrResult = processMeterImageWithFallbacks($fullImagePath, $croppedForOcr);
+                        if (!empty($ocrResult['success']) && !empty($ocrResult['meter_reading'])) {
+                            $ocrReading = floatval($ocrResult['meter_reading']);
+                            $extractedText = $ocrResult['extracted_text'] ?? '';
+                            $ocrProcessed = true;
+                            $status = ocrResultQualifiesForAutoVerify($ocrResult) ? 'verified' : 'needs_review';
+                            mobileUploadLog("OCR on upload client=$client_id reading=" . $ocrReading . " status=$status", 'OK');
+                        }
+                    } catch (Exception $e) {
+                        $ocrError = $e->getMessage();
+                        error_log('Batch upload OCR: ' . $ocrError);
+                    }
+                }
+            }
             
             // Get mobile device info if provided
             $device_info = $reading_data['device_info'] ?? null;
