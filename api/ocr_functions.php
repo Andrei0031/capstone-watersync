@@ -26,9 +26,18 @@ if (!defined('METER_IMAGE_BLUR_LAPLACIAN_THRESHOLD')) {
 if (!defined('METER_IMAGE_BLUR_MAX_EDGE')) {
     define('METER_IMAGE_BLUR_MAX_EDGE', 320);
 }
+/**
+ * Weakest digit confidence below this ⇒ numbers look blurry/unreliable to the model ⇒ needs manual review.
+ * (Stricter than auto-verify min: gap 0.72–0.76 is review-only, not auto-verified.)
+ */
+if (!defined('OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW')) {
+    define('OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW', 0.72);
+}
 
 /**
  * True when OCR is strong enough to set status to verified without admin review.
+ * Needs weakest + average digit confidence at the auto-verify bars, no requires_review flag
+ * (weak digits, loose reading, soft focus without strong digits, etc.).
  */
 function ocrResultQualifiesForAutoVerify(array $ocrResult) {
     if (!empty($ocrResult['requires_review'])) {
@@ -142,15 +151,49 @@ function assessMeterImageBlurFromPath($imagePath) {
 }
 
 /**
+ * Mark review when the weakest digit score is low (model unsure / likely blurry characters).
+ *
+ * @param array $result OCR result (mutated)
+ */
+function ocrAttachWeakDigitReviewFlags(array &$result) {
+    if (empty($result['success']) || empty($result['meter_reading'])) {
+        return;
+    }
+    $stats = $result['digit_stats'] ?? null;
+    if (!$stats || !is_array($stats)) {
+        return;
+    }
+    $minD = (float) ($stats['min_confidence'] ?? 0.0);
+    $n = (int) ($stats['count'] ?? 0);
+    if ($n >= 4 && $minD < (float) OCR_REVIEW_IF_WEAKEST_DIGIT_BELOW) {
+        $result['requires_review'] = true;
+        $result['digits_look_unreliable'] = true;
+        error_log('OCR: requires_review (weak digit confidence) min_conf=' . round($minD, 3) . ' count=' . $n);
+    }
+}
+
+/**
+ * Soft-focus hint: only force needs_review when digits are not already clearly strong.
+ * High digit confidence ⇒ trust the model for auto-verify even if the whole frame is a bit soft.
+ *
  * @param array $result OCR result (mutated)
  */
 function ocrAttachBlurReviewFlags(array &$result, $imagePathUsed) {
     $blur = assessMeterImageBlurFromPath($imagePathUsed);
     $result['blur_laplacian_variance'] = $blur['variance'];
     $result['image_likely_blurry'] = !empty($blur['is_blurry']);
-    if (!empty($blur['is_blurry'])) {
+
+    $stats = $result['digit_stats'] ?? [];
+    $minD = (float) ($stats['min_confidence'] ?? 0.0);
+    $avgD = (float) ($stats['avg_confidence'] ?? 0.0);
+    $digitsClearlyStrong = $minD >= OCR_AUTO_VERIFY_MIN_DIGIT_CONFIDENCE
+        && $avgD >= OCR_AUTO_VERIFY_AVG_DIGIT_CONFIDENCE;
+
+    if (!empty($blur['is_blurry']) && !$digitsClearlyStrong) {
         $result['requires_review'] = true;
-        error_log('OCR: requires_review (likely blurry image) laplacian_var=' . ($blur['variance'] !== null ? round($blur['variance'], 2) : 'null') . ' path=' . basename((string) $imagePathUsed));
+        error_log('OCR: requires_review (soft focus + digit scores not all strong) laplacian_var=' . ($blur['variance'] !== null ? round($blur['variance'], 2) : 'null') . ' min_conf=' . round($minD, 3) . ' path=' . basename((string) $imagePathUsed));
+    } elseif (!empty($blur['is_blurry']) && $digitsClearlyStrong) {
+        error_log('OCR: soft focus but digit confidences high; not forcing review laplacian_var=' . ($blur['variance'] !== null ? round($blur['variance'], 2) : 'null'));
     }
 }
 
@@ -428,6 +471,7 @@ function processImageWithOcrSpace($imagePath) {
                 ],
                 'requires_review' => true,
             ];
+            ocrAttachWeakDigitReviewFlags($ocrSpaceOk);
             ocrAttachBlurReviewFlags($ocrSpaceOk, $imagePath);
             return $ocrSpaceOk;
         }
@@ -728,6 +772,7 @@ function processImageWithTesseract($imagePath) {
         'meter_reading' => $meterReading,
     ];
     if (!empty($meterReading)) {
+        ocrAttachWeakDigitReviewFlags($tesseractOk);
         ocrAttachBlurReviewFlags($tesseractOk, $imagePath);
     }
     return $tesseractOk;
@@ -1093,6 +1138,7 @@ function processImageWithRoboflowDigits($imagePath) {
                 ],
                 'requires_review' => $requiresReview,
             ];
+            ocrAttachWeakDigitReviewFlags($roboflowOk);
             ocrAttachBlurReviewFlags($roboflowOk, $imagePath);
             return $roboflowOk;
         } else {
