@@ -8,6 +8,15 @@ PHP (`api/ocr_functions.php`) sends cropped meter images here after Roboflow det
 - ~2 GB disk for models (first run downloads weights)
 - CPU is fine; GPU optional
 
+### Namecheap hosting
+
+| Product | Paddle OCR on the same account? | What to do |
+|--------|----------------------------------|------------|
+| **Shared hosting** (Stellar, etc.) | **No** — no Python daemons, no `pip`/venv on the web tier | Set **`PADDLE_OCR_SERVICE_ENABLED=0`** in PHP (see below). Your app uses **Roboflow + OCR.space + Tesseract** only. Optional: run this Python service on a **separate cheap VPS** (any provider) and set **`PADDLE_OCR_SERVICE_URL`** to that server’s URL (HTTPS + firewall). |
+| **Namecheap VPS** | **Yes** | Treat it like any Linux VPS: install Python, run `uvicorn` on `127.0.0.1:8765`, use systemd. Point **`PADDLE_OCR_SERVICE_URL`** at that internal URL. |
+
+On shared hosting, **127.0.0.1:8765** is still “this shared server”; nothing listens there for your app, so either disable Paddle or use an external OCR API URL.
+
 ## Install (Ubuntu-style VPS)
 
 ```bash
