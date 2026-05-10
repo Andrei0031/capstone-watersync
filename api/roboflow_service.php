@@ -949,10 +949,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.10 (10%) - balanced to filter garbage while keeping legitimate digits
-            // Version 7 trained model - rejects very low confidence detections but accepts reasonable ones
-            // This filters out clear false detections while preserving actual meter digits
-            if ($isDigit && $confidence > 0.10) {
+            // Use confidence threshold of 0.05 (5%) - keep faint digits, filter only very low confidence
+            if ($isDigit && $confidence > 0.05) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -962,8 +960,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.10) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.10)");
+            } elseif ($isDigit && $confidence <= 0.05) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.05)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
@@ -1090,27 +1088,22 @@ function detectDigitsWithRoboflow($imagePath) {
  * @return string|null 5-digit reading or null if not enough digits
  */
 function extractMeterReadingFromDigits($digits) {
-    // Require at least 4 digits to form a valid meter reading
-    // Water meter typically shows 4-5 digits (e.g., 0342, 01234)
-    if (empty($digits) || count($digits) < 4) {
+    // Require at least 2 digits to form a provisional meter reading
+    if (empty($digits) || count($digits) < 2) {
         return null;
     }
     
     // Step 1: Filter digits by confidence (remove very low-confidence detections)
-    // CRITICAL: This must match the confidence threshold in detectDigitsWithRoboflow (0.10)
-    // We already filtered to 0.10 in detectDigitsWithRoboflow, so we can be more lenient here
-    $minConfidence = 0.10; // Match the detection threshold (10%) - balanced filtering
+    // Must match the confidence threshold in detectDigitsWithRoboflow (0.05)
+    $minConfidence = 0.05;
     $filteredDigits = array_filter($digits, function($digit) use ($minConfidence) {
         return isset($digit['confidence']) && $digit['confidence'] >= $minConfidence;
     });
     
     if (count($filteredDigits) < 5) {
         error_log("⚠ Less than 5 high-confidence digits. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
-        error_log("   Continuing with " . count($filteredDigits) . " detected digits if >= 4");
-        
-        // Use what we have if at least 4 high-confidence digits
-        if (count($filteredDigits) < 4) {
-            error_log("✗ Insufficient high-confidence digits: " . count($filteredDigits) . " < 4 required");
+        if (count($filteredDigits) < 2) {
+            error_log("✗ Insufficient high-confidence digits: " . count($filteredDigits) . " < 2 required");
             return null;
         }
     }
@@ -1118,7 +1111,7 @@ function extractMeterReadingFromDigits($digits) {
     // Step 2: Remove duplicate/overlapping detections
     // If two digits have very similar positions, keep the one with higher confidence
     $deduplicatedDigits = [];
-    $positionTolerance = 20; // Pixels - digits closer than this are considered overlapping (reduced from 30)
+    $positionTolerance = 10; // Pixels - tighter overlap check for small/close digits
     
     foreach ($filteredDigits as $digit) {
         $isDuplicate = false;
