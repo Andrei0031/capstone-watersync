@@ -294,8 +294,12 @@ function processImageWithOcrSpace($imagePath) {
 }
 
 /**
- * Base URL for the local PaddleOCR microservice (see paddle_ocr_service/).
- * Override with env PADDLE_OCR_SERVICE_URL, e.g. http://127.0.0.1:8765
+ * Base URL for the PaddleOCR microservice (see paddle_ocr_service/).
+ * Set PADDLE_OCR_SERVICE_URL on the machine where PHP runs, e.g.:
+ *   http://127.0.0.1:8765 (same server as PHP)
+ *   http://10.0.0.5:8765 (another VM on your private network)
+ * On shared hosting, 127.0.0.1 is the remote host, not your PC—run the Python
+ * service on that host or disable Paddle with PADDLE_OCR_SERVICE_ENABLED=0.
  */
 function getPaddleOcrServiceBaseUrl() {
     $url = getenv('PADDLE_OCR_SERVICE_URL');
@@ -306,9 +310,31 @@ function getPaddleOcrServiceBaseUrl() {
 }
 
 /**
+ * When false (env PADDLE_OCR_SERVICE_ENABLED=0|false|no|off|disabled), PHP skips
+ * all Paddle HTTP calls—useful on hosts where Python OCR is not installed.
+ */
+function isPaddleOcrServiceEnabled() {
+    $v = getenv('PADDLE_OCR_SERVICE_ENABLED');
+    if ($v === false || trim((string) $v) === '') {
+        return true;
+    }
+    $v = strtolower(trim((string) $v));
+    return !in_array($v, ['0', 'false', 'no', 'off', 'disabled'], true);
+}
+
+/**
  * Call PaddleOCR (+ EasyOCR fallback) service; returns same shape as other OCR helpers.
  */
 function processImageWithPaddleOcrService($imagePath) {
+    if (!isPaddleOcrServiceEnabled()) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Paddle OCR service is disabled (PADDLE_OCR_SERVICE_ENABLED).',
+        ];
+    }
+
     if (!file_exists($imagePath)) {
         return [
             'success' => false,
@@ -353,7 +379,7 @@ function processImageWithPaddleOcrService($imagePath) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -361,11 +387,12 @@ function processImageWithPaddleOcrService($imagePath) {
     curl_close($ch);
 
     if ($curlError) {
+        $hint = ' Remote hosting uses the server\'s loopback: install and run paddle_ocr_service on that server, set PADDLE_OCR_SERVICE_URL to its URL, or set PADDLE_OCR_SERVICE_ENABLED=0 to use OCR.space/Roboflow/Tesseract only.';
         return [
             'success' => false,
             'extracted_text' => '',
             'meter_reading' => null,
-            'error' => 'Paddle OCR service connection error: ' . $curlError . ' (' . $endpoint . ')',
+            'error' => 'Paddle OCR service connection error: ' . $curlError . ' (' . $endpoint . ').' . $hint,
         ];
     }
 
@@ -451,6 +478,10 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
 
     $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$paddleError, &$tesseractError) {
         if (!$path || !file_exists($path)) {
+            return null;
+        }
+
+        if ($method === 'PaddleService' && !isPaddleOcrServiceEnabled()) {
             return null;
         }
 
@@ -568,9 +599,22 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
-        $finalError = $paddleError ?: $ocrSpaceError ?: $roboflowError ?: $lastError ?: 'No OCR result.';
+        $parts = [];
+        if ($paddleError) {
+            $parts[] = $paddleError;
+        }
+        if ($ocrSpaceError) {
+            $parts[] = 'OCR.space: ' . $ocrSpaceError;
+        }
+        if ($roboflowError) {
+            $parts[] = 'Roboflow: ' . $roboflowError;
+        }
         if ($tesseractError && stripos($tesseractError, 'not installed') === false) {
-            $finalError .= ' Optional Tesseract fallback also failed: ' . $tesseractError;
+            $parts[] = 'Tesseract: ' . $tesseractError;
+        }
+        $finalError = $parts ? implode(' | ', $parts) : ($lastError ?: 'No OCR result.');
+        if ($tesseractError && stripos($tesseractError, 'not installed') !== false) {
+            $finalError .= ' (Tesseract not installed on server.)';
         }
 
         return [
