@@ -168,9 +168,11 @@ function cleanupOcrCandidateImages($paths) {
 function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
     $attempts = [];
     $lastError = null;
+    $roboflowError = null;
+    $tesseractError = null;
     $candidatePaths = [];
 
-    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError) {
+    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$tesseractError) {
         if (!$path || !file_exists($path)) {
             return null;
         }
@@ -192,8 +194,17 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
-        $lastError = $result['error'] ?? ($method . ' OCR failed on ' . $label);
-        error_log("$method OCR failed on $label: $lastError");
+        $error = $result['error'] ?? ($method . ' OCR failed on ' . $label);
+        if ($method === 'Roboflow') {
+            $roboflowError = $error;
+            $lastError = $error;
+        } else {
+            $tesseractError = $error;
+            if ($lastError === null) {
+                $lastError = $error;
+            }
+        }
+        error_log("$method OCR failed on $label: $error");
         return null;
     };
 
@@ -236,11 +247,16 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
+        $finalError = $roboflowError ?: $lastError ?: 'No OCR result.';
+        if ($tesseractError && stripos($tesseractError, 'not installed') === false) {
+            $finalError .= ' Optional Tesseract fallback also failed: ' . $tesseractError;
+        }
+
         return [
             'success' => false,
             'extracted_text' => '',
             'meter_reading' => null,
-            'error' => 'OCR failed after trying register crops and original image. ' . ($lastError ?: 'No OCR result.'),
+            'error' => 'OCR failed after trying register crops and original image. ' . $finalError,
             'attempts' => $attempts,
         ];
     } finally {
