@@ -67,6 +67,105 @@ function preprocessImageForOCR($imagePath) {
 }
 
 /**
+ * Create focused crops around the likely odometer/register window.
+ * Analog meter photos often contain small dial digits that confuse object detection.
+ */
+function createMeterRegisterCropCandidates($imagePath) {
+    if (!extension_loaded('gd') || !file_exists($imagePath)) {
+        return [];
+    }
+
+    try {
+        $imageInfo = @getimagesize($imagePath);
+        if (!$imageInfo) {
+            return [];
+        }
+
+        $imageType = $imageInfo[2];
+        switch ($imageType) {
+            case IMAGETYPE_JPEG:
+                $image = imagecreatefromjpeg($imagePath);
+                break;
+            case IMAGETYPE_PNG:
+                $image = imagecreatefrompng($imagePath);
+                break;
+            case IMAGETYPE_GIF:
+                $image = imagecreatefromgif($imagePath);
+                break;
+            default:
+                return [];
+        }
+
+        if (!$image) {
+            return [];
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $regions = [
+            // Most analog water meter odometers sit in the upper center.
+            ['x' => 0.18, 'y' => 0.04, 'w' => 0.64, 'h' => 0.28, 'name' => 'upper_center'],
+            ['x' => 0.12, 'y' => 0.00, 'w' => 0.76, 'h' => 0.36, 'name' => 'upper_wide'],
+            ['x' => 0.22, 'y' => 0.10, 'w' => 0.56, 'h' => 0.24, 'name' => 'register_tight'],
+            ['x' => 0.05, 'y' => 0.00, 'w' => 0.90, 'h' => 0.45, 'name' => 'top_half'],
+        ];
+
+        $candidatePaths = [];
+        foreach ($regions as $region) {
+            $x = max(0, (int) round($width * $region['x']));
+            $y = max(0, (int) round($height * $region['y']));
+            $cropW = min($width - $x, (int) round($width * $region['w']));
+            $cropH = min($height - $y, (int) round($height * $region['h']));
+
+            if ($cropW < 20 || $cropH < 10) {
+                continue;
+            }
+
+            $crop = imagecrop($image, [
+                'x' => $x,
+                'y' => $y,
+                'width' => $cropW,
+                'height' => $cropH
+            ]);
+            if (!$crop) {
+                continue;
+            }
+
+            $scale = max(2, min(4, (int) ceil(900 / max(1, $cropW))));
+            $scaledW = $cropW * $scale;
+            $scaledH = $cropH * $scale;
+            $scaled = imagecreatetruecolor($scaledW, $scaledH);
+            imagecopyresampled($scaled, $crop, 0, 0, 0, 0, $scaledW, $scaledH, $cropW, $cropH);
+
+            imagefilter($scaled, IMG_FILTER_GRAYSCALE);
+            imagefilter($scaled, IMG_FILTER_CONTRAST, -35);
+            imagefilter($scaled, IMG_FILTER_SMOOTH, -1);
+
+            $candidatePath = $imagePath . '_register_' . $region['name'] . '.jpg';
+            imagejpeg($scaled, $candidatePath, 95);
+            $candidatePaths[] = $candidatePath;
+
+            imagedestroy($crop);
+            imagedestroy($scaled);
+        }
+
+        imagedestroy($image);
+        return $candidatePaths;
+    } catch (Exception $e) {
+        error_log('Register crop candidate generation failed: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function cleanupOcrCandidateImages($paths) {
+    foreach ($paths as $path) {
+        if ($path && file_exists($path)) {
+            @unlink($path);
+        }
+    }
+}
+
+/**
  * Process image with Tesseract OCR (server-side)
  * Returns extracted text and meter reading
  */
