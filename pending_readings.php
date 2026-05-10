@@ -507,6 +507,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_bills'])) {
         $reading = $result->fetch_assoc();
         
         if ($reading) {
+            $isProvisionalOcr = !empty($reading['extracted_text'])
+                && preg_match('/\[PROVISIONAL pattern=([0-9\?]+)\]/', $reading['extracted_text']);
+            if ($isProvisionalOcr && ($reading['verified_reading'] === null || $reading['verified_reading'] === '')) {
+                error_log("Skipping reading ID {$reading_id}: Provisional OCR reading requires manual verification");
+                continue;
+            }
+
             // Get the actual reading value (prioritize verified_reading, then ocr_reading, then reading_value)
             $current_reading = null;
             if (isset($reading['verified_reading']) && $reading['verified_reading'] !== null) {
@@ -742,15 +749,15 @@ function pendingFormatDT($dt) {
 function pendingFormatReading($row) {
     $extractedText = $row['extracted_text'] ?? '';
     if (!empty($extractedText) && preg_match('/\[PROVISIONAL pattern=([0-9\?]+)\]/', $extractedText, $matches)) {
-        return $matches[1];
-    }
-
-    if (isset($row['ocr_reading']) && $row['ocr_reading'] !== null) {
-        return number_format((float)$row['ocr_reading'], 0);
+        return 'N/A';
     }
 
     if (isset($row['verified_reading']) && $row['verified_reading'] !== null) {
         return number_format((float)$row['verified_reading'], 0);
+    }
+
+    if (isset($row['ocr_reading']) && $row['ocr_reading'] !== null) {
+        return number_format((float)$row['ocr_reading'], 0);
     }
 
     if (isset($row['reading_value']) && $row['reading_value'] !== null) {
