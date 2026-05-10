@@ -16,15 +16,15 @@ define('ROBOFLOW_WORKSPACE', 'watersync');
 // Meter Detection Model Configuration
 // Using serverless.roboflow.com API endpoint (Hosted Image Inference)
 define('ROBOFLOW_PROJECT', 'watersync-oekrf');
-define('ROBOFLOW_MODEL_VERSION', '7'); // Using version 7
-define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/7'); // Model ID format: project/version
+define('ROBOFLOW_MODEL_VERSION', '4'); // Using version 4
+define('ROBOFLOW_MODEL_ID', 'watersync-oekrf/4'); // Model ID format: project/version
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
-// Format: "project-name/version" (e.g., "watersync-oekrf/7")
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Single OCR model requested
+// Format: "project-name/version" (e.g., "watersync-oekrf/4")
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/4'); // Single OCR model requested
 
 // Build inference URL (serverless endpoint only)
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}

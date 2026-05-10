@@ -821,7 +821,12 @@ function pendingFormatMeterValue($value) {
         return 'N/A';
     }
 
-    return str_pad((string) max(0, (int) round((float) $value)), 5, '0', STR_PAD_LEFT);
+    $numericValue = max(0, (int) round((float) $value));
+    if ($numericValue === 0) {
+        return 'N/A';
+    }
+
+    return str_pad((string) $numericValue, 5, '0', STR_PAD_LEFT);
 }
 
 function pendingFormatReading($row) {
