@@ -7,13 +7,17 @@ $client_id = null;
 $deletionDone = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['id'])) {
-    $client_id = $_GET['id'];
-    // Perform deletion
-    $stmt = $conn->prepare("DELETE FROM client_list WHERE id = ?");
+    $client_id = intval($_GET['id']);
+    // Soft-delete the client so related records stay intact.
+    $stmt = $conn->prepare("UPDATE client_list SET delete_flag = 1, status = 0 WHERE id = ?");
     $stmt->bind_param("i", $client_id);
 
     if ($stmt->execute()) {
-        $message = "Client deleted successfully.";
+        if ($stmt->affected_rows > 0) {
+            $message = "Client deleted successfully.";
+        } else {
+            $message = "Client not found or already deleted.";
+        }
         $messageClass = "alert alert-success";
         $deletionDone = true;
     } else {
