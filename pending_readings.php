@@ -3,7 +3,21 @@ require_once __DIR__ . '/timezone_helper.php';
 watersync_force_timezone();
 
 session_start();
+$isAjaxRequest = (
+    isset($_POST['process_single']) ||
+    (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
+    (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+);
 if (!isset($_SESSION['admin_id'])) {
+    if ($isAjaxRequest) {
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Session expired. Please refresh and log in again.'
+        ]);
+        exit();
+    }
     header("Location: adminlogin.php");
     exit();
 }
@@ -2489,16 +2503,26 @@ function pendingFormatDT($dt) {
                         fetch('pending_readings.php', {
                             method: 'POST',
                             body: formData,
-                            signal: controller.signal
+                            signal: controller.signal,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json'
+                            }
                         })
                         .then(res => res.text().then(text => ({ status: res.status, text })))
                         .then(({ status, text }) => {
                             clearTimeout(timeoutId);
                             let data = null;
                             try {
+                                if (/^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text)) {
+                                    throw new Error('HTML response');
+                                }
                                 data = JSON.parse(text);
                             } catch (e) {
-                                data = { success: false, message: text ? text.slice(0, 300) : 'Invalid response from server.' };
+                                data = {
+                                    success: false,
+                                    message: 'Session expired or server returned HTML. Please refresh and try again.'
+                                };
                             }
 
                             if (data && data.success) {
