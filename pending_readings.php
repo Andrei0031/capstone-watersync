@@ -816,6 +816,14 @@ function pendingFormatDT($dt) {
     }
 }
 
+function pendingFormatMeterValue($value) {
+    if ($value === null || $value === '') {
+        return 'N/A';
+    }
+
+    return str_pad((string) max(0, (int) round((float) $value)), 5, '0', STR_PAD_LEFT);
+}
+
 function pendingFormatReading($row) {
     $extractedText = $row['extracted_text'] ?? '';
     if (!empty($extractedText) && preg_match('/\[PROVISIONAL pattern=([0-9\?]+)\]/', $extractedText, $matches)) {
@@ -823,15 +831,15 @@ function pendingFormatReading($row) {
     }
 
     if (isset($row['verified_reading']) && $row['verified_reading'] !== null) {
-        return number_format((float)$row['verified_reading'], 0);
+        return pendingFormatMeterValue($row['verified_reading']);
     }
 
     if (isset($row['ocr_reading']) && $row['ocr_reading'] !== null) {
-        return number_format((float)$row['ocr_reading'], 0);
+        return pendingFormatMeterValue($row['ocr_reading']);
     }
 
     if (isset($row['reading_value']) && $row['reading_value'] !== null) {
-        return number_format((float)$row['reading_value'], 0);
+        return pendingFormatMeterValue($row['reading_value']);
     }
 
     return 'N/A';
@@ -1973,7 +1981,7 @@ function pendingFormatReading($row) {
                                                 </div>
                                                 <?php if ($ocrReading !== null): ?>
                                                     <br><small class="text-muted">
-                                                        <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
+                                                        <i class="fas fa-robot"></i> OCR: <?php echo pendingFormatMeterValue($ocrReading); ?>
                                                     </small>
                                                 <?php endif; ?>
                                             </td>
@@ -2142,7 +2150,7 @@ function pendingFormatReading($row) {
                                                     <?php echo htmlspecialchars(pendingFormatReading($row)); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
-                                                            <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
+                                                            <i class="fas fa-robot"></i> OCR: <?php echo pendingFormatMeterValue($ocrReading); ?>
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
@@ -2285,7 +2293,7 @@ function pendingFormatReading($row) {
                                                     <?php echo htmlspecialchars(pendingFormatReading($row)); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
-                                                            <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
+                                                            <i class="fas fa-robot"></i> OCR: <?php echo pendingFormatMeterValue($ocrReading); ?>
                                                         </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>

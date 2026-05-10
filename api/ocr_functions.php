@@ -752,16 +752,17 @@ function processImageWithRoboflowDigits($imagePath) {
         
         if ($candidate['success']) {
             $meterReading = $candidate['reading'];
-            $requiresReview = !empty($candidate['used_loose_reading']);
+            $requiresReview = !empty($candidate['used_loose_reading']) || $meterReading === '00000';
             $digitStats = $candidate['digit_stats'];
             if ($requiresReview) {
-                // Prevent auto-verify when a loose left-to-right fallback was needed.
+                // Prevent auto-verify when the result is loose or suspicious.
                 $digitStats['min_confidence'] = 0.0;
             }
 
             $extractedText = $candidate['extracted_text']
                 . ' [SINGLE_MODEL model=' . $candidate['model_id']
                 . ' loose=' . ($candidate['used_loose_reading'] ? 'yes' : 'no')
+                . ' zero=' . ($meterReading === '00000' ? 'yes' : 'no')
                 . ' review=' . ($requiresReview ? 'yes' : 'no')
                 . ']';
 
