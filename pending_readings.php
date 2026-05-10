@@ -441,6 +441,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
         $singleId = (int)$_POST['reading_id'];
         $result = processPendingReading($conn, $singleId);
         header('Content-Type: application/json');
+        if (!$result['success']) {
+            http_response_code(400);
+        }
         echo json_encode($result);
         exit();
     }
@@ -2456,14 +2459,18 @@ function pendingFormatDT($dt) {
                     const ids = Array.from(selectedReadings).map(el => el.value);
                     let processed = 0;
                     let failed = 0;
+                    const errors = [];
 
                     const processNext = (index) => {
                         if (index >= ids.length) {
                             loadingModal.hide();
                             const status = failed > 0 && processed > 0 ? 'partial' : (failed > 0 ? 'error' : 'success');
-                            const message = failed > 0
+                            let message = failed > 0
                                 ? `Processed: ${processed}, Failed: ${failed}`
                                 : `Successfully processed ${processed} reading(s)`;
+                            if (errors.length > 0) {
+                                message += `\nFirst error: ${errors[0]}`;
+                            }
                             setTimeout(() => showProcessingResult(status, message), 300);
                             return;
                         }
@@ -2484,13 +2491,27 @@ function pendingFormatDT($dt) {
                             body: formData,
                             signal: controller.signal
                         })
-                        .then(res => res.json())
-                        .then(data => {
+                        .then(res => res.text().then(text => ({ status: res.status, text })))
+                        .then(({ status, text }) => {
                             clearTimeout(timeoutId);
+                            let data = null;
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                data = { success: false, message: text ? text.slice(0, 300) : 'Invalid response from server.' };
+                            }
+
                             if (data && data.success) {
                                 processed++;
                             } else {
                                 failed++;
+                                if (data && data.message) {
+                                    errors.push(data.message);
+                                } else if (status >= 400) {
+                                    errors.push(`Server error (${status}).`);
+                                } else {
+                                    errors.push('Unknown OCR error.');
+                                }
                             }
                             processNext(index + 1);
                         })
@@ -2498,6 +2519,7 @@ function pendingFormatDT($dt) {
                             clearTimeout(timeoutId);
                             failed++;
                             console.error('Processing error:', err);
+                            errors.push(err?.message || 'Network error');
                             processNext(index + 1);
                         });
                     };
