@@ -594,6 +594,84 @@ function extractMeterReadingFromText($text) {
  * @param string $imagePath Full path to image file
  * @return array ['success' => bool, 'extracted_text' => string, 'meter_reading' => string|null, 'error' => string]
  */
+function buildRoboflowReadingCandidate($digitResult) {
+    $digits = $digitResult['digits'] ?? [];
+    $modelId = $digitResult['model_id'] ?? 'unknown';
+    $reading = !empty($digits) ? extractMeterReadingFromDigits($digits) : null;
+    $confidences = [];
+    $extractedText = "Model $modelId detected digits: ";
+
+    foreach ($digits as $digit) {
+        $c = isset($digit['confidence']) ? floatval($digit['confidence']) : 0.0;
+        $confidences[] = $c;
+        $extractedText .= ($digit['digit'] ?? '?') . ' (confidence: ' . round($c, 2) . ', x: ' . round(floatval($digit['x'] ?? 0)) . ') ';
+    }
+
+    return [
+        'success' => !empty($reading),
+        'model_id' => $modelId,
+        'reading' => $reading,
+        'digits' => $digits,
+        'extracted_text' => trim($extractedText),
+        'digit_stats' => [
+            'count' => count($digits),
+            'min_confidence' => !empty($confidences) ? min($confidences) : 0.0,
+            'avg_confidence' => !empty($confidences) ? array_sum($confidences) / count($confidences) : 0.0,
+        ],
+        'raw_result' => $digitResult,
+    ];
+}
+
+function chooseDualRoboflowCandidate($latestCandidate, $fallbackCandidate) {
+    $latestOk = $latestCandidate['success'];
+    $fallbackOk = $fallbackCandidate['success'];
+
+    if (!$latestOk && !$fallbackOk) {
+        return null;
+    }
+
+    $requiresReview = false;
+    $agreement = false;
+    $selected = null;
+    $reason = '';
+
+    if ($latestOk && $fallbackOk) {
+        $agreement = ($latestCandidate['reading'] === $fallbackCandidate['reading']);
+        if ($agreement) {
+            $selected = $latestCandidate;
+            $reason = 'Both Roboflow models agreed on the same reading.';
+        } else {
+            $latestAvg = $latestCandidate['digit_stats']['avg_confidence'] ?? 0.0;
+            $fallbackAvg = $fallbackCandidate['digit_stats']['avg_confidence'] ?? 0.0;
+            $selected = ($fallbackAvg > $latestAvg) ? $fallbackCandidate : $latestCandidate;
+            $requiresReview = true;
+            $reason = 'Roboflow models disagreed; selected higher average confidence and flagged for verification.';
+        }
+    } elseif ($latestOk) {
+        $selected = $latestCandidate;
+        $requiresReview = true;
+        $reason = 'Latest Roboflow model produced a reading, but v7 did not validate it.';
+    } else {
+        $selected = $fallbackCandidate;
+        $requiresReview = true;
+        $reason = 'Latest Roboflow model failed; v7 fallback produced a reading.';
+    }
+
+    $digitStats = $selected['digit_stats'];
+    if ($requiresReview) {
+        // Prevent auto-verify when the result was not validated by both models.
+        $digitStats['min_confidence'] = 0.0;
+    }
+
+    return [
+        'selected' => $selected,
+        'agreement' => $agreement,
+        'requires_review' => $requiresReview,
+        'reason' => $reason,
+        'digit_stats' => $digitStats,
+    ];
+}
+
 function processImageWithRoboflowDigits($imagePath) {
     // Include Roboflow service functions
     if (!function_exists('detectDigitsWithRoboflow')) {
@@ -621,18 +699,25 @@ function processImageWithRoboflowDigits($imagePath) {
             }
         }
         
-        // Step 1: Detect digits using Roboflow API (YOLOv8)
-        error_log("Calling detectDigitsWithRoboflow() (YOLOv8)...");
+        // Step 1: Detect digits using both Roboflow digit models for validation.
+        $latestModelId = defined('ROBOFLOW_DIGIT_MODEL_ID') ? ROBOFLOW_DIGIT_MODEL_ID : null;
+        $fallbackModelId = defined('ROBOFLOW_DIGIT_FALLBACK_MODEL_ID') ? ROBOFLOW_DIGIT_FALLBACK_MODEL_ID : 'watersync-oekrf/7';
+
+        error_log("Calling detectDigitsWithRoboflow() latest model: " . ($latestModelId ?? 'default'));
         $startTime = microtime(true);
-        $digitResult = detectDigitsWithRoboflow($imagePath);
+        $latestResult = detectDigitsWithRoboflow($imagePath, $latestModelId);
+        error_log("Calling detectDigitsWithRoboflow() fallback model: " . $fallbackModelId);
+        $fallbackResult = detectDigitsWithRoboflow($imagePath, $fallbackModelId);
         $elapsedTime = microtime(true) - $startTime;
         
-        error_log("detectDigitsWithRoboflow() returned in " . round($elapsedTime, 2) . "s:");
-        error_log("  success: " . ($digitResult['success'] ? 'true' : 'false'));
-        error_log("  digits count: " . count($digitResult['digits'] ?? []));
-        error_log("  message: " . ($digitResult['message'] ?? 'N/A'));
-        if (isset($digitResult['api_response'])) {
-            error_log("  api_response keys: " . implode(', ', array_keys($digitResult['api_response'])));
+        error_log("Dual Roboflow detection returned in " . round($elapsedTime, 2) . "s:");
+        error_log("  latest success: " . ($latestResult['success'] ? 'true' : 'false') . ', digits: ' . count($latestResult['digits'] ?? []));
+        error_log("  fallback success: " . ($fallbackResult['success'] ? 'true' : 'false') . ', digits: ' . count($fallbackResult['digits'] ?? []));
+        if (isset($latestResult['api_response'])) {
+            error_log("  latest api_response keys: " . implode(', ', array_keys($latestResult['api_response'])));
+        }
+        if (isset($fallbackResult['api_response'])) {
+            error_log("  fallback api_response keys: " . implode(', ', array_keys($fallbackResult['api_response'])));
         }
         
         // Log timing but don't fail on slow responses - Roboflow API can be slow but still work
@@ -640,39 +725,17 @@ function processImageWithRoboflowDigits($imagePath) {
             error_log('⚠ Roboflow took a long time (' . round($elapsedTime, 2) . 's) but continuing...');
         }
         
-        if (!$digitResult['success']) {
-            $errorMsg = 'Roboflow digit detection failed';
-            if (isset($digitResult['message']) && !empty($digitResult['message'])) {
-                $errorMsg .= ': ' . $digitResult['message'];
+        if (!$latestResult['success'] && !$fallbackResult['success']) {
+            $messages = array_filter([
+                $latestResult['message'] ?? null,
+                $fallbackResult['message'] ?? null,
+            ]);
+            $errorMsg = 'Roboflow digit detection failed on both models';
+            if (!empty($messages)) {
+                $errorMsg .= ': ' . implode(' | ', $messages);
             }
             error_log('✗ Roboflow OCR: ' . $errorMsg);
             error_log("=== ROBOFLOW OCR PROCESSING END (FAILED) ===");
-            error_log("NOTE: Roboflow YOLOv8 is the only OCR method - no fallback");
-            // Return failure - let calling function handle Tesseract fallback
-            return [
-                'success' => false,
-                'extracted_text' => '',
-                'meter_reading' => null,
-                'error' => $errorMsg
-            ];
-        }
-        
-        $digits = $digitResult['digits'] ?? [];
-        error_log("Digits array count: " . count($digits));
-        
-        if (empty($digits)) {
-            $errorMsg = 'No digits detected in image';
-            if (isset($digitResult['message']) && !empty($digitResult['message'])) {
-                $errorMsg .= ': ' . $digitResult['message'];
-            }
-            if (isset($digitResult['all_predictions']) && !empty($digitResult['all_predictions'])) {
-                error_log("⚠ Found " . count($digitResult['all_predictions']) . " predictions but none were valid digits");
-                foreach ($digitResult['all_predictions'] as $idx => $pred) {
-                    error_log("  Prediction #$idx: " . json_encode($pred));
-                }
-            }
-            error_log('✗ Roboflow OCR: ' . $errorMsg);
-            error_log("=== ROBOFLOW OCR PROCESSING END (NO DIGITS) ===");
             return [
                 'success' => false,
                 'extracted_text' => '',
@@ -685,44 +748,65 @@ function processImageWithRoboflowDigits($imagePath) {
         if (!function_exists('extractMeterReadingFromDigits')) {
             require_once __DIR__ . '/roboflow_service.php';
         }
-        
-        $meterReading = extractMeterReadingFromDigits($digits);
-        
-        // Create extracted text representation (for compatibility)
-        $extractedText = 'Detected digits: ';
-        $confidences = [];
-        foreach ($digits as $digit) {
-            $c = isset($digit['confidence']) ? floatval($digit['confidence']) : 0.0;
-            $confidences[] = $c;
-            $extractedText .= $digit['digit'] . ' (confidence: ' . round($c, 2) . ', x: ' . round($digit['x']) . ') ';
-        }
 
-        // Basic stats for callers (used to decide auto-verify vs needs-review)
-        $digitStats = [
-            'count' => count($digits),
-            'min_confidence' => !empty($confidences) ? min($confidences) : 0.0,
-            'avg_confidence' => !empty($confidences) ? array_sum($confidences) / count($confidences) : 0.0,
-        ];
+        $latestCandidate = buildRoboflowReadingCandidate($latestResult);
+        $fallbackCandidate = buildRoboflowReadingCandidate($fallbackResult);
+        $choice = chooseDualRoboflowCandidate($latestCandidate, $fallbackCandidate);
         
-        if ($meterReading) {
-            error_log("✓ Roboflow OCR: Successfully extracted reading: $meterReading");
+        if ($choice) {
+            $selected = $choice['selected'];
+            $meterReading = $selected['reading'];
+            $extractedText = $selected['extracted_text']
+                . ' [DUAL_MODEL latest=' . ($latestCandidate['reading'] ?? 'none')
+                . ' fallback=' . ($fallbackCandidate['reading'] ?? 'none')
+                . ' selected=' . $selected['model_id']
+                . ' agreement=' . ($choice['agreement'] ? 'yes' : 'no')
+                . ' review=' . ($choice['requires_review'] ? 'yes' : 'no')
+                . ']';
+
+            error_log("✓ Roboflow OCR: Selected reading $meterReading from model {$selected['model_id']}. " . $choice['reason']);
             return [
                 'success' => true,
                 'extracted_text' => $extractedText,
                 'meter_reading' => $meterReading,
-                'digit_stats' => $digitStats,
-                'digits' => $digits,
+                'digit_stats' => $choice['digit_stats'],
+                'digits' => $selected['digits'],
+                'dual_model' => [
+                    'latest' => [
+                        'model_id' => $latestCandidate['model_id'],
+                        'reading' => $latestCandidate['reading'],
+                        'digit_stats' => $latestCandidate['digit_stats'],
+                    ],
+                    'fallback' => [
+                        'model_id' => $fallbackCandidate['model_id'],
+                        'reading' => $fallbackCandidate['reading'],
+                        'digit_stats' => $fallbackCandidate['digit_stats'],
+                    ],
+                    'agreement' => $choice['agreement'],
+                    'requires_review' => $choice['requires_review'],
+                    'reason' => $choice['reason'],
+                ],
+                'requires_review' => $choice['requires_review'],
             ];
         } else {
-            $errorMsg = 'Could not form 5-digit reading from detected digits. Found ' . count($digits) . ' digit(s): ' . implode(', ', array_map(function($d) { return $d['digit']; }, $digits));
+            $latestDigits = $latestResult['digits'] ?? [];
+            $fallbackDigits = $fallbackResult['digits'] ?? [];
+            $errorMsg = 'Could not form 5-digit reading from either Roboflow model. Latest found ' . count($latestDigits)
+                . ' digit(s): ' . implode(', ', array_map(function($d) { return $d['digit']; }, $latestDigits))
+                . '. Fallback v7 found ' . count($fallbackDigits)
+                . ' digit(s): ' . implode(', ', array_map(function($d) { return $d['digit']; }, $fallbackDigits));
             error_log('✗ Roboflow OCR: ' . $errorMsg);
             return [
                 'success' => false,
-                'extracted_text' => $extractedText,
+                'extracted_text' => $latestCandidate['extracted_text'] . ' | ' . $fallbackCandidate['extracted_text'],
                 'meter_reading' => null,
                 'error' => $errorMsg,
-                'digit_stats' => $digitStats,
-                'digits' => $digits,
+                'digit_stats' => [
+                    'count' => max(count($latestDigits), count($fallbackDigits)),
+                    'min_confidence' => 0.0,
+                    'avg_confidence' => 0.0,
+                ],
+                'digits' => array_merge($latestDigits, $fallbackDigits),
             ];
         }
         

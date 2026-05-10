@@ -25,10 +25,12 @@ define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_M
 // Using model_id format from Roboflow "Hosted Image Inference"
 // Format: "project-name/version" (e.g., "watersync-oekrf/8")
 define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/8'); // Using version 8 - newly trained model
+define('ROBOFLOW_DIGIT_FALLBACK_MODEL_ID', 'watersync-oekrf/7'); // Validation/fallback model
 
 // Build inference URL (serverless endpoint only)
 // Serverless API endpoint format: https://serverless.roboflow.com/{model_id}
 define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
+define('ROBOFLOW_DIGIT_FALLBACK_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_FALLBACK_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
 
 /**
  * Detect meter region using Roboflow API
@@ -343,7 +345,7 @@ function detectAndCropMeterWithRoboflow($imagePath) {
  * @param string $imagePath Full path to image file
  * @return array ['success' => bool, 'digits' => array, 'message' => string]
  */
-function detectDigitsWithRoboflow($imagePath) {
+function detectDigitsWithRoboflow($imagePath, $modelId = null) {
     if (!file_exists($imagePath)) {
         return [
             'success' => false,
@@ -362,8 +364,12 @@ function detectDigitsWithRoboflow($imagePath) {
     }
     
     try {
+        $modelId = $modelId ?: ROBOFLOW_DIGIT_MODEL_ID;
+        $inferenceUrl = 'https://serverless.roboflow.com/' . $modelId . '?api_key=' . ROBOFLOW_API_KEY;
+
         error_log("Roboflow Digit Detection: Calling API for image: $imagePath");
-        error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        error_log("Roboflow Digit Detection: Model ID: " . $modelId);
+        error_log("Roboflow Digit Detection: API URL: " . $inferenceUrl);
         
         // Check if image file exists and is readable
         if (!file_exists($imagePath)) {
@@ -427,10 +433,10 @@ function detectDigitsWithRoboflow($imagePath) {
         error_log("Roboflow Digit Detection: Trying Method 1 - Base64 POST body (matching cURL format)");
         $base64Image = base64_encode($imageData);
         error_log("Roboflow Digit Detection: Base64 encoded size: " . round(strlen($base64Image) / 1024, 2) . " KB");
-        error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        error_log("Roboflow Digit Detection: API URL: " . $inferenceUrl);
         
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL);
+        curl_setopt($ch, CURLOPT_URL, $inferenceUrl);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -441,7 +447,7 @@ function detectDigitsWithRoboflow($imagePath) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // Force HTTP/1.1
         
-        error_log("Roboflow Digit Detection: Sending request to: " . ROBOFLOW_DIGIT_INFERENCE_URL);
+        error_log("Roboflow Digit Detection: Sending request to: " . $inferenceUrl);
         $startTime = microtime(true);
         $response = curl_exec($ch);
         $elapsedTime = microtime(true) - $startTime;
@@ -513,8 +519,8 @@ function detectDigitsWithRoboflow($imagePath) {
         error_log("=== ROBOFLOW DIGIT DETECTION SUMMARY ===");
         error_log("Final method used: $methodUsed");
         error_log("HTTP Code: $httpCode");
-        error_log("API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
-        error_log("Model ID: " . ROBOFLOW_DIGIT_MODEL_ID);
+        error_log("API URL: " . $inferenceUrl);
+        error_log("Model ID: " . $modelId);
         error_log("Response length: " . strlen($response ?? '') . " bytes");
         error_log("Has cURL error: " . ($error ? 'Yes - ' . $error : 'No'));
         error_log("Response preview: " . substr($response ?? '', 0, 1000));
@@ -543,8 +549,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 $errorMsg .= ' - Response: ' . substr($response, 0, 500);
             }
             error_log('✗ Roboflow Digit Detection API HTTP Error: ' . $errorMsg);
-            error_log('✗ API URL: ' . ROBOFLOW_DIGIT_INFERENCE_URL);
-            error_log('✗ Model ID: ' . ROBOFLOW_DIGIT_MODEL_ID);
+            error_log('✗ API URL: ' . $inferenceUrl);
+            error_log('✗ Model ID: ' . $modelId);
             error_log('✗ Full API Response: ' . substr($response, 0, 1000));
             return [
                 'success' => false,
@@ -584,7 +590,7 @@ function detectDigitsWithRoboflow($imagePath) {
                 return [
                     'success' => false,
                     'digits' => [],
-                    'message' => 'Roboflow API returned HTML instead of JSON. This usually means the endpoint is wrong or the model is not deployed. Check: ' . ROBOFLOW_DIGIT_INFERENCE_URL
+                    'message' => 'Roboflow API returned HTML instead of JSON. This usually means the endpoint is wrong or the model is not deployed. Check: ' . $inferenceUrl
                 ];
             }
             
@@ -783,7 +789,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'y' => isset($prediction['y']) ? floatval($prediction['y']) : 0,
                     'width' => isset($prediction['width']) ? floatval($prediction['width']) : 0,
                     'height' => isset($prediction['height']) ? floatval($prediction['height']) : 0,
-                    'confidence' => $confidence
+                    'confidence' => $confidence,
+                    'model_id' => $modelId
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
             } elseif ($isDigit && $confidence <= 0.01) {
@@ -835,7 +842,8 @@ function detectDigitsWithRoboflow($imagePath) {
             return [
                 'success' => true,
                 'digits' => $digits,
-                'all_predictions' => $predictions
+                'all_predictions' => $predictions,
+                'model_id' => $modelId
             ];
         } else {
             $errorMsg = 'No digits detected in image';
@@ -870,8 +878,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             error_log('✗ Roboflow Digit Detection: ' . $errorMsg);
-            error_log('✗ API URL: ' . ROBOFLOW_DIGIT_INFERENCE_URL);
-            error_log('✗ Model ID: ' . ROBOFLOW_DIGIT_MODEL_ID);
+            error_log('✗ API URL: ' . $inferenceUrl);
+            error_log('✗ Model ID: ' . $modelId);
             error_log('✗ HTTP Code: ' . $httpCode);
             error_log('✗ Roboflow API Response (full): ' . json_encode($data, JSON_PRETTY_PRINT));
             
@@ -890,7 +898,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 'digits' => [],
                 'message' => $errorMsg,
                 'all_predictions' => $predictions,
-                'api_response' => $data
+                'api_response' => $data,
+                'model_id' => $modelId
             ];
         }
         
