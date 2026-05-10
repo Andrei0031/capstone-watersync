@@ -97,7 +97,7 @@ function processPendingReading($conn, $reading_id) {
         if ($croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
             $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
             if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = $ocrResult['meter_reading'];
+                $ocrReading = !empty($ocrResult['is_provisional']) ? null : $ocrResult['meter_reading'];
                 $extractedText = $ocrResult['extracted_text'] ?? '';
                 $ocrProcessed = true;
             } else {
@@ -108,7 +108,7 @@ function processPendingReading($conn, $reading_id) {
         if (!$ocrProcessed && file_exists($imagePath)) {
             $ocrResult = processImageWithRoboflowDigits($imagePath);
             if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = $ocrResult['meter_reading'];
+                $ocrReading = !empty($ocrResult['is_provisional']) ? null : $ocrResult['meter_reading'];
                 $extractedText = $ocrResult['extracted_text'] ?? '';
                 $ocrProcessed = true;
             } else {

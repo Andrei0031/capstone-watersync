@@ -739,6 +739,27 @@ function pendingFormatDT($dt) {
     }
 }
 
+function pendingFormatReading($row) {
+    $extractedText = $row['extracted_text'] ?? '';
+    if (!empty($extractedText) && preg_match('/\[PROVISIONAL pattern=([0-9\?]+)\]/', $extractedText, $matches)) {
+        return $matches[1];
+    }
+
+    if (isset($row['ocr_reading']) && $row['ocr_reading'] !== null) {
+        return number_format((float)$row['ocr_reading'], 0);
+    }
+
+    if (isset($row['verified_reading']) && $row['verified_reading'] !== null) {
+        return number_format((float)$row['verified_reading'], 0);
+    }
+
+    if (isset($row['reading_value']) && $row['reading_value'] !== null) {
+        return number_format((float)$row['reading_value'], 0);
+    }
+
+    return 'N/A';
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -1865,13 +1886,13 @@ function pendingFormatDT($dt) {
                                             <td>
                                                 <?php 
                                                     $ocrReading = $row['ocr_reading'] ?? null;
-                                                    $reading = $ocrReading ?? $row['reading_value'] ?? 0;
+                                                    $reading = pendingFormatReading($row);
                                                 ?>
                                                 <div class="d-flex align-items-center">
                                                     <span class="badge bg-danger me-2">
                                                         <i class="fas fa-exclamation-triangle"></i> Needs Verification
                                                     </span>
-                                                    <strong><?php echo number_format($reading, 0); ?></strong>
+                                                    <strong><?php echo htmlspecialchars($reading); ?></strong>
                                                 </div>
                                                 <?php if ($ocrReading !== null): ?>
                                                     <br><small class="text-muted">
@@ -2038,10 +2059,10 @@ function pendingFormatDT($dt) {
                                                         <span class="badge bg-success me-2">
                                                             <i class="fas fa-check-circle"></i> Verified
                                                         </span>
-                                                        <strong class="text-success"><?php echo number_format($verifiedReading, 0); ?></strong>
+                                                        <strong class="text-success"><?php echo htmlspecialchars(pendingFormatReading($row)); ?></strong>
                                                     </div>
                                                 <?php else: ?>
-                                                    <?php echo number_format($reading, 0); ?>
+                                                    <?php echo htmlspecialchars(pendingFormatReading($row)); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
                                                             <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
@@ -2181,10 +2202,10 @@ function pendingFormatDT($dt) {
                                                         <span class="badge bg-success me-2">
                                                             <i class="fas fa-check-circle"></i> Verified
                                                         </span>
-                                                        <strong class="text-success"><?php echo number_format($verifiedReading, 0); ?></strong>
+                                                        <strong class="text-success"><?php echo htmlspecialchars(pendingFormatReading($row)); ?></strong>
                                                     </div>
                                                 <?php else: ?>
-                                                    <?php echo number_format($reading, 0); ?>
+                                                    <?php echo htmlspecialchars(pendingFormatReading($row)); ?>
                                                     <?php if ($ocrReading !== null): ?>
                                                         <br><small class="text-muted">
                                                             <i class="fas fa-robot"></i> OCR: <?php echo number_format($ocrReading, 0); ?>
