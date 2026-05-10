@@ -25,6 +25,7 @@ define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_M
 // Using model_id format from Roboflow "Hosted Image Inference"
 // Format: "project-name/version" (e.g., "watersync-oekrf/7")
 define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Using version 7
+define('ROBOFLOW_DIGIT_MODEL_ID_SECONDARY', 'watersync-oekrf/4'); // Secondary OCR model
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
@@ -37,7 +38,9 @@ define('ROBOFLOW_DIGIT_MODEL_VERSION', '7'); // Using version 7
 if (defined('ROBOFLOW_DIGIT_MODEL_ID') && !empty(ROBOFLOW_DIGIT_MODEL_ID)) {
     // Primary: Use serverless endpoint
     define('ROBOFLOW_DIGIT_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID . '?api_key=' . ROBOFLOW_API_KEY);
-    // Alternative: Use detect endpoint (fallback)
+    // Secondary: Use the second trained model as fallback
+    define('ROBOFLOW_DIGIT_INFERENCE_URL_SECONDARY', 'https://serverless.roboflow.com/' . ROBOFLOW_DIGIT_MODEL_ID_SECONDARY . '?api_key=' . ROBOFLOW_API_KEY);
+    // Legacy fallback endpoint (kept for compatibility)
     define('ROBOFLOW_DIGIT_INFERENCE_URL_ALT', 'https://detect.roboflow.com/' . ROBOFLOW_WORKSPACE . '/' . ROBOFLOW_PROJECT . '/' . ROBOFLOW_MODEL_VERSION . '?api_key=' . ROBOFLOW_API_KEY);
 } else {
     // Use project/version format (legacy)
@@ -660,8 +663,31 @@ function detectDigitsWithRoboflow($imagePath) {
                     curl_close($ch);
                 }
                 
-                // If all methods failed with serverless endpoint, try detect.roboflow.com endpoint
+                // If all methods failed with the primary model, try the secondary digit model
                 if ($httpCode !== 200 || $error || empty($response)) {
+                    if (defined('ROBOFLOW_DIGIT_INFERENCE_URL_SECONDARY')) {
+                        error_log("Roboflow Digit Detection: All methods failed with the primary model, trying secondary model watersync-oekrf/4");
+                        $methodUsed = 'secondary-model';
+
+                        $ch = curl_init();
+                        curl_setopt($ch, CURLOPT_URL, ROBOFLOW_DIGIT_INFERENCE_URL_SECONDARY);
+                        curl_setopt($ch, CURLOPT_POST, true);
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                            'Content-Type: application/x-www-form-urlencoded'
+                        ]);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+                        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
+                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+
+                        $response = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $error = curl_error($ch);
+                        curl_close($ch);
+                    }
+
+                    // If the secondary model also fails, try the legacy detect.roboflow.com endpoint
                     if (defined('ROBOFLOW_DIGIT_INFERENCE_URL_ALT')) {
                         error_log("Roboflow Digit Detection: All methods failed with serverless endpoint, trying alternative detect.roboflow.com endpoint");
                         $methodUsed = 'detect-endpoint-base64';
