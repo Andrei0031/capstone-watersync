@@ -650,7 +650,7 @@ if (isset($_GET['debug']) && $_GET['debug'] === '1') {
 // Fetch pending readings with billing cycle info
 // Use LEFT JOIN to show readings even if client is missing/inactive
 $pending_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
-                bc.cycle_name, bc.due_date as cycle_due_date,
+                bc.cycle_name, bc.due_date as cycle_due_date
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -665,7 +665,7 @@ if (!$pending_result) {
 // Fetch needs_review readings - suspicious readings that need manual verification
 $needs_review_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
-                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
+                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -680,7 +680,7 @@ if (!$needs_review_result) {
 // Fetch verified readings - ready for billing
 $verified_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
-                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
+                  COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -697,7 +697,7 @@ if (!$verified_result) {
 $processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
-                  bl.id as bill_id,
+                  bl.id as bill_id
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -716,7 +716,7 @@ if (!$processed_result) {
 // Use LEFT JOIN to show readings even if client is missing/inactive
 $failed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                bc.cycle_name, bc.due_date as cycle_due_date,
-               pmr.admin_notes as error_message,
+               pmr.admin_notes as error_message
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
