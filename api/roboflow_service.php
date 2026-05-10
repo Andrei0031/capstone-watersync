@@ -361,12 +361,6 @@ function detectDigitsWithRoboflow($imagePath) {
         ];
     }
     
-    // Check if digit detection project is configured
-    if (ROBOFLOW_DIGIT_PROJECT === 'watersync-digits' && !defined('ROBOFLOW_DIGIT_PROJECT_CONFIGURED')) {
-        // This is a placeholder - user needs to update with actual project name
-        error_log('⚠ Roboflow Digit Detection: Project not configured. Please update ROBOFLOW_DIGIT_PROJECT and ROBOFLOW_DIGIT_MODEL_VERSION in roboflow_service.php');
-    }
-    
     try {
         error_log("Roboflow Digit Detection: Calling API for image: $imagePath");
         error_log("Roboflow Digit Detection: API URL: " . ROBOFLOW_DIGIT_INFERENCE_URL);
