@@ -738,10 +738,14 @@ function detectDigitsWithRoboflow($imagePath, $modelId = null) {
                     $digitValue = strval($classId);
                 }
             }
-            // Check if class name contains digit (e.g., "digit_5", "5_digit", "number_3", etc.)
-            elseif (preg_match('/[0-9]/', $className, $matches)) {
+            // Named digit classes only — avoid "m3", "v8", etc. being read as digits.
+            elseif (preg_match('/^(?:digit|d|n|num|number)[_-]?([0-9])$/i', $className, $matches)) {
                 $isDigit = true;
-                $digitValue = $matches[0]; // Extract the first digit found
+                $digitValue = $matches[1];
+                error_log("   Extracted digit '$digitValue' from class name '$className'");
+            } elseif (preg_match('/^(\d)[_-](?:digit|class)?$/i', $className, $matches)) {
+                $isDigit = true;
+                $digitValue = $matches[1];
                 error_log("   Extracted digit '$digitValue' from class name '$className'");
             }
             // Check if prediction has 'predictions' key with class inside (nested structure)

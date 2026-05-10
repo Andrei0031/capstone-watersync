@@ -103,7 +103,10 @@ function createMeterRegisterCropCandidates($imagePath) {
         $width = imagesx($image);
         $height = imagesy($image);
         $regions = [
-            // Most analog water meter odometers sit in the upper center.
+            // Close-up photos that are already mostly register: full frame + center band first.
+            ['x' => 0.0, 'y' => 0.0, 'w' => 1.0, 'h' => 1.0, 'name' => 'full_frame'],
+            ['x' => 0.02, 'y' => 0.12, 'w' => 0.96, 'h' => 0.76, 'name' => 'center_band'],
+            // Full-meter shots: odometer usually upper-center.
             ['x' => 0.18, 'y' => 0.04, 'w' => 0.64, 'h' => 0.28, 'name' => 'upper_center'],
             ['x' => 0.12, 'y' => 0.00, 'w' => 0.76, 'h' => 0.36, 'name' => 'upper_wide'],
             ['x' => 0.22, 'y' => 0.10, 'w' => 0.56, 'h' => 0.24, 'name' => 'register_tight'],
