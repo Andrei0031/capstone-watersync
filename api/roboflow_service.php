@@ -937,39 +937,48 @@ function extractMeterReadingFromDigits($digits) {
         }
     }
     
-    // Step 2: Remove duplicate/overlapping detections
-    // If two digits have very similar positions, keep the one with higher confidence
+    // Step 2: Remove only truly overlapping detections.
+    // Use bounding-box overlap ratio instead of center-distance so adjacent digits are preserved.
     $deduplicatedDigits = [];
-    $positionTolerance = 10; // Pixels - tighter overlap check for small/close digits
-    
+    $overlapThreshold = 0.45; // Consider duplicate only if one box heavily overlaps another
+
     foreach ($filteredDigits as $digit) {
         $isDuplicate = false;
-        $digitX = floatval($digit['x']);
-        $digitY = floatval($digit['y']);
-        $digitValue = $digit['digit'];
         $digitConfidence = floatval($digit['confidence']);
-        
+
+        $ax1 = floatval($digit['x']) - (floatval($digit['width']) / 2.0);
+        $ay1 = floatval($digit['y']) - (floatval($digit['height']) / 2.0);
+        $ax2 = floatval($digit['x']) + (floatval($digit['width']) / 2.0);
+        $ay2 = floatval($digit['y']) + (floatval($digit['height']) / 2.0);
+        $areaA = max(0.0, ($ax2 - $ax1)) * max(0.0, ($ay2 - $ay1));
+
         foreach ($deduplicatedDigits as $index => $existingDigit) {
-            $existingX = floatval($existingDigit['x']);
-            $existingY = floatval($existingDigit['y']);
-            $existingValue = $existingDigit['digit'];
             $existingConfidence = floatval($existingDigit['confidence']);
-            
-            // Check if positions are very close (overlapping)
-            $distanceX = abs($digitX - $existingX);
-            $distanceY = abs($digitY - $existingY);
-            
-            if ($distanceX < $positionTolerance && $distanceY < $positionTolerance) {
-                // Overlapping detection - keep the one with higher confidence
+
+            $bx1 = floatval($existingDigit['x']) - (floatval($existingDigit['width']) / 2.0);
+            $by1 = floatval($existingDigit['y']) - (floatval($existingDigit['height']) / 2.0);
+            $bx2 = floatval($existingDigit['x']) + (floatval($existingDigit['width']) / 2.0);
+            $by2 = floatval($existingDigit['y']) + (floatval($existingDigit['height']) / 2.0);
+            $areaB = max(0.0, ($bx2 - $bx1)) * max(0.0, ($by2 - $by1));
+
+            $ix1 = max($ax1, $bx1);
+            $iy1 = max($ay1, $by1);
+            $ix2 = min($ax2, $bx2);
+            $iy2 = min($ay2, $by2);
+            $interArea = max(0.0, ($ix2 - $ix1)) * max(0.0, ($iy2 - $iy1));
+
+            $minArea = min($areaA, $areaB);
+            $overlapRatio = ($minArea > 0.0) ? ($interArea / $minArea) : 0.0;
+
+            if ($overlapRatio >= $overlapThreshold) {
                 if ($digitConfidence > $existingConfidence) {
-                    // Replace existing with this one
                     $deduplicatedDigits[$index] = $digit;
                 }
                 $isDuplicate = true;
                 break;
             }
         }
-        
+
         if (!$isDuplicate) {
             $deduplicatedDigits[] = $digit;
         }
