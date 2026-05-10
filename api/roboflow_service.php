@@ -914,8 +914,9 @@ function detectDigitsWithRoboflow($imagePath) {
  * @return string|null 5-digit reading or null if not enough digits
  */
 function extractMeterReadingFromDigits($digits) {
-    // Require at least 2 digits to form a provisional meter reading
-    if (empty($digits) || count($digits) < 2) {
+    // Require at least 4 digits to form a valid reading candidate.
+    // Meter windows are expected to show 5 digits; 4 digits may still be valid if one leading 0 is missed.
+    if (empty($digits) || count($digits) < 4) {
         return null;
     }
     
@@ -931,8 +932,8 @@ function extractMeterReadingFromDigits($digits) {
     
     if (count($filteredDigits) < 5) {
         error_log("⚠ Less than 5 high-confidence digits. Found " . count($filteredDigits) . " digits with confidence >= $minConfidence");
-        if (count($filteredDigits) < 2) {
-            error_log("✗ Insufficient high-confidence digits: " . count($filteredDigits) . " < 2 required");
+        if (count($filteredDigits) < 4) {
+            error_log("✗ Insufficient high-confidence digits: " . count($filteredDigits) . " < 4 required");
             return null;
         }
     }
@@ -984,15 +985,10 @@ function extractMeterReadingFromDigits($digits) {
         }
     }
     
-    if (count($deduplicatedDigits) < 3) {
-        error_log("⚠ Not enough digits after deduplication. Found " . count($deduplicatedDigits) . " unique digits (need at least 3)");
+    if (count($deduplicatedDigits) < 4) {
+        error_log("⚠ Not enough digits after deduplication. Found " . count($deduplicatedDigits) . " unique digits (need at least 4)");
         error_log("   Original digits: " . count($digits) . ", After confidence filter: " . count($filteredDigits));
-        // Try to form reading with fewer digits if we have at least 2
-        if (count($deduplicatedDigits) >= 2) {
-            error_log("   Attempting to form reading with " . count($deduplicatedDigits) . " digits (less than ideal)");
-        } else {
-            return null;
-        }
+        return null;
     }
     
     // Step 3: Group digits by Y position (to handle multi-row displays)
@@ -1086,10 +1082,15 @@ function extractMeterReadingFromDigits($digits) {
     
     // Step 7: Normalize to 5 digits
     $originalLength = strlen($reading);
-    if ($originalLength < 5) {
-        // Pad with leading zeros if less than 5 digits
+    if ($originalLength < 4) {
+        error_log("✗ Reading too short after extraction ($originalLength digit(s)): $reading");
+        return null;
+    }
+
+    if ($originalLength === 4) {
+        // Accept one missing leading digit by padding to 5 digits.
         $reading = str_pad($reading, 5, '0', STR_PAD_LEFT);
-        error_log("⚠ Padded reading from $originalLength to 5 digits: $reading");
+        error_log("⚠ Padded 4-digit reading to 5 digits: $reading");
     } elseif ($originalLength > 5) {
         // Take first 5 digits if more than 5 (most likely the reading)
         $reading = substr($reading, 0, 5);
