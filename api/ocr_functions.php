@@ -165,14 +165,143 @@ function cleanupOcrCandidateImages($paths) {
     }
 }
 
+function processImageWithOcrSpace($imagePath) {
+    if (!file_exists($imagePath)) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Image file not found: ' . $imagePath
+        ];
+    }
+
+    if (!function_exists('curl_init')) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'PHP cURL extension is required for OCR.space'
+        ];
+    }
+
+    $apiKey = getenv('OCR_SPACE_API_KEY');
+    if (!$apiKey) {
+        // OCR.space provides "helloworld" as a limited demo key. Use a real key in production.
+        $apiKey = 'helloworld';
+    }
+
+    $processedImagePath = preprocessImageForOCR($imagePath);
+    $cleanupPreprocessed = ($processedImagePath !== $imagePath);
+
+    try {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://api.ocr.space/parse/image');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 45);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            'apikey' => $apiKey,
+            'language' => 'eng',
+            'OCREngine' => '2',
+            'scale' => 'true',
+            'isOverlayRequired' => 'false',
+            'detectOrientation' => 'false',
+            'file' => new CURLFile($processedImagePath)
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return [
+                'success' => false,
+                'extracted_text' => '',
+                'meter_reading' => null,
+                'error' => 'OCR.space API error: ' . $curlError
+            ];
+        }
+
+        if ($httpCode !== 200 || !$response) {
+            return [
+                'success' => false,
+                'extracted_text' => '',
+                'meter_reading' => null,
+                'error' => 'OCR.space HTTP error: ' . $httpCode . '. Response: ' . substr((string)$response, 0, 200)
+            ];
+        }
+
+        $data = json_decode($response, true);
+        if (!$data) {
+            return [
+                'success' => false,
+                'extracted_text' => '',
+                'meter_reading' => null,
+                'error' => 'OCR.space returned invalid JSON: ' . json_last_error_msg()
+            ];
+        }
+
+        if (!empty($data['IsErroredOnProcessing'])) {
+            $messages = $data['ErrorMessage'] ?? $data['ErrorDetails'] ?? 'OCR.space processing failed';
+            if (is_array($messages)) {
+                $messages = implode(' ', $messages);
+            }
+            return [
+                'success' => false,
+                'extracted_text' => '',
+                'meter_reading' => null,
+                'error' => 'OCR.space failed: ' . $messages
+            ];
+        }
+
+        $parsedText = '';
+        if (!empty($data['ParsedResults']) && is_array($data['ParsedResults'])) {
+            foreach ($data['ParsedResults'] as $result) {
+                $parsedText .= "\n" . ($result['ParsedText'] ?? '');
+            }
+        }
+
+        $parsedText = trim($parsedText);
+        $meterReading = extractMeterReadingFromText($parsedText);
+
+        if ($meterReading) {
+            return [
+                'success' => true,
+                'extracted_text' => $parsedText,
+                'meter_reading' => $meterReading,
+                'digit_stats' => [
+                    'count' => strlen($meterReading),
+                    'min_confidence' => 0.0,
+                    'avg_confidence' => 0.0,
+                ],
+                'requires_review' => true,
+            ];
+        }
+
+        return [
+            'success' => false,
+            'extracted_text' => $parsedText,
+            'meter_reading' => null,
+            'error' => 'OCR.space could not extract a valid meter reading. Text: ' . substr($parsedText, 0, 120)
+        ];
+    } finally {
+        if ($cleanupPreprocessed && file_exists($processedImagePath)) {
+            @unlink($processedImagePath);
+        }
+    }
+}
+
 function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
     $attempts = [];
     $lastError = null;
     $roboflowError = null;
+    $ocrSpaceError = null;
     $tesseractError = null;
     $candidatePaths = [];
 
-    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$tesseractError) {
+    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$tesseractError) {
         if (!$path || !file_exists($path)) {
             return null;
         }
@@ -182,6 +311,8 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
 
         if ($method === 'Roboflow') {
             $result = processImageWithRoboflowDigits($path);
+        } elseif ($method === 'OCRSpace') {
+            $result = processImageWithOcrSpace($path);
         } else {
             $result = processImageWithTesseract($path);
         }
@@ -198,6 +329,9 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         if ($method === 'Roboflow') {
             $roboflowError = $error;
             $lastError = $error;
+        } elseif ($method === 'OCRSpace') {
+            $ocrSpaceError = $error;
+            $lastError = $error;
         } else {
             $tesseractError = $error;
             if ($lastError === null) {
@@ -210,6 +344,11 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
 
     try {
         if ($croppedImagePath && $croppedImagePath !== $imagePath) {
+            $result = $tryOcr($croppedImagePath, 'OCRSpace', 'roboflow_crop');
+            if ($result) {
+                return $result;
+            }
+
             $result = $tryOcr($croppedImagePath, 'Roboflow', 'cropped');
             if ($result) {
                 return $result;
@@ -220,6 +359,13 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         foreach ($candidateSources as $sourcePath) {
             if ($sourcePath && file_exists($sourcePath)) {
                 $candidatePaths = array_merge($candidatePaths, createMeterRegisterCropCandidates($sourcePath));
+            }
+        }
+
+        foreach ($candidatePaths as $candidatePath) {
+            $result = $tryOcr($candidatePath, 'OCRSpace', 'register_crop');
+            if ($result) {
+                return $result;
             }
         }
 
@@ -242,12 +388,17 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
+        $result = $tryOcr($imagePath, 'OCRSpace', 'original');
+        if ($result) {
+            return $result;
+        }
+
         $result = $tryOcr($imagePath, 'Tesseract', 'original');
         if ($result) {
             return $result;
         }
 
-        $finalError = $roboflowError ?: $lastError ?: 'No OCR result.';
+        $finalError = $ocrSpaceError ?: $roboflowError ?: $lastError ?: 'No OCR result.';
         if ($tesseractError && stripos($tesseractError, 'not installed') === false) {
             $finalError .= ' Optional Tesseract fallback also failed: ' . $tesseractError;
         }
