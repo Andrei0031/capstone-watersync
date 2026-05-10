@@ -534,6 +534,34 @@ function processImageWithRoboflowDigits($imagePath) {
                 'digits' => $digits,
             ];
         } else {
+            // Fallback for partial detections: keep workflow moving and send to needs_review.
+            // If we have at least 2 digits, build a provisional 5-digit reading by ordering left-to-right
+            // and padding leading zeros (e.g., "45" -> "00045").
+            if (count($digits) >= 2) {
+                usort($digits, function($a, $b) {
+                    return floatval($a['x'] ?? 0) <=> floatval($b['x'] ?? 0);
+                });
+                $partialDigits = array_map(function($d) {
+                    return strval($d['digit']);
+                }, $digits);
+                $partialRaw = implode('', $partialDigits);
+                if (strlen($partialRaw) > 5) {
+                    $partialRaw = substr($partialRaw, 0, 5);
+                }
+                $provisionalReading = str_pad($partialRaw, 5, '0', STR_PAD_LEFT);
+
+                error_log('⚠ Roboflow OCR: Using provisional reading from partial digits: ' . $provisionalReading);
+                return [
+                    'success' => true,
+                    'extracted_text' => $extractedText . ' [PROVISIONAL]',
+                    'meter_reading' => $provisionalReading,
+                    'digit_stats' => $digitStats,
+                    'digits' => $digits,
+                    'is_provisional' => true,
+                    'warning' => 'Partial digit detection used. Please verify manually.'
+                ];
+            }
+
             $errorMsg = 'Could not form 5-digit reading from detected digits. Found ' . count($digits) . ' digit(s): ' . implode(', ', array_map(function($d) { return $d['digit']; }, $digits));
             error_log('✗ Roboflow OCR: ' . $errorMsg);
             return [
