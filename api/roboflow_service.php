@@ -24,8 +24,8 @@ define('ROBOFLOW_INFERENCE_URL', 'https://serverless.roboflow.com/' . ROBOFLOW_M
 // Digit Detection Model Configuration
 // Using model_id format from Roboflow "Hosted Image Inference"
 // Format: "project-name/version" (e.g., "watersync-oekrf/7")
-define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/7'); // Using version 7
-define('ROBOFLOW_DIGIT_MODEL_ID_SECONDARY', 'watersync-oekrf/4'); // Secondary OCR model
+define('ROBOFLOW_DIGIT_MODEL_ID', 'watersync-oekrf/4'); // Using version 4 as primary OCR model
+define('ROBOFLOW_DIGIT_MODEL_ID_SECONDARY', 'watersync-oekrf/7'); // Secondary OCR model
 
 // Option 2: Use separate project and version (alternative format - kept for compatibility)
 define('ROBOFLOW_DIGIT_PROJECT', 'watersync-digits'); // Change this to your digit detection project name
@@ -666,7 +666,7 @@ function detectDigitsWithRoboflow($imagePath) {
                 // If all methods failed with the primary model, try the secondary digit model
                 if ($httpCode !== 200 || $error || empty($response)) {
                     if (defined('ROBOFLOW_DIGIT_INFERENCE_URL_SECONDARY')) {
-                        error_log("Roboflow Digit Detection: All methods failed with the primary model, trying secondary model watersync-oekrf/4");
+                        error_log("Roboflow Digit Detection: All methods failed with the primary model, trying secondary model watersync-oekrf/7");
                         $methodUsed = 'secondary-model';
 
                         $ch = curl_init();
