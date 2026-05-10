@@ -896,7 +896,8 @@ function detectDigitsWithRoboflow($imagePath) {
             }
             
             // Check multiple possible confidence field names
-            $confidence = 0.0;
+            // If missing, treat as high confidence to avoid dropping valid digits
+            $confidence = 1.0;
             if (isset($prediction['confidence'])) {
                 $confidence = floatval($prediction['confidence']);
             } elseif (isset($prediction['confidence_score'])) {
@@ -949,8 +950,8 @@ function detectDigitsWithRoboflow($imagePath) {
                 }
             }
             
-            // Use confidence threshold of 0.05 (5%) - keep faint digits, filter only very low confidence
-            if ($isDigit && $confidence > 0.05) {
+            // Use confidence threshold of 0.01 (1%) - keep faint digits, filter only near-zero confidence
+            if ($isDigit && $confidence > 0.01) {
                 $digits[] = [
                     'digit' => $digitValue,
                     'x' => isset($prediction['x']) ? floatval($prediction['x']) : 0,
@@ -960,8 +961,8 @@ function detectDigitsWithRoboflow($imagePath) {
                     'confidence' => $confidence
                 ];
                 error_log("✓ Roboflow Digit Detection: Found digit '$digitValue' with confidence $confidence at position ({$digits[count($digits)-1]['x']}, {$digits[count($digits)-1]['y']})");
-            } elseif ($isDigit && $confidence <= 0.05) {
-                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.05)");
+            } elseif ($isDigit && $confidence <= 0.01) {
+                error_log("⚠ Roboflow Digit Detection: Digit '$digitValue' found but confidence $confidence is below threshold (0.01)");
             } elseif ($isDigit) {
                 // Digit found and above threshold
                 error_log("✓ Roboflow Digit Detection: Digit '$digitValue' accepted with confidence $confidence");
@@ -1094,10 +1095,13 @@ function extractMeterReadingFromDigits($digits) {
     }
     
     // Step 1: Filter digits by confidence (remove very low-confidence detections)
-    // Must match the confidence threshold in detectDigitsWithRoboflow (0.05)
-    $minConfidence = 0.05;
+    // Must match the confidence threshold in detectDigitsWithRoboflow (0.01)
+    $minConfidence = 0.01;
     $filteredDigits = array_filter($digits, function($digit) use ($minConfidence) {
-        return isset($digit['confidence']) && $digit['confidence'] >= $minConfidence;
+        if (!isset($digit['confidence'])) {
+            return true;
+        }
+        return $digit['confidence'] >= $minConfidence;
     });
     
     if (count($filteredDigits) < 5) {
