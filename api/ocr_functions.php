@@ -610,10 +610,53 @@ function extractMeterReadingFromText($text) {
  * @param string $imagePath Full path to image file
  * @return array ['success' => bool, 'extracted_text' => string, 'meter_reading' => string|null, 'error' => string]
  */
+/**
+ * @return string|null
+ */
+function buildLooseReadingFromDetectedDigits($digits) {
+    if (count($digits) < 4) {
+        return null;
+    }
+
+    $workingDigits = array_values(array_filter($digits, function ($digit) {
+        return floatval($digit['confidence'] ?? 0.0) > 0.01 && preg_match('/^\d$/', strval($digit['digit'] ?? ''));
+    }));
+
+    if (count($workingDigits) < 4) {
+        return null;
+    }
+
+    usort($workingDigits, function ($a, $b) {
+        return floatval($a['x'] ?? 0) <=> floatval($b['x'] ?? 0);
+    });
+
+    if (function_exists('selectRegisterReadingFromRowDigits')) {
+        $reading = selectRegisterReadingFromRowDigits($workingDigits);
+        if ($reading !== null) {
+            return $reading;
+        }
+    }
+
+    $digitString = implode('', array_map(function ($digit) {
+        return strval($digit['digit'] ?? '');
+    }, array_slice($workingDigits, 0, 5)));
+
+    if (strlen($digitString) === 4) {
+        $digitString = str_pad($digitString, 5, '0', STR_PAD_LEFT);
+    }
+
+    return preg_match('/^\d{5}$/', $digitString) ? $digitString : null;
+}
+
 function buildRoboflowReadingCandidate($digitResult) {
     $digits = $digitResult['digits'] ?? [];
     $modelId = $digitResult['model_id'] ?? 'unknown';
     $reading = !empty($digits) ? extractMeterReadingFromDigits($digits) : null;
+    $usedLooseReading = false;
+    if ($reading === null && count($digits) >= 4) {
+        $reading = buildLooseReadingFromDetectedDigits($digits);
+        $usedLooseReading = ($reading !== null);
+    }
     $confidences = [];
     $extractedText = "Model $modelId detected digits: ";
 
@@ -627,6 +670,7 @@ function buildRoboflowReadingCandidate($digitResult) {
         'success' => !empty($reading),
         'model_id' => $modelId,
         'reading' => $reading,
+        'used_loose_reading' => $usedLooseReading,
         'digits' => $digits,
         'extracted_text' => trim($extractedText),
         'digit_stats' => [
@@ -656,6 +700,10 @@ function chooseDualRoboflowCandidate($latestCandidate, $fallbackCandidate) {
         if ($agreement) {
             $selected = $latestCandidate;
             $reason = 'Both Roboflow models agreed on the same reading.';
+            if (!empty($latestCandidate['used_loose_reading']) || !empty($fallbackCandidate['used_loose_reading'])) {
+                $requiresReview = true;
+                $reason .= ' Loose digit ordering was needed, so manual verification is required.';
+            }
         } else {
             $latestAvg = $latestCandidate['digit_stats']['avg_confidence'] ?? 0.0;
             $fallbackAvg = $fallbackCandidate['digit_stats']['avg_confidence'] ?? 0.0;
@@ -791,11 +839,13 @@ function processImageWithRoboflowDigits($imagePath) {
                     'latest' => [
                         'model_id' => $latestCandidate['model_id'],
                         'reading' => $latestCandidate['reading'],
+                        'used_loose_reading' => $latestCandidate['used_loose_reading'],
                         'digit_stats' => $latestCandidate['digit_stats'],
                     ],
                     'fallback' => [
                         'model_id' => $fallbackCandidate['model_id'],
                         'reading' => $fallbackCandidate['reading'],
+                        'used_loose_reading' => $fallbackCandidate['used_loose_reading'],
                         'digit_stats' => $fallbackCandidate['digit_stats'],
                     ],
                     'agreement' => $choice['agreement'],
