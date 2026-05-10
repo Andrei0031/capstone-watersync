@@ -80,42 +80,23 @@ try {
         }
     }
 
-    // Try Roboflow digit detection first (preferred method)
-    if (function_exists('processImageWithRoboflowDigits')) {
-        // Try current image (might be cropped) first
-        if (file_exists($imagePath)) {
-            error_log("Attempting OCR on current image: $imagePath");
-            $ocrResult = processImageWithRoboflowDigits($imagePath);
-            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = $ocrResult['meter_reading'];
-                $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrProcessed = true;
-                error_log("✓ Retry OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
-            } else {
-                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
-                error_log("⚠ Retry OCR failed on current image: $ocrError");
-            }
-        }
-        
-        // If failed and we have an original image, try that
-        if (!$ocrProcessed && $originalImagePath !== $imagePath && file_exists($originalImagePath)) {
-            error_log("Attempting OCR on ORIGINAL (uncropped) image: $originalImagePath");
-            $ocrResult = processImageWithRoboflowDigits($originalImagePath);
-            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = $ocrResult['meter_reading'];
-                $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrProcessed = true;
-                error_log("✓ Retry OCR SUCCESS (Roboflow on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
-            } else {
-                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
-                error_log("⚠ Retry OCR failed on original image: $ocrError");
-            }
-        }
+    if (!function_exists('processMeterImageWithFallbacks')) {
+        throw new Exception('OCR fallback function not available. Make sure ocr_functions.php is included.');
     }
-    
-    // Roboflow YOLOv8 only - no Tesseract fallback
+
+    $ocrResult = processMeterImageWithFallbacks($originalImagePath, $imagePath);
+    if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+        $ocrReading = $ocrResult['meter_reading'];
+        $extractedText = $ocrResult['extracted_text'] ?? '';
+        $ocrProcessed = true;
+        error_log("✓ Retry OCR SUCCESS: Reading ID $reading_id processed with value: $ocrReading");
+    } else {
+        $ocrError = $ocrResult['error'] ?? 'OCR failed';
+        error_log("⚠ Retry OCR failed: $ocrError");
+    }
+
     if (!$ocrProcessed) {
-        $errorMsg = $ocrError ?? 'Roboflow YOLOv8 OCR processing failed. Please check if Roboflow model version 7 is deployed and accessible.';
+        $errorMsg = $ocrError ?? 'OCR processing failed. Please verify the meter reading manually.';
         error_log("✗ Retry OCR FAILED for reading ID $reading_id: $errorMsg");
         
         // Don't throw exception - instead update status to failed with error message

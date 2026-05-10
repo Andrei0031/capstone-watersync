@@ -165,6 +165,89 @@ function cleanupOcrCandidateImages($paths) {
     }
 }
 
+function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
+    $attempts = [];
+    $lastError = null;
+    $candidatePaths = [];
+
+    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError) {
+        if (!$path || !file_exists($path)) {
+            return null;
+        }
+
+        $attempts[] = $method . ':' . $label;
+        error_log("Attempting $method OCR on $label image: $path");
+
+        if ($method === 'Roboflow') {
+            $result = processImageWithRoboflowDigits($path);
+        } else {
+            $result = processImageWithTesseract($path);
+        }
+
+        if ($result['success'] && !empty($result['meter_reading'])) {
+            $result['extracted_text'] = ($result['extracted_text'] ?? '') . ' [' . strtoupper($method) . '_' . strtoupper($label) . ']';
+            $result['ocr_engine'] = $method;
+            $result['attempts'] = $attempts;
+            error_log("OCR success with $method on $label: " . $result['meter_reading']);
+            return $result;
+        }
+
+        $lastError = $result['error'] ?? ($method . ' OCR failed on ' . $label);
+        error_log("$method OCR failed on $label: $lastError");
+        return null;
+    };
+
+    try {
+        if ($croppedImagePath && $croppedImagePath !== $imagePath) {
+            $result = $tryOcr($croppedImagePath, 'Roboflow', 'cropped');
+            if ($result) {
+                return $result;
+            }
+        }
+
+        $candidateSources = array_unique(array_filter([$croppedImagePath, $imagePath]));
+        foreach ($candidateSources as $sourcePath) {
+            if ($sourcePath && file_exists($sourcePath)) {
+                $candidatePaths = array_merge($candidatePaths, createMeterRegisterCropCandidates($sourcePath));
+            }
+        }
+
+        foreach ($candidatePaths as $candidatePath) {
+            $result = $tryOcr($candidatePath, 'Roboflow', 'register_crop');
+            if ($result) {
+                return $result;
+            }
+        }
+
+        foreach ($candidatePaths as $candidatePath) {
+            $result = $tryOcr($candidatePath, 'Tesseract', 'register_crop');
+            if ($result) {
+                return $result;
+            }
+        }
+
+        $result = $tryOcr($imagePath, 'Roboflow', 'original');
+        if ($result) {
+            return $result;
+        }
+
+        $result = $tryOcr($imagePath, 'Tesseract', 'original');
+        if ($result) {
+            return $result;
+        }
+
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'OCR failed after trying register crops and original image. ' . ($lastError ?: 'No OCR result.'),
+            'attempts' => $attempts,
+        ];
+    } finally {
+        cleanupOcrCandidateImages($candidatePaths);
+    }
+}
+
 /**
  * Process image with Tesseract OCR (server-side)
  * Returns extracted text and meter reading

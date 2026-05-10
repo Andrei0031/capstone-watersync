@@ -94,30 +94,21 @@ function processPendingReading($conn, $reading_id) {
         $ocrError = null;
         $ocrResult = null;
 
-        if ($croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
-            $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
-            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = !empty($ocrResult['is_provisional']) ? null : $ocrResult['meter_reading'];
-                $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrProcessed = true;
-            } else {
-                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on cropped image';
-            }
+        if (!function_exists('processMeterImageWithFallbacks')) {
+            throw new Exception('OCR fallback function not available. Make sure ocr_functions.php is included.');
         }
 
-        if (!$ocrProcessed && file_exists($imagePath)) {
-            $ocrResult = processImageWithRoboflowDigits($imagePath);
-            if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                $ocrReading = !empty($ocrResult['is_provisional']) ? null : $ocrResult['meter_reading'];
-                $extractedText = $ocrResult['extracted_text'] ?? '';
-                $ocrProcessed = true;
-            } else {
-                $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
-            }
+        $ocrResult = processMeterImageWithFallbacks($imagePath, $croppedImagePath);
+        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+            $ocrReading = $ocrResult['meter_reading'];
+            $extractedText = $ocrResult['extracted_text'] ?? '';
+            $ocrProcessed = true;
+        } else {
+            $ocrError = $ocrResult['error'] ?? 'OCR failed';
         }
 
         if (!$ocrProcessed) {
-            $errorMsg = 'Roboflow OCR failed. ' . ($ocrError ?: 'No OCR result.') . ' ' . ($roboflowError ?: '');
+            $errorMsg = 'OCR failed. ' . ($ocrError ?: 'No OCR result.') . ' ' . ($roboflowError ?: '');
             throw new Exception(trim($errorMsg));
         }
 
