@@ -294,19 +294,171 @@ function processImageWithOcrSpace($imagePath) {
 }
 
 /**
- * Multi-stage OCR: Roboflow digit model first, then OCR.space, then Tesseract.
- * Meter region crop comes from detectAndCropMeterWithRoboflow() in the caller.
+ * EasyOCR HTTP service (Python). Roboflow supplies the crop; EasyOCR reads digits.
+ * VPS: run easyocr_service on port 8766. Shared hosting: EASYOCR_SERVICE_ENABLED=0.
+ */
+function getEasyOcrServiceBaseUrl() {
+    $url = getenv('EASYOCR_SERVICE_URL');
+    if ($url !== false && trim($url) !== '') {
+        return rtrim(trim($url), '/');
+    }
+    return 'http://127.0.0.1:8766';
+}
+
+function isEasyOcrServiceEnabled() {
+    $v = getenv('EASYOCR_SERVICE_ENABLED');
+    if ($v === false || trim((string) $v) === '') {
+        return true;
+    }
+    $v = strtolower(trim((string) $v));
+    return !in_array($v, ['0', 'false', 'no', 'off', 'disabled'], true);
+}
+
+function processImageWithEasyOcrService($imagePath) {
+    if (!isEasyOcrServiceEnabled()) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'EasyOCR service disabled (EASYOCR_SERVICE_ENABLED).',
+        ];
+    }
+    if (!file_exists($imagePath)) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Image file not found: ' . $imagePath,
+        ];
+    }
+    if (!function_exists('curl_init')) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'PHP cURL required for EasyOCR service',
+        ];
+    }
+
+    $base = getEasyOcrServiceBaseUrl();
+    $endpoint = $base . '/meter-ocr';
+    $apiKey = getenv('EASYOCR_SERVICE_API_KEY');
+    $apiKey = ($apiKey !== false && trim($apiKey) !== '') ? trim($apiKey) : '';
+
+    $ext = strtolower(pathinfo($imagePath, PATHINFO_EXTENSION));
+    $mime = ($ext === 'png') ? 'image/png' : (($ext === 'gif') ? 'image/gif' : 'image/jpeg');
+    $post = ['file' => new CURLFile($imagePath, $mime, basename($imagePath))];
+
+    $ch = curl_init($endpoint);
+    $headers = [];
+    if ($apiKey !== '') {
+        $headers[] = 'X-OCR-Key: ' . $apiKey;
+    }
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'EasyOCR service: ' . $curlError . ' (' . $endpoint . '). Set EASYOCR_SERVICE_URL or EASYOCR_SERVICE_ENABLED=0.',
+        ];
+    }
+    if ($httpCode !== 200 || !$response) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'EasyOCR HTTP ' . $httpCode . ' at ' . $endpoint,
+        ];
+    }
+
+    $data = json_decode($response, true);
+    if (!is_array($data) || empty($data['success'])) {
+        return [
+            'success' => false,
+            'extracted_text' => is_array($data) ? ($data['raw_text'] ?? '') : '',
+            'meter_reading' => null,
+            'error' => is_array($data) ? ($data['error'] ?? 'EasyOCR failed') : 'Invalid JSON from EasyOCR',
+        ];
+    }
+
+    $rawText = isset($data['raw_text']) ? trim((string) $data['raw_text']) : '';
+    $meterReading = null;
+    if (!empty($data['meter_reading']) && preg_match('/^\d{5}$/', (string) $data['meter_reading'])) {
+        $meterReading = (string) $data['meter_reading'];
+    }
+    if (!$meterReading) {
+        $meterReading = extractMeterReadingFromText($rawText);
+    }
+    if (!$meterReading && !empty($data['digits_only'])) {
+        $d = preg_replace('/\D/', '', (string) $data['digits_only']);
+        if (strlen($d) >= 5) {
+            $meterReading = substr($d, -5);
+        }
+    }
+    if (!$meterReading) {
+        return [
+            'success' => false,
+            'extracted_text' => $rawText,
+            'meter_reading' => null,
+            'error' => 'EasyOCR could not form a 5-digit reading.',
+        ];
+    }
+
+    $minConf = isset($data['min_confidence']) ? (float) $data['min_confidence'] : 0.0;
+    $avgConf = isset($data['avg_confidence']) ? (float) $data['avg_confidence'] : 0.0;
+    $needsReview = !empty($data['needs_review']) || $meterReading === '00000';
+    if ($needsReview) {
+        $minConf = min($minConf, 0.0);
+    }
+
+    $pass = isset($data['preprocess_pass']) ? (string) $data['preprocess_pass'] : '';
+    $extractedText = $rawText . ' [EASYOCR_SERVICE pass=' . $pass . ' min=' . round($minConf, 3) . ']';
+
+    return [
+        'success' => true,
+        'extracted_text' => $extractedText,
+        'meter_reading' => $meterReading,
+        'digit_stats' => [
+            'count' => 5,
+            'min_confidence' => $minConf,
+            'avg_confidence' => $avgConf,
+        ],
+        'requires_review' => $needsReview,
+        'easyocr_response' => $data,
+    ];
+}
+
+/**
+ * Roboflow: meter crop + digit detection. EasyOCR (optional Python API) reads crops.
+ * Fallback: OCR.space, Tesseract.
  */
 function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
     $attempts = [];
     $lastError = null;
     $roboflowError = null;
     $ocrSpaceError = null;
+    $easyOcrError = null;
     $tesseractError = null;
     $candidatePaths = [];
 
-    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$tesseractError) {
+    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$easyOcrError, &$tesseractError) {
         if (!$path || !file_exists($path)) {
+            return null;
+        }
+
+        if ($method === 'EasyOcrService' && !isEasyOcrServiceEnabled()) {
             return null;
         }
 
@@ -317,6 +469,8 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             $result = processImageWithRoboflowDigits($path);
         } elseif ($method === 'OCRSpace') {
             $result = processImageWithOcrSpace($path);
+        } elseif ($method === 'EasyOcrService') {
+            $result = processImageWithEasyOcrService($path);
         } else {
             $result = processImageWithTesseract($path);
         }
@@ -336,6 +490,9 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         } elseif ($method === 'OCRSpace') {
             $ocrSpaceError = $error;
             $lastError = $error;
+        } elseif ($method === 'EasyOcrService') {
+            $easyOcrError = $error;
+            $lastError = $error;
         } else {
             $tesseractError = $error;
             if ($lastError === null) {
@@ -348,6 +505,11 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
 
     try {
         if ($croppedImagePath && $croppedImagePath !== $imagePath) {
+            $result = $tryOcr($croppedImagePath, 'EasyOcrService', 'roboflow_crop');
+            if ($result) {
+                return $result;
+            }
+
             $result = $tryOcr($croppedImagePath, 'Roboflow', 'cropped');
             if ($result) {
                 return $result;
@@ -363,6 +525,13 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         foreach ($candidateSources as $sourcePath) {
             if ($sourcePath && file_exists($sourcePath)) {
                 $candidatePaths = array_merge($candidatePaths, createMeterRegisterCropCandidates($sourcePath));
+            }
+        }
+
+        foreach ($candidatePaths as $candidatePath) {
+            $result = $tryOcr($candidatePath, 'EasyOcrService', 'register_crop');
+            if ($result) {
+                return $result;
             }
         }
 
@@ -387,6 +556,11 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             }
         }
 
+        $result = $tryOcr($imagePath, 'EasyOcrService', 'original');
+        if ($result) {
+            return $result;
+        }
+
         $result = $tryOcr($imagePath, 'Roboflow', 'original');
         if ($result) {
             return $result;
@@ -402,9 +576,22 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
-        $finalError = $roboflowError ?: $ocrSpaceError ?: $lastError ?: 'No OCR result.';
+        $parts = [];
+        if ($easyOcrError) {
+            $parts[] = $easyOcrError;
+        }
+        if ($roboflowError) {
+            $parts[] = 'Roboflow: ' . $roboflowError;
+        }
+        if ($ocrSpaceError) {
+            $parts[] = 'OCR.space: ' . $ocrSpaceError;
+        }
         if ($tesseractError && stripos($tesseractError, 'not installed') === false) {
-            $finalError .= ' Optional Tesseract fallback also failed: ' . $tesseractError;
+            $parts[] = 'Tesseract: ' . $tesseractError;
+        }
+        $finalError = $parts ? implode(' | ', $parts) : ($lastError ?: 'No OCR result.');
+        if ($tesseractError && stripos($tesseractError, 'not installed') !== false) {
+            $finalError .= ' (Tesseract not installed.)';
         }
 
         return [
