@@ -538,27 +538,54 @@ function processImageWithRoboflowDigits($imagePath) {
             // If we have at least 2 digits, build a provisional 5-digit reading by ordering left-to-right
             // and padding leading zeros (e.g., "45" -> "00045").
             if (count($digits) >= 2) {
-                usort($digits, function($a, $b) {
+                $workingDigits = $digits;
+
+                // Focus on the main meter window row (avoid tiny dial digits/noise).
+                $heights = array_map(function($d) { return floatval($d['height'] ?? 0); }, $workingDigits);
+                sort($heights);
+                $medianHeight = $heights[(int) floor(count($heights) / 2)] ?? 0.0;
+
+                $ys = array_map(function($d) { return floatval($d['y'] ?? 0); }, $workingDigits);
+                sort($ys);
+                $medianY = $ys[(int) floor(count($ys) / 2)] ?? 0.0;
+
+                $rowTolerance = max(20.0, $medianHeight * 1.1);
+                $sizeThreshold = $medianHeight > 0 ? ($medianHeight * 0.60) : 0.0;
+
+                $filteredDigits = array_values(array_filter($workingDigits, function($d) use ($medianY, $rowTolerance, $sizeThreshold) {
+                    $dy = abs(floatval($d['y'] ?? 0) - $medianY);
+                    $h = floatval($d['height'] ?? 0);
+                    return $dy <= $rowTolerance && $h >= $sizeThreshold;
+                }));
+
+                if (count($filteredDigits) >= 2) {
+                    $workingDigits = $filteredDigits;
+                }
+
+                usort($workingDigits, function($a, $b) {
                     return floatval($a['x'] ?? 0) <=> floatval($b['x'] ?? 0);
                 });
                 $partialDigits = array_map(function($d) {
                     return strval($d['digit']);
-                }, $digits);
+                }, $workingDigits);
                 $partialRaw = implode('', $partialDigits);
                 if (strlen($partialRaw) > 5) {
                     $partialRaw = substr($partialRaw, 0, 5);
                 }
                 $provisionalReading = str_pad($partialRaw, 5, '0', STR_PAD_LEFT);
+                $unknownCount = max(0, 5 - strlen($partialRaw));
+                $pattern = $partialRaw . str_repeat('?', $unknownCount);
 
                 error_log('⚠ Roboflow OCR: Using provisional reading from partial digits: ' . $provisionalReading);
                 return [
                     'success' => true,
-                    'extracted_text' => $extractedText . ' [PROVISIONAL]',
+                    'extracted_text' => $extractedText . ' [PROVISIONAL pattern=' . $pattern . ']',
                     'meter_reading' => $provisionalReading,
                     'digit_stats' => $digitStats,
-                    'digits' => $digits,
+                    'digits' => $workingDigits,
                     'is_provisional' => true,
-                    'warning' => 'Partial digit detection used. Please verify manually.'
+                    'warning' => 'Partial digit detection used. Please verify manually.',
+                    'provisional_pattern' => $pattern
                 ];
             }
 
