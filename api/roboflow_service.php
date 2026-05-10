@@ -263,8 +263,8 @@ function cropMeterRegion($originalImagePath, $detection) {
         $width = floatval($detection['width']);
         $height = floatval($detection['height']);
         
-        // Calculate crop coordinates (with padding)
-        $padding = 20; // Add padding around detection
+        // Padding: fixed minimum + % of box so the full odometer row stays in frame (reduces single-spurious-digit crops)
+        $padding = max(36, (int) round(0.14 * max($width, $height)));
         $x = max(0, intval($centerX - $width / 2 - $padding));
         $y = max(0, intval($centerY - $height / 2 - $padding));
         $cropWidth = min($imageWidth - $x, intval($width + $padding * 2));
@@ -339,6 +339,186 @@ function detectAndCropMeterWithRoboflow($imagePath) {
 }
 
 /**
+ * Upscale small crops so the digit model sees larger characters (reduces "only one digit" failures).
+ * @return string|null Path to temp JPEG, or null if upscale not needed / GD unavailable
+ */
+function roboflowCreateUpscaledImageForDigitInference($imagePath) {
+    if (!extension_loaded('gd') || !file_exists($imagePath)) {
+        return null;
+    }
+    $info = @getimagesize($imagePath);
+    if (!$info) {
+        return null;
+    }
+    $w = $info[0];
+    $h = $info[1];
+    $minSide = min($w, $h);
+    $targetMin = 900;
+    if ($minSide >= $targetMin) {
+        return null;
+    }
+    $scale = min(3.8, $targetMin / max(1, $minSide));
+    $nw = max(1, (int) round($w * $scale));
+    $nh = max(1, (int) round($h * $scale));
+
+    $imageType = $info[2];
+    switch ($imageType) {
+        case IMAGETYPE_JPEG:
+            $src = @imagecreatefromjpeg($imagePath);
+            break;
+        case IMAGETYPE_PNG:
+            $src = @imagecreatefrompng($imagePath);
+            break;
+        case IMAGETYPE_GIF:
+            $src = @imagecreatefromgif($imagePath);
+            break;
+        default:
+            return null;
+    }
+    if (!$src) {
+        return null;
+    }
+    $dst = imagecreatetruecolor($nw, $nh);
+    if (!$dst) {
+        imagedestroy($src);
+        return null;
+    }
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    $outPath = $imagePath . '_roboflow_digit_upscale.jpg';
+    imagejpeg($dst, $outPath, 94);
+    imagedestroy($src);
+    imagedestroy($dst);
+    error_log("Roboflow digit upscale: {$w}x{$h} -> {$nw}x{$nh} saved " . basename($outPath));
+    return $outPath;
+}
+
+/**
+ * IoU for Roboflow boxes (center x, y, width, height).
+ */
+function roboflowDetectionBoxIoU(array $a, array $b) {
+    $ax = floatval($a['x'] ?? 0);
+    $ay = floatval($a['y'] ?? 0);
+    $aw = floatval($a['width'] ?? 0);
+    $ah = floatval($a['height'] ?? 0);
+    $bx = floatval($b['x'] ?? 0);
+    $by = floatval($b['y'] ?? 0);
+    $bw = floatval($b['width'] ?? 0);
+    $bh = floatval($b['height'] ?? 0);
+
+    $a_x1 = $ax - $aw / 2.0;
+    $a_y1 = $ay - $ah / 2.0;
+    $a_x2 = $ax + $aw / 2.0;
+    $a_y2 = $ay + $ah / 2.0;
+    $b_x1 = $bx - $bw / 2.0;
+    $b_y1 = $by - $bh / 2.0;
+    $b_x2 = $bx + $bw / 2.0;
+    $b_y2 = $by + $bh / 2.0;
+
+    $ix1 = max($a_x1, $b_x1);
+    $iy1 = max($a_y1, $b_y1);
+    $ix2 = min($a_x2, $b_x2);
+    $iy2 = min($a_y2, $b_y2);
+    $iw = max(0.0, $ix2 - $ix1);
+    $ih = max(0.0, $iy2 - $iy1);
+    $inter = $iw * $ih;
+    $areaA = max(0.0, $a_x2 - $a_x1) * max(0.0, $a_y2 - $a_y1);
+    $areaB = max(0.0, $b_x2 - $b_x1) * max(0.0, $b_y2 - $b_y1);
+    $union = $areaA + $areaB - $inter;
+    return ($union > 1e-9) ? ($inter / $union) : 0.0;
+}
+
+function roboflowPredictionConfidence(array $p) {
+    if (isset($p['confidence'])) {
+        return floatval($p['confidence']);
+    }
+    if (isset($p['confidence_score'])) {
+        return floatval($p['confidence_score']);
+    }
+    if (isset($p['score'])) {
+        return floatval($p['score']);
+    }
+    if (isset($p['prob'])) {
+        return floatval($p['prob']);
+    }
+    return 0.0;
+}
+
+/**
+ * Merge duplicate boxes from multi-scale inference (keep higher confidence).
+ */
+function roboflowMergeOverlappingDetections(array $predictions, $iouThreshold = 0.55) {
+    if (count($predictions) < 2) {
+        return $predictions;
+    }
+    usort($predictions, function ($x, $y) {
+        return roboflowPredictionConfidence($y) <=> roboflowPredictionConfidence($x);
+    });
+    $kept = [];
+    foreach ($predictions as $p) {
+        $duplicate = false;
+        foreach ($kept as $k) {
+            if (roboflowDetectionBoxIoU($p, $k) >= $iouThreshold) {
+                $duplicate = true;
+                break;
+            }
+        }
+        if (!$duplicate) {
+            $kept[] = $p;
+        }
+    }
+    return $kept;
+}
+
+function roboflowExtractPredictionsArrayFromApiData($data) {
+    if (!is_array($data)) {
+        return [];
+    }
+    if (isset($data['predictions']) && is_array($data['predictions'])) {
+        return $data['predictions'];
+    }
+    if (isset($data['detections']) && is_array($data['detections'])) {
+        return $data['detections'];
+    }
+    if (isset($data['results']) && is_array($data['results'])) {
+        return $data['results'];
+    }
+    if (isset($data['data']) && is_array($data['data'])) {
+        return $data['data'];
+    }
+    if (isset($data['objects']) && is_array($data['objects'])) {
+        return $data['objects'];
+    }
+    if (isset($data[0]) && is_array($data)) {
+        return $data;
+    }
+    return [];
+}
+
+/**
+ * Hosted serverless infer: raw base64 in POST body.
+ * @return array [httpCode, responseBody, curlError]
+ */
+function roboflowDigitModelServerlessInfer($imageBinary, $modelId) {
+    $inferenceUrl = 'https://serverless.roboflow.com/' . $modelId . '?api_key=' . ROBOFLOW_API_KEY;
+    $base64Image = base64_encode($imageBinary);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $inferenceUrl);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    return [$httpCode, $response, $error];
+}
+
+/**
  * Detect digits (0-9) in image using Roboflow API
  * @param string $imagePath Full path to image file
  * @return array ['success' => bool, 'digits' => array, 'message' => string]
@@ -404,297 +584,95 @@ function detectDigitsWithRoboflow($imagePath, $modelId = null) {
         }
         
         error_log("Roboflow Digit Detection: Image dimensions: " . $imageInfo[0] . "x" . $imageInfo[1] . ", type: " . $imageInfo['mime']);
-        
-        // Prepare image data - encode to base64 for POST body
-        // Method: base64 YOUR_IMAGE.jpg | curl -d @- (sends base64 data in POST body)
-        $imageData = file_get_contents($imagePath);
-        if (!$imageData) {
-            return [
-                'success' => false,
-                'digits' => [],
-                'message' => 'Failed to read image file'
-            ];
+
+        $upscaledPath = roboflowCreateUpscaledImageForDigitInference($imagePath);
+        $inferencePaths = [];
+        if ($upscaledPath && file_exists($upscaledPath)) {
+            $inferencePaths[] = $upscaledPath;
         }
-        
-        // Try multiple methods to send image to Roboflow API
-        // Method 1: Base64 in POST body (original method)
-        // Method 2: Multipart form-data with file
-        // Method 3: Base64 with different content type
-        
-        $response = null;
-        $httpCode = 0;
-        $error = '';
-        $methodUsed = '';
-        
-        // METHOD 1: Try base64 in POST body (matching cURL: base64 IMAGE | curl -d @-)
-        // This is the EXACT format from Roboflow cURL example
-        error_log("Roboflow Digit Detection: Trying Method 1 - Base64 POST body (matching cURL format)");
-        $base64Image = base64_encode($imageData);
-        error_log("Roboflow Digit Detection: Base64 encoded size: " . round(strlen($base64Image) / 1024, 2) . " KB");
-        error_log("Roboflow Digit Detection: API URL: " . $inferenceUrl);
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $inferenceUrl);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $base64Image); // Send raw base64 data (matching: curl -d @-)
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        // Don't set Content-Type header - let cURL handle it (matching cURL behavior)
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Shorter timeout to avoid long blocking
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Shorter connect timeout
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // Force HTTP/1.1
-        
-        error_log("Roboflow Digit Detection: Sending request to: " . $inferenceUrl);
-        $startTime = microtime(true);
-        $response = curl_exec($ch);
-        $elapsedTime = microtime(true) - $startTime;
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        $curlInfo = curl_getinfo($ch);
-        curl_close($ch);
-        
-        error_log("Roboflow Digit Detection: Method 1 Response - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None') . ", Size: " . strlen($response ?? '') . " bytes");
-        
-        // If request failed, log the issue (but don't fail on slow responses)
-        if ($error || $httpCode !== 200) {
-            error_log("⚠ Roboflow request failed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s, Error: " . ($error ?: 'None'));
-        } else {
-            error_log("✓ Roboflow request completed - HTTP: $httpCode, Time: " . round($elapsedTime, 2) . "s");
-        }
-        
-        // Check if Method 1 returned valid predictions
-        $method1Success = false;
-        // Process if we got a valid response (removed time limit - API can be slow but still work)
-        if ($httpCode === 200 && !$error && !empty($response)) {
-            error_log("Roboflow Digit Detection: Method 1 - HTTP 200, response length: " . strlen($response));
-            $testData = json_decode($response, true);
-            
-            if ($testData) {
-                error_log("Roboflow Digit Detection: Method 1 - JSON decoded successfully");
-                error_log("Roboflow Digit Detection: Method 1 - Response keys: " . implode(', ', array_keys($testData)));
-                error_log("Roboflow Digit Detection: Method 1 - Full response: " . json_encode($testData, JSON_PRETTY_PRINT));
-                
-                // Check multiple possible response formats
-                $hasPredictions = false;
-                $predictionCount = 0;
-                
-                if (isset($testData['predictions']) && is_array($testData['predictions'])) {
-                    $hasPredictions = true;
-                    $predictionCount = count($testData['predictions']);
-                    error_log("Roboflow Digit Detection: Method 1 - Found 'predictions' array with $predictionCount items");
-                } elseif (isset($testData['detections']) && is_array($testData['detections'])) {
-                    $hasPredictions = true;
-                    $predictionCount = count($testData['detections']);
-                    error_log("Roboflow Digit Detection: Method 1 - Found 'detections' array with $predictionCount items");
-                } elseif (isset($testData['results']) && is_array($testData['results'])) {
-                    $hasPredictions = true;
-                    $predictionCount = count($testData['results']);
-                    error_log("Roboflow Digit Detection: Method 1 - Found 'results' array with $predictionCount items");
-                } else {
-                    error_log("Roboflow Digit Detection: Method 1 - No predictions/detections/results found. Full response structure:");
-                    error_log(json_encode($testData, JSON_PRETTY_PRINT));
-                }
-                
-                if ($hasPredictions && $predictionCount > 0) {
-                    $method1Success = true;
-                    $methodUsed = 'base64-form';
-                    error_log("✓ Roboflow Digit Detection: Method 1 (base64-form) succeeded with $predictionCount predictions");
-                } else {
-                    error_log("✗ Roboflow Digit Detection: Method 1 returned HTTP 200 but no predictions found. Response keys: " . implode(', ', array_keys($testData)));
-                }
-            } else {
-                $jsonError = json_last_error_msg();
-                error_log("✗ Roboflow Digit Detection: Method 1 returned HTTP 200 but JSON decode failed: $jsonError");
-                error_log("✗ Roboflow Digit Detection: Method 1 - Raw response: " . substr($response, 0, 1000));
+        $inferencePaths[] = $imagePath;
+        $inferencePaths = array_values(array_unique(array_filter($inferencePaths)));
+
+        $mergedRawPredictions = [];
+        $anyHttp200 = false;
+        $lastHttpCode = 0;
+        $lastCurlError = '';
+        $lastResponseBody = '';
+
+        foreach ($inferencePaths as $inferPath) {
+            $imageData = @file_get_contents($inferPath);
+            if ($imageData === false || $imageData === '') {
+                continue;
             }
-        } else {
-            error_log("✗ Roboflow Digit Detection: Method 1 failed - HTTP Code: $httpCode, Error: $error, Response length: " . strlen($response ?? ''));
-        }
-        
-        // Skip additional upload methods to avoid long retry chains
-        
-        error_log("=== ROBOFLOW DIGIT DETECTION SUMMARY ===");
-        error_log("Final method used: $methodUsed");
-        error_log("HTTP Code: $httpCode");
-        error_log("API URL: " . $inferenceUrl);
-        error_log("Model ID: " . $modelId);
-        error_log("Response length: " . strlen($response ?? '') . " bytes");
-        error_log("Has cURL error: " . ($error ? 'Yes - ' . $error : 'No'));
-        error_log("Response preview: " . substr($response ?? '', 0, 1000));
-        error_log("==========================================");
-        
-        if ($error) {
-            error_log("Roboflow Digit Detection: cURL Error: $error");
-            return [
-                'success' => false,
-                'digits' => [],
-                'message' => 'Roboflow API error: ' . $error
-            ];
-        }
-        
-        if ($httpCode !== 200) {
-            $errorMsg = 'Roboflow Digit Detection API error: HTTP ' . $httpCode;
-            if ($httpCode === 401) {
-                $errorMsg .= ' - Unauthorized. Check your API key in roboflow_service.php';
-            } elseif ($httpCode === 404) {
-                $errorMsg .= ' - Not found. Model version 7 may not be deployed. Check Roboflow dashboard and deploy the model.';
-                $errorMsg .= ' If version 2 works, you may need to deploy version 7 in Roboflow.';
-            } elseif ($httpCode === 405) {
-                $errorMsg .= ' - Method Not Allowed. The digit detection model version 7 may not be deployed yet.';
-                $errorMsg .= ' Please deploy your model version 7 in Roboflow dashboard.';
-            } else {
-                $errorMsg .= ' - Response: ' . substr($response, 0, 500);
+            list($httpCode, $response, $curlErr) = roboflowDigitModelServerlessInfer($imageData, $modelId);
+            $lastHttpCode = (int) $httpCode;
+            $lastCurlError = $curlErr ? (string) $curlErr : '';
+            $lastResponseBody = is_string($response) ? $response : '';
+            if ($lastCurlError !== '' || $lastHttpCode !== 200 || $lastResponseBody === '') {
+                error_log('Roboflow digit pass ' . basename($inferPath) . ': HTTP ' . $lastHttpCode . ' err=' . ($lastCurlError ?: '-'));
+                continue;
             }
-            error_log('✗ Roboflow Digit Detection API HTTP Error: ' . $errorMsg);
-            error_log('✗ API URL: ' . $inferenceUrl);
-            error_log('✗ Model ID: ' . $modelId);
-            error_log('✗ Full API Response: ' . substr($response, 0, 1000));
-            return [
-                'success' => false,
-                'digits' => [],
-                'message' => $errorMsg
-            ];
+            $anyHttp200 = true;
+            $decoded = json_decode($lastResponseBody, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            $batch = roboflowExtractPredictionsArrayFromApiData($decoded);
+            foreach ($batch as $pr) {
+                $mergedRawPredictions[] = $pr;
+            }
+            error_log('Roboflow digit pass ' . basename($inferPath) . ': raw detections=' . count($batch));
         }
-        
-        // Log raw response for debugging
-        error_log("Roboflow Digit Detection: Raw API Response (first 2000 chars): " . substr($response ?? '', 0, 2000));
-        error_log("Roboflow Digit Detection: Full response length: " . strlen($response ?? '') . " bytes");
-        
-        // Check if response is completely empty
-        if (empty($response) || trim($response) === '') {
-            error_log('✗ Roboflow Digit Detection: API returned EMPTY response');
-            error_log('   HTTP Code: ' . $httpCode);
-            error_log('   cURL Error: ' . ($error ?: 'None'));
-            error_log('   This usually means the model is not deployed or the endpoint is wrong');
-            return [
-                'success' => false,
-                'digits' => [],
-                'message' => 'Roboflow API returned empty response. HTTP Code: ' . $httpCode . '. Check if model version 7 is deployed for "Hosted Image Inference" in Roboflow dashboard.'
-            ];
+
+        if ($upscaledPath && $upscaledPath !== $imagePath && file_exists($upscaledPath)) {
+            @unlink($upscaledPath);
         }
-        
-        $data = json_decode($response, true);
-        
-        if (!$data) {
-            $jsonError = json_last_error_msg();
-            error_log('✗ Roboflow Digit Detection: JSON decode failed: ' . $jsonError);
-            error_log('✗ Roboflow Digit Detection: Response type: ' . gettype($response));
-            error_log('✗ Roboflow Digit Detection: Full response (first 2000 chars): ' . substr($response, 0, 2000));
-            
-            // Check if it's HTML (error page) or other non-JSON
-            if (stripos($response, '<html') !== false || stripos($response, '<!DOCTYPE') !== false) {
-                error_log('⚠ Response appears to be HTML (error page), not JSON');
+
+        if (!$anyHttp200) {
+            if ($lastCurlError !== '') {
                 return [
                     'success' => false,
                     'digits' => [],
-                    'message' => 'Roboflow API returned HTML instead of JSON. This usually means the endpoint is wrong or the model is not deployed. Check: ' . $inferenceUrl
+                    'message' => 'Roboflow API error: ' . $lastCurlError,
                 ];
             }
-            
+            $errorMsg = 'Roboflow Digit Detection API error: HTTP ' . $lastHttpCode;
+            if ($lastHttpCode === 401) {
+                $errorMsg .= ' - Unauthorized. Check your API key in roboflow_service.php';
+            } elseif ($lastHttpCode === 404) {
+                $errorMsg .= ' - Not found. Deploy the digit model for Hosted Image Inference.';
+            } elseif ($lastHttpCode === 405) {
+                $errorMsg .= ' - Method Not Allowed. Deploy the digit model in Roboflow.';
+            } else {
+                $errorMsg .= ' - ' . substr($lastResponseBody, 0, 500);
+            }
             return [
                 'success' => false,
                 'digits' => [],
-                'message' => 'Invalid JSON response from Roboflow API: ' . $jsonError . '. Response preview: ' . substr($response, 0, 200)
+                'message' => $errorMsg,
             ];
         }
-        
-        // Log full API response structure
-        error_log("=== ROBOFLOW API RESPONSE STRUCTURE ===");
-        error_log(json_encode($data, JSON_PRETTY_PRINT));
-        error_log("========================================");
-        
-        // Check if response is empty object/array
-        if (empty($data) || (is_array($data) && count($data) === 0)) {
-            error_log('⚠ WARNING: API returned empty data structure');
-            error_log('   Response type: ' . gettype($data));
-            error_log('   Is array: ' . (is_array($data) ? 'Yes' : 'No'));
-            error_log('   Array count: ' . (is_array($data) ? count($data) : 'N/A'));
-            error_log('   This usually means:');
-            error_log('   1. Version 7 is NOT deployed for "Hosted Image Inference"');
-            error_log('   2. You need to go to Roboflow → Deploy → "Hosted Image Inference" → Click "View Code"');
-            error_log('   3. The model may only be deployed for "Embedded Device" (not for API calls)');
-            error_log('   4. Check if version 7 shows a cURL example in "Hosted Image Inference" section');
+
+        $beforeMerge = count($mergedRawPredictions);
+        $mergedRawPredictions = roboflowMergeOverlappingDetections($mergedRawPredictions, 0.55);
+        error_log('Roboflow digit multi-scale merge: ' . $beforeMerge . ' -> ' . count($mergedRawPredictions) . ' boxes');
+
+        $response = $lastResponseBody;
+        $httpCode = $lastHttpCode;
+        $error = $lastCurlError;
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            $data = ['predictions' => $mergedRawPredictions];
         }
-        
-        // Parse digit detections - check multiple possible response formats
-        $predictions = [];
-        $predictionsFound = false;
-        
-        if (isset($data['predictions']) && is_array($data['predictions'])) {
-            $predictions = $data['predictions'];
-            $predictionsFound = true;
-            error_log("✓ Found 'predictions' array with " . count($predictions) . " items");
-        } elseif (isset($data['detections']) && is_array($data['detections'])) {
-            $predictions = $data['detections'];
-            $predictionsFound = true;
-            error_log("✓ Found 'detections' array with " . count($predictions) . " items");
-        } elseif (isset($data['results']) && is_array($data['results'])) {
-            $predictions = $data['results'];
-            $predictionsFound = true;
-            error_log("✓ Found 'results' array with " . count($predictions) . " items");
-        } elseif (isset($data['data']) && is_array($data['data'])) {
-            // Some APIs wrap predictions in 'data' key
-            $predictions = $data['data'];
-            $predictionsFound = true;
-            error_log("✓ Found 'data' array with " . count($predictions) . " items");
-        } elseif (isset($data['objects']) && is_array($data['objects'])) {
-            // Some APIs use 'objects' key
-            $predictions = $data['objects'];
-            $predictionsFound = true;
-            error_log("✓ Found 'objects' array with " . count($predictions) . " items");
-        } else {
-            // Check if response is directly an array
-            if (is_array($data) && isset($data[0])) {
-                $predictions = $data;
-                $predictionsFound = true;
-                error_log("✓ Response is directly an array with " . count($predictions) . " items");
-            }
-        }
-        
-        // CRITICAL: If predictions array exists but is empty, this means the model ran but detected nothing
-        if ($predictionsFound && count($predictions) === 0) {
-            error_log("⚠⚠⚠ CRITICAL: API returned predictions array but it's EMPTY (no detections) ⚠⚠⚠");
-            error_log("   This means:");
-            error_log("   1. The API call succeeded (HTTP 200)");
-            error_log("   2. The model is deployed and accessible");
-            error_log("   3. BUT the model detected NO digits in the image");
-            error_log("   Possible reasons:");
-            error_log("   - Image quality is too poor");
-            error_log("   - Image is too small or cropped incorrectly");
-            error_log("   - Digits are not visible or too blurry");
-            error_log("   - Model confidence threshold is too high (but we're using 0.05)");
-            error_log("   - Model version 7 might need retraining or different preprocessing");
-            error_log("   Full API response: " . json_encode($data, JSON_PRETTY_PRINT));
-        }
-        
-        error_log('Roboflow Digit Detection API response keys: ' . implode(', ', array_keys($data)));
-        error_log('Roboflow Digit Detection API full response (first 2000 chars): ' . substr(json_encode($data), 0, 2000));
-        error_log('Number of digit predictions found: ' . count($predictions));
-        
-        // If no predictions found, log the full response structure for debugging
+        $data['predictions'] = $mergedRawPredictions;
+        $predictions = $mergedRawPredictions;
+
+        error_log('Roboflow Digit Detection merged predictions: ' . count($predictions));
+
         if (count($predictions) === 0) {
-            error_log('⚠ Roboflow Digit Detection: No predictions array found. Full response structure:');
-            error_log('   Response type: ' . gettype($data));
-            if (is_array($data)) {
-                error_log('   Top-level keys: ' . implode(', ', array_keys($data)));
-                foreach ($data as $key => $value) {
-                    if (is_array($value)) {
-                        error_log("   Key '$key' is array with " . count($value) . " items");
-                        if (count($value) > 0 && isset($value[0])) {
-                            error_log("   First item keys: " . implode(', ', array_keys($value[0])));
-                        }
-                    } else {
-                        error_log("   Key '$key' = " . (is_string($value) ? substr($value, 0, 100) : gettype($value)));
-                    }
-                }
-            }
+            error_log('⚠ Roboflow Digit Detection: merged multi-scale pass returned no digit boxes (check crop, image size, or model).');
         }
-        
-        if (count($predictions) === 0 && !empty($data)) {
-            error_log('⚠ Roboflow Digit Detection: API returned data but no predictions array found. Response structure: ' . json_encode(array_keys($data)));
-        }
-        
+
         // Extract digits with their positions
         $digits = [];
         foreach ($predictions as $prediction) {
