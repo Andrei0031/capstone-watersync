@@ -649,10 +649,8 @@ if (isset($_GET['debug']) && $_GET['debug'] === '1') {
 
 // Fetch pending readings with billing cycle info
 // Use LEFT JOIN to show readings even if client is missing/inactive
-// Convert upload_date from UTC to Asia/Manila timezone
 $pending_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                 bc.cycle_name, bc.due_date as cycle_due_date,
-                CONVERT_TZ(pmr.upload_date, '+00:00', '+08:00') as upload_date_converted
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -665,12 +663,9 @@ if (!$pending_result) {
 }
 
 // Fetch needs_review readings - suspicious readings that need manual verification
-// Convert timestamps from UTC to Asia/Manila timezone
 $needs_review_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
-                  CONVERT_TZ(pmr.processed_at, '+00:00', '+08:00') as processed_at_converted,
-                  CONVERT_TZ(pmr.upload_date, '+00:00', '+08:00') as upload_date_converted
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -683,12 +678,9 @@ if (!$needs_review_result) {
 }
 
 // Fetch verified readings - ready for billing
-// Convert timestamps from UTC to Asia/Manila timezone
 $verified_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
-                  CONVERT_TZ(pmr.processed_at, '+00:00', '+08:00') as processed_at_converted,
-                  CONVERT_TZ(pmr.upload_date, '+00:00', '+08:00') as upload_date_converted
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -702,14 +694,10 @@ if (!$verified_result) {
 
 // Fetch processed readings - only readings that have bills created
 // Check if bill exists in billing_list table
-// Convert timestamps from UTC to Asia/Manila timezone
 $processed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                   bc.cycle_name, bc.due_date as cycle_due_date,
                   COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) as reading_value,
                   bl.id as bill_id,
-                  CONVERT_TZ(pmr.processed_at, '+00:00', '+08:00') as processed_at_converted,
-                  CONVERT_TZ(pmr.processed_date, '+00:00', '+08:00') as processed_date_converted,
-                  CONVERT_TZ(pmr.upload_date, '+00:00', '+08:00') as upload_date_converted
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -726,12 +714,9 @@ if (!$processed_result) {
 
 // Fetch failed readings with billing cycle info
 // Use LEFT JOIN to show readings even if client is missing/inactive
-// Convert timestamps from UTC to Asia/Manila timezone
 $failed_sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as client_status,
                bc.cycle_name, bc.due_date as cycle_due_date,
                pmr.admin_notes as error_message,
-               CONVERT_TZ(pmr.processed_at, '+00:00', '+08:00') as processed_at_converted,
-               CONVERT_TZ(pmr.upload_date, '+00:00', '+08:00') as upload_date_converted
     FROM pending_meter_readings pmr 
     LEFT JOIN client_list cl ON pmr.client_id = cl.id 
     LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
@@ -748,14 +733,9 @@ function pendingFormatDT($dt) {
     if (empty($dt)) return 'N/A';
     
     try {
-        // Create DateTime from the string (already in Manila time from SQL CONVERT_TZ)
+        // Create DateTime from the string using the app's default Manila timezone
         $datetime = new DateTime($dt);
         
-        // Ensure we're working in Asia/Manila timezone
-        $timezone = new DateTimeZone('Asia/Manila');
-        $datetime->setTimezone($timezone);
-        
-        // Format and return - should now show correct Manila time
         return $datetime->format('M d, Y g:i A');
     } catch (Exception $e) {
         error_log("DateTime parsing error: " . $e->getMessage() . " for input: " . $dt);
@@ -1791,7 +1771,7 @@ function pendingFormatDT($dt) {
                                                      data-bs-target="#imageModal"
                                                      data-image="<?php echo htmlspecialchars($row['image_path']); ?>">
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-pending">
                                                     <i class="fas fa-clock"></i>
@@ -1904,7 +1884,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
@@ -2074,7 +2054,7 @@ function pendingFormatDT($dt) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['upload_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-info">
@@ -2216,7 +2196,7 @@ function pendingFormatDT($dt) {
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-processed">
                                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -2328,7 +2308,7 @@ function pendingFormatDT($dt) {
                                                     <span class="text-muted">No error details</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['upload_date_converted'] ?? $row['upload_date'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['upload_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-failed">
                                                     <i class="fas fa-exclamation-circle"></i>
