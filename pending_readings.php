@@ -228,6 +228,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
     ini_set('display_errors', 0); // Don't display, but log
     ini_set('log_errors', 1);
 
+    require_once __DIR__ . '/api/roboflow_service.php';
+    require_once __DIR__ . '/api/ocr_functions.php';
+
     // Helper to process a single reading to avoid long-running requests
     function processPendingReading($conn, $reading_id) {
         $stmt = $conn->prepare("SELECT * FROM pending_meter_readings WHERE id = ? AND status = 'pending'");
@@ -302,128 +305,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
                 $croppedImagePath = $imagePath;
             }
 
-            if (!function_exists('processImageWithRoboflowDigits')) {
-                throw new Exception('Roboflow OCR function not available. Make sure ocr_functions.php and roboflow_service.php are included.');
+            if (!function_exists('processMeterImageWithFallbacks')) {
+                throw new Exception('OCR fallback function not available. Include api/ocr_functions.php.');
             }
 
-            $ocrProcessed = false;
-            $ocrReading = null;
-            $extractedText = '';
-            $ocrError = null;
-            $ocrResult = null;
-
-            // Try cropped image first (if different), then original
-            if ($croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
-                error_log("Attempting OCR on CROPPED image: $croppedImagePath");
-                $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
-                if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                    $ocrReading = $ocrResult['meter_reading'];
-                    $extractedText = $ocrResult['extracted_text'] ?? '';
-                    $ocrProcessed = true;
-                    error_log("✓ OCR SUCCESS (Roboflow on CROPPED): Reading ID $reading_id processed with value: $ocrReading");
-                } else {
-                    $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on cropped image';
-                    error_log("⚠ Roboflow OCR failed on CROPPED image for reading ID $reading_id: $ocrError");
-                }
-            }
-
-            if (!$ocrProcessed && file_exists($imagePath)) {
-                $registerCandidatePaths = [];
-                $candidateSources = array_unique(array_filter([$croppedImagePath, $imagePath]));
-
-                foreach ($candidateSources as $candidateSource) {
-                    if (!file_exists($candidateSource) || !function_exists('createMeterRegisterCropCandidates')) {
-                        continue;
-                    }
-                    $registerCandidatePaths = array_merge($registerCandidatePaths, createMeterRegisterCropCandidates($candidateSource));
-                }
-
-                foreach ($registerCandidatePaths as $candidatePath) {
-                    if (!file_exists($candidatePath)) {
-                        continue;
-                    }
-
-                    error_log("Attempting OCR on REGISTER CROP: $candidatePath");
-                    $ocrResult = processImageWithRoboflowDigits($candidatePath);
-                    if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                        $ocrReading = $ocrResult['meter_reading'];
-                        $extractedText = ($ocrResult['extracted_text'] ?? '') . ' [REGISTER_CROP]';
-                        $ocrProcessed = true;
-                        error_log("✓ OCR SUCCESS (Roboflow on REGISTER CROP): Reading ID $reading_id processed with value: $ocrReading");
-                        break;
-                    }
-
-                    $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on register crop';
-                    error_log("⚠ Roboflow OCR failed on REGISTER CROP for reading ID $reading_id: $ocrError");
-                }
-
-                if (!$ocrProcessed && function_exists('processImageWithTesseract')) {
-                    foreach ($registerCandidatePaths as $candidatePath) {
-                        if (!file_exists($candidatePath)) {
-                            continue;
-                        }
-
-                        error_log("Attempting Tesseract OCR on REGISTER CROP: $candidatePath");
-                        $ocrResult = processImageWithTesseract($candidatePath);
-                        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                            $ocrReading = $ocrResult['meter_reading'];
-                            $extractedText = ($ocrResult['extracted_text'] ?? '') . ' [TESSERACT_REGISTER_CROP]';
-                            $ocrProcessed = true;
-                            error_log("✓ OCR SUCCESS (Tesseract on REGISTER CROP): Reading ID $reading_id processed with value: $ocrReading");
-                            break;
-                        }
-
-                        $ocrError = $ocrResult['error'] ?? 'Tesseract OCR failed on register crop';
-                        error_log("⚠ Tesseract OCR failed on REGISTER CROP for reading ID $reading_id: $ocrError");
-                    }
-                }
-
-                if (function_exists('cleanupOcrCandidateImages')) {
-                    cleanupOcrCandidateImages($registerCandidatePaths);
-                }
-            }
-
-            if (!$ocrProcessed && file_exists($imagePath)) {
-                error_log("Attempting OCR on ORIGINAL image: $imagePath");
-                $ocrResult = processImageWithRoboflowDigits($imagePath);
-                if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                    $ocrReading = $ocrResult['meter_reading'];
-                    $extractedText = $ocrResult['extracted_text'] ?? '';
-                    $ocrProcessed = true;
-                    error_log("✓ OCR SUCCESS (Roboflow on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
-                } else {
-                    $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
-                    error_log("⚠ Roboflow OCR failed on ORIGINAL image for reading ID $reading_id: $ocrError");
-                }
-            }
-
-            if (!$ocrProcessed && function_exists('processImageWithTesseract') && file_exists($imagePath)) {
-                error_log("Attempting Tesseract OCR on ORIGINAL image: $imagePath");
-                $ocrResult = processImageWithTesseract($imagePath);
-                if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                    $ocrReading = $ocrResult['meter_reading'];
-                    $extractedText = ($ocrResult['extracted_text'] ?? '') . ' [TESSERACT_ORIGINAL]';
-                    $ocrProcessed = true;
-                    error_log("✓ OCR SUCCESS (Tesseract on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
-                } else {
-                    $ocrError = $ocrResult['error'] ?? 'Tesseract OCR failed on original image';
-                    error_log("⚠ Tesseract OCR failed on ORIGINAL image for reading ID $reading_id: $ocrError");
-                }
-            }
-
-            if (!$ocrProcessed) {
-                $errorMsg = 'OCR processing failed. ' . ($ocrError ?: 'Digit detection failed to process the image.');
-                $errorMsg .= ' Image path: ' . $croppedImagePath;
+            $ocrResult = processMeterImageWithFallbacks($imagePath, $croppedImagePath);
+            if (!$ocrResult['success'] || empty($ocrResult['meter_reading'])) {
+                $ocrError = $ocrResult['error'] ?? 'OCR failed';
+                $errorMsg = 'OCR processing failed. ' . $ocrError . ' Image path: ' . $croppedImagePath;
                 throw new Exception($errorMsg);
             }
 
+            $ocrReading = $ocrResult['meter_reading'];
+            $extractedText = $ocrResult['extracted_text'] ?? '';
+
             $statusToSet = 'needs_review';
-            $digitStats = $ocrResult['digit_stats'] ?? null;
-            if ($digitStats) {
-                $digitCount = (int)($digitStats['count'] ?? 0);
-                $minConf   = (float)($digitStats['min_confidence'] ?? 0.0);
-                if ($digitCount >= 5 && $minConf >= 0.5) {
-                    $statusToSet = 'verified';
+            if (empty($ocrResult['requires_review'])) {
+                $digitStats = $ocrResult['digit_stats'] ?? null;
+                if ($digitStats) {
+                    $digitCount = (int) ($digitStats['count'] ?? 0);
+                    $minConf = (float) ($digitStats['min_confidence'] ?? 0.0);
+                    if ($digitCount >= 5 && $minConf >= 0.5) {
+                        $statusToSet = 'verified';
+                    }
                 }
             }
 
@@ -505,10 +409,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
     
     // Update status enum if needed - add needs_review and verified statuses
     $conn->query("ALTER TABLE pending_meter_readings MODIFY COLUMN status ENUM('pending', 'needs_review', 'verified', 'processed', 'failed') DEFAULT 'pending'");
-    
-    // Include Roboflow service and OCR functions
-    require_once __DIR__ . '/api/roboflow_service.php';
-    require_once __DIR__ . '/api/ocr_functions.php';
     
     $selected_ids = $_POST['selected_readings'] ?? [];
     $processed_count = 0;

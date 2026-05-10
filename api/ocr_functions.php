@@ -293,15 +293,163 @@ function processImageWithOcrSpace($imagePath) {
     }
 }
 
+/**
+ * Base URL for the local PaddleOCR microservice (see paddle_ocr_service/).
+ * Override with env PADDLE_OCR_SERVICE_URL, e.g. http://127.0.0.1:8765
+ */
+function getPaddleOcrServiceBaseUrl() {
+    $url = getenv('PADDLE_OCR_SERVICE_URL');
+    if ($url !== false && trim($url) !== '') {
+        return rtrim(trim($url), '/');
+    }
+    return 'http://127.0.0.1:8765';
+}
+
+/**
+ * Call PaddleOCR (+ EasyOCR fallback) service; returns same shape as other OCR helpers.
+ */
+function processImageWithPaddleOcrService($imagePath) {
+    if (!file_exists($imagePath)) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Image file not found: ' . $imagePath,
+        ];
+    }
+
+    if (!function_exists('curl_init')) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'PHP cURL extension is required for Paddle OCR service',
+        ];
+    }
+
+    $base = getPaddleOcrServiceBaseUrl();
+    $endpoint = $base . '/meter-ocr';
+    $apiKey = getenv('PADDLE_OCR_SERVICE_API_KEY');
+    $apiKey = ($apiKey !== false && trim($apiKey) !== '') ? trim($apiKey) : '';
+
+    $ext = strtolower(pathinfo($imagePath, PATHINFO_EXTENSION));
+    if ($ext === 'png') {
+        $mime = 'image/png';
+    } elseif ($ext === 'gif') {
+        $mime = 'image/gif';
+    } else {
+        $mime = 'image/jpeg';
+    }
+
+    $post = ['file' => new CURLFile($imagePath, $mime, basename($imagePath))];
+
+    $ch = curl_init($endpoint);
+    $headers = [];
+    if ($apiKey !== '') {
+        $headers[] = 'X-OCR-Key: ' . $apiKey;
+    }
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Paddle OCR service connection error: ' . $curlError . ' (' . $endpoint . ')',
+        ];
+    }
+
+    if ($httpCode !== 200 || !$response) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Paddle OCR service HTTP ' . $httpCode . ' at ' . $endpoint . ': ' . substr((string) $response, 0, 200),
+        ];
+    }
+
+    $data = json_decode($response, true);
+    if (!is_array($data)) {
+        return [
+            'success' => false,
+            'extracted_text' => '',
+            'meter_reading' => null,
+            'error' => 'Paddle OCR service returned invalid JSON',
+        ];
+    }
+
+    if (empty($data['success'])) {
+        return [
+            'success' => false,
+            'extracted_text' => $data['raw_text'] ?? '',
+            'meter_reading' => null,
+            'error' => $data['error'] ?? 'Paddle OCR service failed',
+        ];
+    }
+
+    $rawText = isset($data['raw_text']) ? trim((string) $data['raw_text']) : '';
+    $meterReading = extractMeterReadingFromText($rawText);
+    if (!$meterReading && !empty($data['meter_reading'])) {
+        $meterReading = preg_match('/^\d{5}$/', (string) $data['meter_reading'])
+            ? (string) $data['meter_reading']
+            : extractMeterReadingFromText((string) $data['meter_reading']);
+    }
+
+    if (!$meterReading) {
+        return [
+            'success' => false,
+            'extracted_text' => $rawText,
+            'meter_reading' => null,
+            'error' => 'Paddle OCR could not derive a 5-digit reading. raw_text: ' . substr($rawText, 0, 120),
+        ];
+    }
+
+    $minConf = isset($data['min_confidence']) ? (float) $data['min_confidence'] : 0.0;
+    $avgConf = isset($data['avg_confidence']) ? (float) $data['avg_confidence'] : 0.0;
+    $needsReview = !empty($data['needs_review']) || !empty($data['disagreement']) || $meterReading === '00000';
+    if ($needsReview) {
+        $minConf = min($minConf, 0.0);
+    }
+
+    $engine = isset($data['engine']) ? (string) $data['engine'] : 'paddle';
+    $pass = isset($data['preprocess_pass']) ? (string) $data['preprocess_pass'] : '';
+    $extractedText = $rawText . ' [PADDLE_SERVICE engine=' . $engine . ' pass=' . $pass
+        . ' min_conf=' . round($minConf, 3) . ' easyocr=' . (!empty($data['easyocr_used']) ? '1' : '0') . ']';
+
+    return [
+        'success' => true,
+        'extracted_text' => $extractedText,
+        'meter_reading' => $meterReading,
+        'digit_stats' => [
+            'count' => 5,
+            'min_confidence' => $minConf,
+            'avg_confidence' => $avgConf,
+        ],
+        'requires_review' => $needsReview,
+        'paddle_service_response' => $data,
+    ];
+}
+
 function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
     $attempts = [];
     $lastError = null;
     $roboflowError = null;
     $ocrSpaceError = null;
+    $paddleError = null;
     $tesseractError = null;
     $candidatePaths = [];
 
-    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$tesseractError) {
+    $tryOcr = function ($path, $method, $label) use (&$attempts, &$lastError, &$roboflowError, &$ocrSpaceError, &$paddleError, &$tesseractError) {
         if (!$path || !file_exists($path)) {
             return null;
         }
@@ -313,6 +461,8 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             $result = processImageWithRoboflowDigits($path);
         } elseif ($method === 'OCRSpace') {
             $result = processImageWithOcrSpace($path);
+        } elseif ($method === 'PaddleService') {
+            $result = processImageWithPaddleOcrService($path);
         } else {
             $result = processImageWithTesseract($path);
         }
@@ -332,6 +482,9 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         } elseif ($method === 'OCRSpace') {
             $ocrSpaceError = $error;
             $lastError = $error;
+        } elseif ($method === 'PaddleService') {
+            $paddleError = $error;
+            $lastError = $error;
         } else {
             $tesseractError = $error;
             if ($lastError === null) {
@@ -344,6 +497,11 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
 
     try {
         if ($croppedImagePath && $croppedImagePath !== $imagePath) {
+            $result = $tryOcr($croppedImagePath, 'PaddleService', 'roboflow_crop');
+            if ($result) {
+                return $result;
+            }
+
             $result = $tryOcr($croppedImagePath, 'OCRSpace', 'roboflow_crop');
             if ($result) {
                 return $result;
@@ -359,6 +517,13 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
         foreach ($candidateSources as $sourcePath) {
             if ($sourcePath && file_exists($sourcePath)) {
                 $candidatePaths = array_merge($candidatePaths, createMeterRegisterCropCandidates($sourcePath));
+            }
+        }
+
+        foreach ($candidatePaths as $candidatePath) {
+            $result = $tryOcr($candidatePath, 'PaddleService', 'register_crop');
+            if ($result) {
+                return $result;
             }
         }
 
@@ -383,7 +548,7 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             }
         }
 
-        $result = $tryOcr($imagePath, 'Roboflow', 'original');
+        $result = $tryOcr($imagePath, 'PaddleService', 'original');
         if ($result) {
             return $result;
         }
@@ -393,12 +558,17 @@ function processMeterImageWithFallbacks($imagePath, $croppedImagePath = null) {
             return $result;
         }
 
+        $result = $tryOcr($imagePath, 'Roboflow', 'original');
+        if ($result) {
+            return $result;
+        }
+
         $result = $tryOcr($imagePath, 'Tesseract', 'original');
         if ($result) {
             return $result;
         }
 
-        $finalError = $ocrSpaceError ?: $roboflowError ?: $lastError ?: 'No OCR result.';
+        $finalError = $paddleError ?: $ocrSpaceError ?: $roboflowError ?: $lastError ?: 'No OCR result.';
         if ($tesseractError && stripos($tesseractError, 'not installed') === false) {
             $finalError .= ' Optional Tesseract fallback also failed: ' . $tesseractError;
         }

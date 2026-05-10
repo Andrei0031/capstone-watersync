@@ -113,12 +113,14 @@ function processPendingReading($conn, $reading_id) {
         }
 
         $statusToSet = 'needs_review';
-        $digitStats = $ocrResult['digit_stats'] ?? null;
-        if ($digitStats) {
-            $digitCount = (int)($digitStats['count'] ?? 0);
-            $minConf = (float)($digitStats['min_confidence'] ?? 0.0);
-            if ($digitCount >= 5 && $minConf >= 0.5) {
-                $statusToSet = 'verified';
+        if (empty($ocrResult['requires_review'])) {
+            $digitStats = $ocrResult['digit_stats'] ?? null;
+            if ($digitStats) {
+                $digitCount = (int) ($digitStats['count'] ?? 0);
+                $minConf = (float) ($digitStats['min_confidence'] ?? 0.0);
+                if ($digitCount >= 5 && $minConf >= 0.5) {
+                    $statusToSet = 'verified';
+                }
             }
         }
 
