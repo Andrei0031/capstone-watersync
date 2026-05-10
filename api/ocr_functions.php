@@ -259,18 +259,16 @@ function extractMeterReadingFromText($text) {
     
     // Also try extracting digits from the original text (before normalization)
     $originalDigits = preg_replace('/\D/', '', $text);
-    
-    // Combine both approaches
-    $combinedDigits = $allDigits . $originalDigits;
-    
-    // If we found digits, try to extract 5-digit reading
-    if (!empty($combinedDigits)) {
-        // Look for 5 consecutive digits
-        if (preg_match('/(\d{5})/', $combinedDigits, $matches)) {
+
+    // Do not concatenate digit blobs; that creates fake long strings and wrong first \d{5} matches.
+    foreach (array_unique([$allDigits, $originalDigits]) as $digitBlob) {
+        if ($digitBlob === '' || $digitBlob === null) {
+            continue;
+        }
+        if (preg_match('/(\d{5})/', $digitBlob, $matches)) {
             return $matches[1];
         }
-        // Look for 4-6 digits and normalize
-        if (preg_match('/(\d{4,6})/', $combinedDigits, $matches)) {
+        if (preg_match('/(\d{4,6})/', $digitBlob, $matches)) {
             $reading = $matches[1];
             if (strlen($reading) == 4) {
                 $reading = '0' . $reading;

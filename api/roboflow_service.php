@@ -904,12 +904,106 @@ function detectDigitsWithRoboflow($imagePath) {
 }
 
 /**
+ * Pick the best contiguous sequence of 5 digits along X (register windows are evenly spaced).
+ * For 4 detections, left-pad to 5. For 6+, choose the window with lowest gap variance.
+ *
+ * @param array $rowDigits Digit entries sorted left-to-right by x
+ * @return string|null
+ */
+function selectRegisterReadingFromRowDigits(array $rowDigits) {
+    $n = count($rowDigits);
+    if ($n < 4) {
+        return null;
+    }
+
+    if ($n === 4) {
+        $s = implode('', array_map(function ($d) {
+            return strval($d['digit'] ?? '');
+        }, $rowDigits));
+        if (!preg_match('/^\d{4}$/', $s)) {
+            return null;
+        }
+        return str_pad($s, 5, '0', STR_PAD_LEFT);
+    }
+
+    if ($n === 5) {
+        $s = implode('', array_map(function ($d) {
+            return strval($d['digit'] ?? '');
+        }, $rowDigits));
+        return preg_match('/^\d{5}$/', $s) ? $s : null;
+    }
+
+    $bestStart = 0;
+    $bestVar = null;
+    $bestConfSum = -1.0;
+    $bestHSum = -1.0;
+
+    for ($start = 0; $start <= $n - 5; $start++) {
+        $win = array_slice($rowDigits, $start, 5);
+        $xs = array_map(function ($d) {
+            return floatval($d['x'] ?? 0);
+        }, $win);
+        $gaps = [];
+        for ($i = 0; $i < 4; $i++) {
+            $gaps[] = max(0.0, $xs[$i + 1] - $xs[$i]);
+        }
+        $mean = array_sum($gaps) / 4.0;
+        $var = 0.0;
+        foreach ($gaps as $g) {
+            $d = $g - $mean;
+            $var += $d * $d;
+        }
+        $var /= 4.0;
+
+        $confSum = 0.0;
+        foreach ($win as $d) {
+            $confSum += floatval($d['confidence'] ?? 0);
+        }
+        $hSum = 0.0;
+        foreach ($win as $d) {
+            $hSum += floatval($d['height'] ?? 0);
+        }
+
+        // Lower variance is better; tie-break: higher confidence, then taller boxes, then more leftward window
+        $pick = false;
+        if ($bestVar === null) {
+            $pick = true;
+        } elseif ($var < $bestVar - 1e-9) {
+            $pick = true;
+        } elseif (abs($var - $bestVar) <= 1e-9) {
+            if ($confSum > $bestConfSum + 1e-9) {
+                $pick = true;
+            } elseif (abs($confSum - $bestConfSum) <= 1e-9) {
+                if ($hSum > $bestHSum + 1e-9) {
+                    $pick = true;
+                } elseif (abs($hSum - $bestHSum) <= 1e-9 && $start < $bestStart) {
+                    $pick = true;
+                }
+            }
+        }
+        if ($pick) {
+            $bestVar = $var;
+            $bestConfSum = $confSum;
+            $bestHSum = $hSum;
+            $bestStart = $start;
+        }
+    }
+
+    $chosen = array_slice($rowDigits, $bestStart, 5);
+    $s = implode('', array_map(function ($d) {
+        return strval($d['digit'] ?? '');
+    }, $chosen));
+
+    return preg_match('/^\d{5}$/', $s) ? $s : null;
+}
+
+/**
  * Extract 5-digit meter reading from detected digits
  * Improved algorithm that handles:
  * - Multi-row digit displays
  * - Overlapping detections (deduplication)
- * - Better sorting by Y position first, then X position
- * - Confidence filtering
+ * - Adaptive row clustering (median digit height) so small dials are not merged with the register
+ * - Sliding-window selection when more than 5 boxes appear on the register row
  * @param array $digits Array of digit detections from Roboflow
  * @return string|null 5-digit reading or null if not enough digits
  */
@@ -990,120 +1084,82 @@ function extractMeterReadingFromDigits($digits) {
         error_log("   Original digits: " . count($digits) . ", After confidence filter: " . count($filteredDigits));
         return null;
     }
-    
-    // Step 3: Group digits by Y position (to handle multi-row displays)
-    // Calculate average Y position to determine if digits are on same row
-    $yPositions = array_map(function($d) { return floatval($d['y']); }, $deduplicatedDigits);
-    $avgY = array_sum($yPositions) / count($yPositions);
-    $yTolerance = 50; // Pixels - digits within this Y range are considered same row
-    
-    // Group digits into rows
+
+    // Step 3: Adaptive Y clustering: register digits share similar box height; dial digits are usually smaller / different band.
+    $heightsForTol = array_map(function ($d) {
+        return floatval($d['height'] ?? 0);
+    }, $deduplicatedDigits);
+    sort($heightsForTol);
+    $medianH = $heightsForTol[(int) floor(count($heightsForTol) / 2)] ?? 0.0;
+    $yTolerance = max(18.0, min(45.0, $medianH > 0 ? ($medianH * 0.65) : 35.0));
+
     $rows = [];
     foreach ($deduplicatedDigits as $digit) {
         $digitY = floatval($digit['y']);
         $assigned = false;
-        
-        // Try to assign to existing row
         foreach ($rows as $rowIndex => $rowDigits) {
-            $rowAvgY = array_sum(array_map(function($d) { return floatval($d['y']); }, $rowDigits)) / count($rowDigits);
+            $rowAvgY = array_sum(array_map(function ($d) {
+                return floatval($d['y']);
+            }, $rowDigits)) / count($rowDigits);
             if (abs($digitY - $rowAvgY) <= $yTolerance) {
                 $rows[$rowIndex][] = $digit;
                 $assigned = true;
                 break;
             }
         }
-        
-        // Create new row if not assigned
         if (!$assigned) {
             $rows[] = [$digit];
         }
     }
-    
-    // Step 4: Sort rows by Y position (top to bottom), then sort digits within each row by X (left to right)
-    usort($rows, function($a, $b) {
-        $avgYA = array_sum(array_map(function($d) { return floatval($d['y']); }, $a)) / count($a);
-        $avgYB = array_sum(array_map(function($d) { return floatval($d['y']); }, $b)) / count($b);
-        return $avgYA <=> $avgYB;
-    });
-    
-    // Sort digits within each row by X position
+
     foreach ($rows as &$row) {
-        usort($row, function($a, $b) {
-            return floatval($a['x']) <=> floatval($b['x']);
+        usort($row, function ($a, $b) {
+            return floatval($a['x'] ?? 0) <=> floatval($b['x'] ?? 0);
         });
     }
     unset($row);
-    
-    // Step 5: Extract digits from rows (prefer top row, or combine if needed)
-    $digitValues = [];
-    
-    // If we have multiple rows, prefer the row with most digits (likely the reading)
-    if (count($rows) > 1) {
-        // Find row with most digits
-        $bestRow = $rows[0];
-        $maxDigits = count($rows[0]);
-        foreach ($rows as $row) {
-            if (count($row) > $maxDigits) {
-                $maxDigits = count($row);
-                $bestRow = $row;
-            }
+
+    // Step 4: Score rows: prefer a register-like row (about 5 digits, large median height), never merge digits across rows.
+    $scoreRow = function (array $row) {
+        $c = count($row);
+        $hs = array_map(function ($d) {
+            return floatval($d['height'] ?? 0);
+        }, $row);
+        sort($hs);
+        $medianRowH = $hs[(int) floor(count($hs) / 2)] ?? 0.0;
+
+        if ($c === 5) {
+            $tier = 400;
+        } elseif ($c === 4) {
+            $tier = 350;
+        } elseif ($c === 6) {
+            $tier = 330;
+        } elseif ($c >= 7) {
+            $tier = max(200, 300 - ($c - 7) * 15);
+        } else {
+            $tier = 100 + $c * 20;
         }
-        
-        // Use best row
-        foreach ($bestRow as $digit) {
-            $digitValues[] = $digit['digit'];
+
+        return $tier * 10000 + $medianRowH;
+    };
+
+    usort($rows, function ($a, $b) use ($scoreRow) {
+        return $scoreRow($b) <=> $scoreRow($a);
+    });
+
+    $reading = null;
+    foreach ($rows as $row) {
+        if (count($row) < 4) {
+            continue;
         }
-        
-        // If best row doesn't have 5 digits, try to supplement from other rows
-        if (count($digitValues) < 5) {
-            foreach ($rows as $row) {
-                if ($row === $bestRow) continue;
-                foreach ($row as $digit) {
-                    if (count($digitValues) >= 5) break;
-                    $digitValues[] = $digit['digit'];
-                }
-                if (count($digitValues) >= 5) break;
-            }
+        $reading = selectRegisterReadingFromRowDigits($row);
+        if ($reading !== null) {
+            error_log("✓ Extracted meter reading from digits: $reading (row size " . count($row) . ", yTolerance=" . round($yTolerance, 1) . ", from " . count($digits) . " detected / " . count($deduplicatedDigits) . " deduped)");
+            return $reading;
         }
-    } else {
-        // Single row - just extract all digits
-        foreach ($rows[0] as $digit) {
-            $digitValues[] = $digit['digit'];
-        }
-    }
-    
-    if (empty($digitValues)) {
-        error_log("✗ No digit values extracted after processing");
-        return null;
-    }
-    
-    // Step 6: Combine digits into reading
-    $reading = implode('', $digitValues);
-    
-    // Step 7: Normalize to 5 digits
-    $originalLength = strlen($reading);
-    if ($originalLength < 4) {
-        error_log("✗ Reading too short after extraction ($originalLength digit(s)): $reading");
-        return null;
     }
 
-    if ($originalLength === 4) {
-        // Accept one missing leading digit by padding to 5 digits.
-        $reading = str_pad($reading, 5, '0', STR_PAD_LEFT);
-        error_log("⚠ Padded 4-digit reading to 5 digits: $reading");
-    } elseif ($originalLength > 5) {
-        // Take first 5 digits if more than 5 (most likely the reading)
-        $reading = substr($reading, 0, 5);
-        error_log("⚠ Truncated reading from $originalLength to 5 digits: $reading");
-    }
-    
-    // Step 8: Validate it's exactly 5 digits
-    if (strlen($reading) === 5 && preg_match('/^\d{5}$/', $reading)) {
-        error_log("✓ Extracted meter reading from digits: $reading (from " . count($digits) . " detected digits, " . count($deduplicatedDigits) . " after deduplication)");
-        return $reading;
-    }
-    
-    error_log("✗ Failed to extract valid 5-digit reading. Got: '$reading' (length: " . strlen($reading) . ")");
+    error_log("✗ Failed to extract valid 5-digit reading from any row (rows=" . count($rows) . ", yTolerance=" . round($yTolerance, 1) . ")");
     return null;
 }
 
