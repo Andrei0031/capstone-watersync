@@ -666,6 +666,8 @@ function detectDigitsWithRoboflow($imagePath, $modelId = null) {
         }
         $data['predictions'] = $mergedRawPredictions;
         $predictions = $mergedRawPredictions;
+        // Normalized response always includes a predictions array (possibly empty).
+        $predictionsFound = true;
 
         error_log('Roboflow Digit Detection merged predictions: ' . count($predictions));
 
