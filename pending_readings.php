@@ -213,6 +213,174 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
     error_reporting(E_ALL);
     ini_set('display_errors', 0); // Don't display, but log
     ini_set('log_errors', 1);
+
+    // Helper to process a single reading to avoid long-running requests
+    function processPendingReading($conn, $reading_id) {
+        $stmt = $conn->prepare("SELECT * FROM pending_meter_readings WHERE id = ? AND status = 'pending'");
+        $stmt->bind_param("i", $reading_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $reading = $result->fetch_assoc();
+
+        if (!$reading) {
+            return [
+                'success' => false,
+                'status' => 'skipped',
+                'message' => 'Reading not found or not pending.',
+                'reading_id' => $reading_id
+            ];
+        }
+
+        try {
+            // Resolve image path
+            $storedPath = $reading['image_path'];
+            if (strpos($storedPath, '/') !== 0 && strpos($storedPath, '\\') !== 0 && strpos($storedPath, 'C:') !== 0) {
+                $possiblePaths = [
+                    __DIR__ . '/' . $storedPath,
+                    realpath(__DIR__ . '/' . $storedPath),
+                    $storedPath,
+                ];
+                if (strpos($storedPath, '../') === false) {
+                    $possiblePaths[] = __DIR__ . '/../' . $storedPath;
+                }
+            } else {
+                $possiblePaths = [$storedPath, realpath($storedPath)];
+            }
+
+            $imagePath = null;
+            foreach ($possiblePaths as $path) {
+                if ($path && file_exists($path)) {
+                    $imagePath = $path;
+                    break;
+                }
+            }
+
+            if (!$imagePath || !file_exists($imagePath)) {
+                throw new Exception('Image file not found. Tried: ' . implode(', ', $possiblePaths) . '. Stored path: ' . $storedPath);
+            }
+
+            // Step 1: Detect and crop meter region (accuracy path)
+            $croppedImagePath = $imagePath;
+            $roboflowUsed = false;
+            $roboflowError = null;
+
+            try {
+                if (function_exists('detectAndCropMeterWithRoboflow')) {
+                    error_log("Attempting Roboflow detection for reading ID $reading_id, image: $imagePath");
+                    $croppedImagePath = detectAndCropMeterWithRoboflow($imagePath);
+
+                    if ($croppedImagePath !== $imagePath && $croppedImagePath !== null && file_exists($croppedImagePath)) {
+                        $roboflowUsed = true;
+                        error_log("✓ Roboflow SUCCESS: Cropped image for reading ID $reading_id: $croppedImagePath");
+                    } else {
+                        $roboflowError = "Roboflow returned original image path (no crop detected) - will process full image";
+                        error_log("⚠ Roboflow: $roboflowError for reading ID $reading_id");
+                        $croppedImagePath = $imagePath;
+                    }
+                } else {
+                    $roboflowError = "detectAndCropMeterWithRoboflow function not found - will process full image";
+                    error_log("⚠ Roboflow: $roboflowError - continuing without Roboflow");
+                    $croppedImagePath = $imagePath;
+                }
+            } catch (Exception $e) {
+                $roboflowError = "Roboflow exception: " . $e->getMessage() . " - will process full image";
+                error_log("⚠ Roboflow FAILED for reading ID $reading_id: " . $roboflowError);
+                $croppedImagePath = $imagePath;
+            }
+
+            if (!function_exists('processImageWithRoboflowDigits')) {
+                throw new Exception('Roboflow OCR function not available. Make sure ocr_functions.php and roboflow_service.php are included.');
+            }
+
+            $ocrProcessed = false;
+            $ocrReading = null;
+            $extractedText = '';
+            $ocrError = null;
+            $ocrResult = null;
+
+            // Try cropped image first (if different), then original
+            if ($croppedImagePath !== $imagePath && file_exists($croppedImagePath)) {
+                error_log("Attempting OCR on CROPPED image: $croppedImagePath");
+                $ocrResult = processImageWithRoboflowDigits($croppedImagePath);
+                if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                    $ocrReading = $ocrResult['meter_reading'];
+                    $extractedText = $ocrResult['extracted_text'] ?? '';
+                    $ocrProcessed = true;
+                    error_log("✓ OCR SUCCESS (Roboflow on CROPPED): Reading ID $reading_id processed with value: $ocrReading");
+                } else {
+                    $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on cropped image';
+                    error_log("⚠ Roboflow OCR failed on CROPPED image for reading ID $reading_id: $ocrError");
+                }
+            }
+
+            if (!$ocrProcessed && file_exists($imagePath)) {
+                error_log("Attempting OCR on ORIGINAL image: $imagePath");
+                $ocrResult = processImageWithRoboflowDigits($imagePath);
+                if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
+                    $ocrReading = $ocrResult['meter_reading'];
+                    $extractedText = $ocrResult['extracted_text'] ?? '';
+                    $ocrProcessed = true;
+                    error_log("✓ OCR SUCCESS (Roboflow on ORIGINAL): Reading ID $reading_id processed with value: $ocrReading");
+                } else {
+                    $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed on original image';
+                    error_log("⚠ Roboflow OCR failed on ORIGINAL image for reading ID $reading_id: $ocrError");
+                }
+            }
+
+            if (!$ocrProcessed) {
+                $errorMsg = 'Roboflow YOLOv8 OCR processing failed. ' . ($ocrError ?: 'Roboflow digit detection failed to process the image.');
+                $errorMsg .= ' Image path: ' . $croppedImagePath;
+                throw new Exception($errorMsg);
+            }
+
+            $statusToSet = 'needs_review';
+            $digitStats = $ocrResult['digit_stats'] ?? null;
+            if ($digitStats) {
+                $digitCount = (int)($digitStats['count'] ?? 0);
+                $minConf   = (float)($digitStats['min_confidence'] ?? 0.0);
+                if ($digitCount >= 5 && $minConf >= 0.5) {
+                    $statusToSet = 'verified';
+                }
+            }
+
+            $processedAt = date('Y-m-d H:i:s');
+            $update = $conn->prepare("UPDATE pending_meter_readings SET 
+                status = ?,
+                ocr_reading = ?,
+                extracted_text = ?,
+                processed_at = ?
+                WHERE id = ?");
+            $update->bind_param("sdssi", $statusToSet, $ocrReading, $extractedText, $processedAt, $reading_id);
+
+            if (!$update->execute()) {
+                throw new Exception('Failed to update database: ' . $conn->error);
+            }
+
+            return [
+                'success' => true,
+                'status' => $statusToSet,
+                'message' => 'Reading processed successfully.',
+                'reading_id' => $reading_id
+            ];
+        } catch (Exception $e) {
+            $error_msg = $e->getMessage();
+            $failedProcessedAt = date('Y-m-d H:i:s');
+            $update = $conn->prepare("UPDATE pending_meter_readings SET 
+                status = 'failed',
+                admin_notes = ?,
+                processed_at = ?
+                WHERE id = ?");
+            $update->bind_param("ssi", $error_msg, $failedProcessedAt, $reading_id);
+            $update->execute();
+
+            return [
+                'success' => false,
+                'status' => 'failed',
+                'message' => $error_msg,
+                'reading_id' => $reading_id
+            ];
+        }
+    }
     
     // Ensure all required columns exist
     $columns_to_check = [
@@ -268,163 +436,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
         exit();
     }
     
+    // If processing a single reading via AJAX, handle it immediately
+    if (isset($_POST['process_single']) && isset($_POST['reading_id'])) {
+        $singleId = (int)$_POST['reading_id'];
+        $result = processPendingReading($conn, $singleId);
+        header('Content-Type: application/json');
+        echo json_encode($result);
+        exit();
+    }
+
     foreach ($selected_ids as $reading_id) {
-        // Get reading details
-        $stmt = $conn->prepare("SELECT * FROM pending_meter_readings WHERE id = ? AND status = 'pending'");
-        $stmt->bind_param("i", $reading_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $reading = $result->fetch_assoc();
-        
-        if ($reading) {
-            try {
-                // Get full image path - handle both relative and absolute paths
-                $storedPath = $reading['image_path'];
-                
-                // If path doesn't start with / or C:, it's relative to the project root
-                // upload_reading.php stores path as 'uploads/meter_readings/filename.jpg'
-                // pending_readings.php is in project root, so path should be relative to __DIR__
-                if (strpos($storedPath, '/') !== 0 && strpos($storedPath, '\\') !== 0 && strpos($storedPath, 'C:') !== 0) {
-                    // Relative path - try multiple possible locations
-                    $possiblePaths = [
-                        __DIR__ . '/' . $storedPath,  // From project root: C:\xampp\htdocs\CAPSTONE\uploads\meter_readings\...
-                        realpath(__DIR__ . '/' . $storedPath),  // Resolved absolute path
-                        $storedPath,  // Direct path (if already correct)
-                    ];
-                    
-                    // Also try if stored path already includes ../ (legacy)
-                    if (strpos($storedPath, '../') === false) {
-                        $possiblePaths[] = __DIR__ . '/../' . $storedPath;
-                    }
-                } else {
-                    // Absolute path
-                    $possiblePaths = [$storedPath, realpath($storedPath)];
-                }
-                
-                $imagePath = null;
-                foreach ($possiblePaths as $path) {
-                    if (file_exists($path)) {
-                        $imagePath = $path;
-                        break;
-                    }
-                }
-                
-                if (!$imagePath || !file_exists($imagePath)) {
-                    throw new Exception('Image file not found. Tried: ' . implode(', ', $possiblePaths) . '. Stored path: ' . $storedPath);
-                }
-                
-                // Step 1: Skip meter-region detection to speed up processing
-                $croppedImagePath = $imagePath;
-                $roboflowUsed = false;
-                $roboflowError = null;
-                
-                // Step 2: Process OCR with Roboflow YOLOv8 digit detection (single pass)
-                if (!function_exists('processImageWithRoboflowDigits')) {
-                    throw new Exception('Roboflow OCR function not available. Make sure ocr_functions.php and roboflow_service.php are included.');
-                }
-                
-                // Log which image we're processing (original or cropped)
-                if ($roboflowUsed) {
-                    error_log("Processing CROPPED image with Roboflow digit detection (Roboflow detected meter region): $croppedImagePath");
-                } else {
-                    error_log("Processing FULL image with Roboflow digit detection (Roboflow not used or failed): $croppedImagePath");
-                    if ($roboflowError) {
-                        error_log("Roboflow meter detection status: $roboflowError");
-                    }
-                }
-                
-                // Step 2a: Try Roboflow digit detection first (preferred method)
-                $ocrProcessed = false;
-                $ocrReading = null;
-                $extractedText = '';
-                $ocrError = null;
-                $imageUsed = $croppedImagePath;
-                
-                if (function_exists('processImageWithRoboflowDigits')) {
-                    if (file_exists($imagePath)) {
-                        error_log("Attempting OCR on ORIGINAL image: $imagePath");
-                        $ocrResult = processImageWithRoboflowDigits($imagePath);
-                        if ($ocrResult['success'] && !empty($ocrResult['meter_reading'])) {
-                            $ocrReading = $ocrResult['meter_reading'];
-                            $extractedText = $ocrResult['extracted_text'] ?? '';
-                            $ocrProcessed = true;
-                            $imageUsed = $imagePath;
-                            error_log("✓ OCR SUCCESS (Roboflow): Reading ID $reading_id processed with value: $ocrReading");
-                        } else {
-                            $ocrError = $ocrResult['error'] ?? 'Roboflow OCR failed';
-                            error_log("⚠ Roboflow OCR failed for reading ID $reading_id: $ocrError");
-                        }
-                    }
-                }
-                
-                // Step 2b: If Roboflow failed, throw exception (no fallback - Roboflow YOLOv8 only)
-                if (!$ocrProcessed) {
-                    $errorMsg = 'Roboflow YOLOv8 OCR processing failed. ';
-                    if ($ocrError) {
-                        $errorMsg .= $ocrError;
-                    } else {
-                        $errorMsg .= 'Roboflow digit detection failed to process the image.';
-                    }
-                    $errorMsg .= ' Image path: ' . $croppedImagePath;
-                    $errorMsg .= ' Please check if Roboflow model version 7 is deployed and accessible.';
-                    throw new Exception($errorMsg);
-                }
-                
-                // Clean up cropped image if it was created by Roboflow
-                // No cropped images are created in the fast path
-                
-                // Check if reading needs review based on consumption
-                // Decide initial status based on digit detection confidence:
-                // - If ALL detected digits have good confidence and we have at least 5 digits,
-                //   automatically mark as VERIFIED.
-                // - Otherwise, send to Needs Verification for manual review.
-                $needsReview = true;
-                $statusToSet = 'needs_review';
-                $digitStats = $ocrResult['digit_stats'] ?? null;
-                if ($digitStats) {
-                    $digitCount = (int)($digitStats['count'] ?? 0);
-                    $minConf   = (float)($digitStats['min_confidence'] ?? 0.0);
-                    // Require at least 5 digits and all with confidence >= 0.5 to auto-verify
-                    if ($digitCount >= 5 && $minConf >= 0.5) {
-                        $needsReview = false;
-                        $statusToSet = 'verified';
-                    }
-                }
-                
-                // Update reading status (force Asia/Manila timestamp via PHP)
-                $processedAt = date('Y-m-d H:i:s');
-                $update = $conn->prepare("UPDATE pending_meter_readings SET 
-                    status = ?,
-                    ocr_reading = ?,
-                    extracted_text = ?,
-                    processed_at = ?
-                    WHERE id = ?");
-                $update->bind_param("sdssi", $statusToSet, $ocrReading, $extractedText, $processedAt, $reading_id);
-                
-                if (!$update->execute()) {
-                    throw new Exception('Failed to update database: ' . $conn->error);
-                }
-                
-                // Don't delete image yet - keep it for verification if needed
-                // deleteImageAfterProcessing($reading_id, $conn);
-                
-                $processed_count++;
-                
-            } catch (Exception $e) {
-                // Update with error
-                $error_msg = $e->getMessage();
-                $failedProcessedAt = date('Y-m-d H:i:s');
-                $update = $conn->prepare("UPDATE pending_meter_readings SET 
-                    status = 'failed',
-                    admin_notes = ?,
-                    processed_at = ?
-                    WHERE id = ?");
-                $update->bind_param("ssi", $error_msg, $failedProcessedAt, $reading_id);
-                $update->execute();
-                
-                $failed_count++;
-                error_log("OCR processing failed for reading ID $reading_id: " . $error_msg);
-            }
+        $result = processPendingReading($conn, (int)$reading_id);
+        if ($result['success']) {
+            $processed_count++;
+        } else {
+            $failed_count++;
         }
     }
     
@@ -2427,96 +2453,56 @@ function pendingFormatDT($dt) {
                     document.getElementById('processingStatus').textContent = 
                         `Processing ${selectedReadings.length} reading(s)... This may take a moment.`;
                     
-                    // Prepare form data
-                    const formData = new FormData(this);
-                    formData.append('process_selected', '1');
-                    
-                    // Create AbortController for timeout
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => {
-                        controller.abort();
-                        loadingModal.hide();
-                        showError('Processing timed out after 5 minutes. The Roboflow API may be slow. Please try again or check server logs.');
-                    }, 300000); // 5 minute timeout (increased from 2 minutes)
-                    
-                    // Submit via AJAX
-                    fetch('pending_readings.php', {
-                        method: 'POST',
-                        body: formData,
-                        redirect: 'manual', // Don't follow redirects automatically
-                        signal: controller.signal // Add abort signal
-                    })
-                    .then(response => {
-                        clearTimeout(timeoutId); // Clear timeout on success
-                        
-                        // Check if it's a redirect (302, 303, 307, etc.)
-                        if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
-                            // Get redirect location from headers
-                            const redirectUrl = response.headers.get('Location') || response.url;
-                            
-                            // Parse URL parameters from redirect
-                            try {
-                                const url = new URL(redirectUrl, window.location.origin);
-                                const status = url.searchParams.get('status') || 'success';
-                                const message = decodeURIComponent(url.searchParams.get('message') || 'Processing completed!');
-                                
-                                // Hide loading modal
-                                loadingModal.hide();
-                                
-                                // Show result modal
-                                setTimeout(() => {
-                                    showProcessingResult(status, message);
-                                }, 300);
-                                
-                                return;
-                            } catch (e) {
-                                console.error('Error parsing redirect URL:', e);
+                    const ids = Array.from(selectedReadings).map(el => el.value);
+                    let processed = 0;
+                    let failed = 0;
+
+                    const processNext = (index) => {
+                        if (index >= ids.length) {
+                            loadingModal.hide();
+                            const status = failed > 0 && processed > 0 ? 'partial' : (failed > 0 ? 'error' : 'success');
+                            const message = failed > 0
+                                ? `Processed: ${processed}, Failed: ${failed}`
+                                : `Successfully processed ${processed} reading(s)`;
+                            setTimeout(() => showProcessingResult(status, message), 300);
+                            return;
+                        }
+
+                        document.getElementById('processingStatus').textContent =
+                            `Processing ${index + 1} of ${ids.length} reading(s)...`;
+
+                        const formData = new FormData();
+                        formData.append('process_selected', '1');
+                        formData.append('process_single', '1');
+                        formData.append('reading_id', ids[index]);
+
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+                        fetch('pending_readings.php', {
+                            method: 'POST',
+                            body: formData,
+                            signal: controller.signal
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            clearTimeout(timeoutId);
+                            if (data && data.success) {
+                                processed++;
+                            } else {
+                                failed++;
                             }
-                        }
-                        
-                        // If not a redirect, check response
-                        return response.text();
-                    })
-                    .then(html => {
-                        if (!html) return; // Already handled as redirect
-                        
-                        // Hide loading modal
-                        loadingModal.hide();
-                        
-                        // Try to parse the response for redirect URL in the HTML
-                        const match = html.match(/Location:\s*pending_readings\.php\?(.+?)[\s"'<]/);
-                        if (match && match[1]) {
-                            const urlParams = new URLSearchParams(match[1]);
-                            const status = urlParams.get('status') || 'success';
-                            const message = decodeURIComponent(urlParams.get('message') || 'Processing completed!');
-                            
-                            setTimeout(() => {
-                                showProcessingResult(status, message);
-                            }, 300);
-                        } else {
-                            // Fallback: assume success
-                            setTimeout(() => {
-                                showProcessingResult('success', 'Processing completed! Refreshing page...');
-                                setTimeout(() => location.reload(), 2000);
-                            }, 300);
-                        }
-                    })
-                    .catch(error => {
-                        clearTimeout(timeoutId); // Clear timeout on error
-                        
-                        // Hide loading modal
-                        loadingModal.hide();
-                        
-                        // Show error result
-                        console.error('Processing error:', error);
-                        let errorMsg = 'An error occurred while processing.';
-                        if (error.name === 'AbortError') {
-                            errorMsg = 'Processing timed out. The request took too long. Please try again or check if Roboflow API is accessible.';
-                        }
-                        setTimeout(() => {
-                            showProcessingResult('error', errorMsg);
-                        }, 300);
-                    });
+                            processNext(index + 1);
+                        })
+                        .catch(err => {
+                            clearTimeout(timeoutId);
+                            failed++;
+                            console.error('Processing error:', err);
+                            processNext(index + 1);
+                        });
+                    };
+
+                    processNext(0);
                 });
             }
 
