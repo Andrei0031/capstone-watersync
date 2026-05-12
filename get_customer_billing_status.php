@@ -8,8 +8,7 @@ watersync_force_timezone($conn);
 
 // Check if we should return all customers with readings
 if (isset($_GET['all']) && $_GET['all'] == '1') {
-    // Bulk entry saves Jan–Mar bills only; April is created separately. "Complete" = three 2026 bulk months on file.
-    // reading_value = latest pending verified-style April reading for reference (may be null).
+    // Bulk entry saves Dec 2025 + Jan–Mar 2026 when complete; April is separate.
     $sql = "SELECT
                 cl.id AS client_id,
                 cl.firstname,
@@ -24,22 +23,24 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
                     ORDER BY pmr.processed_date DESC, pmr.processed_at DESC
                     LIMIT 1
                 ) AS reading_value,
-                'Jan–Mar 2026 bulk complete' AS cycle_name,
+                'Dec 2025 – Mar 2026 bulk complete' AS cycle_name,
                 (
                     SELECT MAX(bl2.reading_date)
                     FROM billing_list bl2
                     WHERE bl2.client_id = cl.id
-                      AND YEAR(bl2.reading_date) = 2026
-                      AND MONTH(bl2.reading_date) IN (1, 2, 3)
+                      AND (
+                          (YEAR(bl2.reading_date) = 2025 AND MONTH(bl2.reading_date) = 12)
+                          OR (YEAR(bl2.reading_date) = 2026 AND MONTH(bl2.reading_date) IN (1, 2, 3))
+                      )
                 ) AS sort_date
             FROM client_list cl
             INNER JOIN (
                 SELECT bl3.client_id
                 FROM billing_list bl3
-                WHERE YEAR(bl3.reading_date) = 2026
-                  AND MONTH(bl3.reading_date) IN (1, 2, 3)
+                WHERE (YEAR(bl3.reading_date) = 2025 AND MONTH(bl3.reading_date) = 12)
+                   OR (YEAR(bl3.reading_date) = 2026 AND MONTH(bl3.reading_date) IN (1, 2, 3))
                 GROUP BY bl3.client_id
-                HAVING COUNT(DISTINCT MONTH(bl3.reading_date)) >= 3
+                HAVING COUNT(DISTINCT (YEAR(bl3.reading_date) * 100 + MONTH(bl3.reading_date))) >= 4
             ) bulk_done ON bulk_done.client_id = cl.id
             WHERE cl.delete_flag = 0
               AND cl.status = 1

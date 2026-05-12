@@ -321,7 +321,7 @@ include 'header.php';
             </li>
             <li class="nav-item">
                 <button class="nav-link" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers-pane" type="button" role="tab">
-                    <i class="fas fa-list me-2"></i>Completed bulk (Jan–Mar)
+                    <i class="fas fa-list me-2"></i>Completed bulk (Dec–Mar)
                 </button>
             </li>
         </ul>
@@ -338,21 +338,21 @@ include 'header.php';
                         <!-- Customer Dropdown -->
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label for="customer_select"><strong>Customer Name & Meter Code:</strong></label>
-                            <p class="text-muted small mb-1">Customers who already have all three bulk bills (Jan–Mar 2026) are not listed here.</p>
+                            <p class="text-muted small mb-1">Customers who already have December 2025 plus January–March 2026 bulk bills are not listed here.</p>
                             <select id="customer_select" name="client_id" required style="margin-top: 8px;">
                                 <option value="">-- Choose a customer --</option>
                                 <?php
-                                // Exclude customers who already have Jan–Mar 2026 bulk bills (April is not from bulk).
+                                // Exclude customers with full Dec 2025 + Jan–Mar 2026 bulk set (April not from bulk).
                                 $cust_sql = "SELECT c.id, c.firstname, c.lastname, c.meter_code, c.category_id
                                     FROM client_list c
                                     WHERE c.delete_flag = 0 AND c.status = 1
                                       AND c.id NOT IN (
                                           SELECT bl.client_id
                                           FROM billing_list bl
-                                          WHERE YEAR(bl.reading_date) = 2026
-                                            AND MONTH(bl.reading_date) IN (1, 2, 3)
+                                          WHERE (YEAR(bl.reading_date) = 2025 AND MONTH(bl.reading_date) = 12)
+                                             OR (YEAR(bl.reading_date) = 2026 AND MONTH(bl.reading_date) IN (1, 2, 3))
                                           GROUP BY bl.client_id
-                                          HAVING COUNT(DISTINCT MONTH(bl.reading_date)) >= 3
+                                          HAVING COUNT(DISTINCT (YEAR(bl.reading_date) * 100 + MONTH(bl.reading_date))) >= 4
                                       )
                                     ORDER BY c.firstname";
                                 $customers = $conn->query($cust_sql);
@@ -429,9 +429,9 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. <strong>Submit saves only January–March</strong> bills for months you mark ✓ Paid. <strong>April 2026</strong> is your latest <strong>verified</strong> reading from Pending—shown here for <strong>reference only</strong> (consumption/bill preview). Create the April bill in your normal billing flow, not from this bulk save.</p>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings in order: <strong>November</strong> (previous) through <strong>March</strong>. <strong>Submit saves December–March</strong> for months you mark ✓ Paid. <strong>April 2026</strong> is your verified reading from Pending—<strong>reference only</strong>. Bill April using your normal billing screen.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>January–March</strong> for bills to save from this page. April has no paid toggle and is <strong>never</strong> inserted from this form.
+                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>December–March</strong> for bills to save from this page. Enter <strong>November</strong> and <strong>December</strong> readings to compute and save the December bill. April is never inserted from this form.
                         </p>
                         
                         <div class="table-responsive">
@@ -440,7 +440,7 @@ include 'header.php';
                                     <tr>
                                         <th width="16%">
                                             December 2025<br>
-                                            <small style="font-weight: normal;">(Starting Point)</small>
+                                            <small style="font-weight: normal;">(Nov → Dec usage)</small>
                                         </th>
                                         <th width="16%">
                                             January 2026<br>
@@ -462,20 +462,29 @@ include 'header.php';
                                 </thead>
                                 <tbody>
                                     <tr id="readingRow" style="height: 140px;">
-                                        <!-- December 2025: Starting Point (No Consumption) -->
+                                        <!-- December 2025: previous = November reading -->
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
+                                                <strong style="font-size: 0.8rem;">November 2025 (m³)</strong>
+                                                <input type="number" step="0.01" name="nov_reading" id="nov_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                            </div>
+                                            <div style="margin-bottom: 8px;">
+                                                <strong style="font-size: 0.85rem;">December reading (m³)</strong>
                                                 <input type="number" step="0.01" name="dec_reading" id="dec_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem; color: #999;">Consumption (m³)</strong>
-                                                <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem; color: #999;">
-                                                    <strong>N/A</strong> (starting point)
+                                                <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
+                                                <div style="background: #e8f5e9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; color: #2E7D32;">
+                                                    <span id="dec_consumption">0.00</span>
                                                 </div>
                                             </div>
-                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem; color: #999;">
-                                                <strong>Bill:</strong> N/A
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
+                                                <strong>Bill:</strong> ₱<span id="dec_bill">0.00</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button type="button" class="status-btn" data-month="dec" data-status="pending" onclick="setMonthStatus('dec', 'pending')" style="flex: 1; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
+                                                <button type="button" class="status-btn" data-month="dec" data-status="paid" onclick="setMonthStatus('dec', 'paid')" style="flex: 1; padding: 4px; background: #e8f5e9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #999;">✓ Paid</button>
+                                                <input type="hidden" name="dec_status" id="dec_status" value="pending">
                                             </div>
                                         </td>
                                         
@@ -573,7 +582,7 @@ include 'header.php';
 
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i>Save paid Jan–Mar only
+                        <i class="fas fa-save me-2"></i>Save paid December–March only
                     </button>
                 </form>
             </div>
@@ -581,8 +590,8 @@ include 'header.php';
             <!-- Customers with Readings Tab -->
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
-                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Jan–Mar bulk)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Listed when they have <strong>all three</strong> bulk billing records for <strong>January through March 2026</strong> (December is the starting reading in the form, no bill row). April is not part of bulk save—bill it elsewhere. These accounts are <strong>excluded</strong> from the dropdown so they are not run through bulk again by mistake.</p>
+                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Dec–Mar bulk)</h5>
+                    <p style="color: #666; margin-bottom: 20px;">Listed when they have billing records for <strong>December 2025</strong> and <strong>January through March 2026</strong> (four months). April is not part of bulk save. These accounts are <strong>excluded</strong> from the dropdown so they are not run through bulk again by mistake.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -623,11 +632,12 @@ include 'header.php';
     });
 
     function loadCategoryRates() {
-        fetch('get_category_rates.php')
+        return fetch('get_category_rates.php')
             .then(res => res.json())
             .then(data => {
                 categoryRates = data;
                 console.log('Rates loaded:', categoryRates);
+                calculateAllBills();
             });
     }
 
@@ -647,7 +657,7 @@ include 'header.php';
                                 <td><strong>${customer.firstname} ${customer.lastname}</strong></td>
                                 <td>${customer.meter_code}</td>
                                 <td>${refCell}</td>
-                                <td><span class="badge bg-success">Jan–Mar complete</span></td>
+                                <td><span class="badge bg-success">Dec–Mar complete</span></td>
                                 <td>${customer.processed_date ? (() => { const d = new Date(customer.processed_date); return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString(); })() : 'N/A'}</td>
                                 <td></td>
                             </tr>
@@ -655,7 +665,7 @@ include 'header.php';
                     });
                     document.getElementById('customersTableBody').innerHTML = html;
                 } else {
-                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Jan–Mar 2026 bulk billing set yet.</td></tr>';
+                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Dec 2025 – Mar 2026 bulk billing set yet.</td></tr>';
                 }
             })
             .catch(err => {
@@ -776,14 +786,17 @@ include 'header.php';
         const feb = mar - smallMonthlyUsage;
         const jan = feb - smallMonthlyUsage;
         const dec = jan - smallMonthlyUsage;
+        const novSmall = dec - smallMonthlyUsage;
 
-        // December small example - NO PREVIOUS READING
+        const decSmallPrev = novSmall;
         const decSmallCurr = dec;
-        
-        document.getElementById('exSmallDecPrev').textContent = "N/A";
+        const decSmallUsage = decSmallCurr - decSmallPrev;
+        const decSmallBill = calculateBill(decSmallUsage, baseRate, excessRate);
+
+        document.getElementById('exSmallDecPrev').textContent = decSmallPrev.toFixed(2);
         document.getElementById('exSmallDecCurr').textContent = decSmallCurr.toFixed(2);
-        document.getElementById('exSmallDecUse').textContent = "N/A";
-        document.getElementById('exSmallDecBill').textContent = "N/A";
+        document.getElementById('exSmallDecUse').textContent = decSmallUsage.toFixed(2);
+        document.getElementById('exSmallDecBill').textContent = decSmallBill.toFixed(2);
 
         // January small example - uses December current as previous
         const janSmallPrev = dec;
@@ -805,14 +818,17 @@ include 'header.php';
         const feb_lg = mar_lg - largeMonthlyUsage;
         const jan_lg = feb_lg - largeMonthlyUsage;
         const dec_lg = jan_lg - largeMonthlyUsage;
+        const novLarge = Math.max(0, dec_lg - largeMonthlyUsage);
 
-        // December large example - NO PREVIOUS READING
+        const decLargePrev = novLarge;
         const decLargeCurr = Math.max(0, dec_lg);
-        
-        document.getElementById('exLargeDecPrev').textContent = "N/A";
+        const decLargeUsage = decLargeCurr - decLargePrev;
+        const decLargeBill = calculateBill(decLargeUsage, baseRate, excessRate);
+
+        document.getElementById('exLargeDecPrev').textContent = decLargePrev.toFixed(2);
         document.getElementById('exLargeDecCurr').textContent = decLargeCurr.toFixed(2);
-        document.getElementById('exLargeDecUse').textContent = "N/A";
-        document.getElementById('exLargeDecBill').textContent = "N/A";
+        document.getElementById('exLargeDecUse').textContent = decLargeUsage.toFixed(2);
+        document.getElementById('exLargeDecBill').textContent = decLargeBill.toFixed(2);
 
         // January large example - uses December current as previous
         const janLargePrev = Math.max(0, dec_lg);
@@ -884,16 +900,15 @@ include 'header.php';
     }
 
     function calculateAllBills() {
-        const categoryId = document.getElementById('customer_select').options[document.getElementById('customer_select').selectedIndex].dataset.category;
+        const sel = document.getElementById('customer_select');
+        const opt = sel && sel.options[sel.selectedIndex];
+        const categoryId = opt ? opt.dataset.category : '';
+        const hasRates = !!(categoryId && categoryRates[categoryId]);
+        const baseRate = hasRates ? categoryRates[categoryId].rate : 0;
+        const excessRate = hasRates ? categoryRates[categoryId].excess_rate : 0;
 
-        if (!categoryId || !categoryRates[categoryId]) return;
-
-        const rates = categoryRates[categoryId];
-        const baseRate = rates.rate;
-        const excessRate = rates.excess_rate;
-
-        // Get all meter readings
         const readings = {
+            nov: parseFloat(document.getElementById('nov_reading').value) || 0,
             dec: parseFloat(document.getElementById('dec_reading').value) || 0,
             jan: parseFloat(document.getElementById('jan_reading').value) || 0,
             feb: parseFloat(document.getElementById('feb_reading').value) || 0,
@@ -901,46 +916,81 @@ include 'header.php';
             apr: parseFloat(document.getElementById('apr_reading').value) || 0
         };
 
-        // Calculate and display consumption and bills for each month
-        // January (Dec reading → Jan reading)
+        // December (November → December)
+        if (readings.nov > 0 && readings.dec > 0) {
+            const decConsumption = readings.dec - readings.nov;
+            document.getElementById('dec_consumption').textContent = decConsumption.toFixed(2);
+            if (decConsumption < 0) {
+                document.getElementById('dec_bill').textContent = '—';
+            } else if (hasRates) {
+                document.getElementById('dec_bill').textContent = calculateBill(decConsumption, baseRate, excessRate).toFixed(2);
+            } else {
+                document.getElementById('dec_bill').textContent = '—';
+            }
+        } else {
+            document.getElementById('dec_consumption').textContent = '0.00';
+            document.getElementById('dec_bill').textContent = '0.00';
+        }
+
+        // January (Dec → Jan)
         if (readings.dec > 0 && readings.jan > 0) {
             const janConsumption = readings.jan - readings.dec;
-            const janBill = calculateBill(janConsumption, baseRate, excessRate);
             document.getElementById('jan_consumption').textContent = janConsumption.toFixed(2);
-            document.getElementById('jan_bill').textContent = janBill.toFixed(2);
+            if (janConsumption < 0) {
+                document.getElementById('jan_bill').textContent = '—';
+            } else if (hasRates) {
+                document.getElementById('jan_bill').textContent = calculateBill(janConsumption, baseRate, excessRate).toFixed(2);
+            } else {
+                document.getElementById('jan_bill').textContent = '—';
+            }
         } else {
             document.getElementById('jan_consumption').textContent = '0.00';
             document.getElementById('jan_bill').textContent = '0.00';
         }
 
-        // February (Jan reading → Feb reading)
+        // February (Jan → Feb)
         if (readings.jan > 0 && readings.feb > 0) {
             const febConsumption = readings.feb - readings.jan;
-            const febBill = calculateBill(febConsumption, baseRate, excessRate);
             document.getElementById('feb_consumption').textContent = febConsumption.toFixed(2);
-            document.getElementById('feb_bill').textContent = febBill.toFixed(2);
+            if (febConsumption < 0) {
+                document.getElementById('feb_bill').textContent = '—';
+            } else if (hasRates) {
+                document.getElementById('feb_bill').textContent = calculateBill(febConsumption, baseRate, excessRate).toFixed(2);
+            } else {
+                document.getElementById('feb_bill').textContent = '—';
+            }
         } else {
             document.getElementById('feb_consumption').textContent = '0.00';
             document.getElementById('feb_bill').textContent = '0.00';
         }
 
-        // March (Feb reading → Mar reading)
+        // March (Feb → Mar)
         if (readings.feb > 0 && readings.mar > 0) {
             const marConsumption = readings.mar - readings.feb;
-            const marBill = calculateBill(marConsumption, baseRate, excessRate);
             document.getElementById('mar_consumption').textContent = marConsumption.toFixed(2);
-            document.getElementById('mar_bill').textContent = marBill.toFixed(2);
+            if (marConsumption < 0) {
+                document.getElementById('mar_bill').textContent = '—';
+            } else if (hasRates) {
+                document.getElementById('mar_bill').textContent = calculateBill(marConsumption, baseRate, excessRate).toFixed(2);
+            } else {
+                document.getElementById('mar_bill').textContent = '—';
+            }
         } else {
             document.getElementById('mar_consumption').textContent = '0.00';
             document.getElementById('mar_bill').textContent = '0.00';
         }
 
-        // April (Mar reading → Apr reading)
+        // April (Mar → Apr) — reference only
         if (readings.mar > 0 && readings.apr > 0) {
             const aprConsumption = readings.apr - readings.mar;
-            const aprBill = calculateBill(aprConsumption, baseRate, excessRate);
             document.getElementById('apr_consumption').textContent = aprConsumption.toFixed(2);
-            document.getElementById('apr_bill').textContent = aprBill.toFixed(2);
+            if (aprConsumption < 0) {
+                document.getElementById('apr_bill').textContent = '—';
+            } else if (hasRates) {
+                document.getElementById('apr_bill').textContent = calculateBill(aprConsumption, baseRate, excessRate).toFixed(2);
+            } else {
+                document.getElementById('apr_bill').textContent = '—';
+            }
         } else {
             document.getElementById('apr_consumption').textContent = '0.00';
             document.getElementById('apr_bill').textContent = '0.00';
@@ -961,19 +1011,20 @@ include 'header.php';
             return false;
         }
 
-        const paidToggleMonths = ['jan', 'feb', 'mar'];
+        const paidToggleMonths = ['dec', 'jan', 'feb', 'mar'];
         const anyPaid = paidToggleMonths.some(m => {
             const el = document.getElementById(m + '_status');
             return el && el.value === 'paid';
         });
         if (!anyPaid) {
             e.preventDefault();
-            alert('Mark at least one of January–March as ✓ Paid. April is reference-only here and is not saved from bulk.');
+            alert('Mark at least one of December–March as ✓ Paid. April is reference-only here and is not saved from bulk.');
             return false;
         }
 
         // Check if at least one month has reading data
         const readings = {
+            nov: parseFloat(document.getElementById('nov_reading').value) || 0,
             dec: parseFloat(document.getElementById('dec_reading').value) || 0,
             jan: parseFloat(document.getElementById('jan_reading').value) || 0,
             feb: parseFloat(document.getElementById('feb_reading').value) || 0,
@@ -990,7 +1041,7 @@ include 'header.php';
         }
 
         // Validate that readings are in ascending order
-        const readingArray = [readings.dec, readings.jan, readings.feb, readings.mar, readings.apr];
+        const readingArray = [readings.nov, readings.dec, readings.jan, readings.feb, readings.mar, readings.apr];
         for (let i = 1; i < readingArray.length; i++) {
             if (readingArray[i] > 0 && readingArray[i - 1] > 0 && readingArray[i] < readingArray[i - 1]) {
                 e.preventDefault();
