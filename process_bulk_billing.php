@@ -59,12 +59,13 @@ if (!$rate_row) {
 $base_rate = floatval($rate_row['rate'] ?? 0);
 $excess_rate = floatval($rate_row['excess_rate'] ?? 0);
 
+// Bulk save only creates billing_list rows for Jan–Mar when marked Paid.
+// December is the form starting reading; April verified reading is UI reference only (create April bill elsewhere).
 $months = [
     'dec' => ['month' => 12, 'year' => 2025, 'label' => 'December 2025'],
     'jan' => ['month' => 1, 'year' => 2026, 'label' => 'January 2026'],
     'feb' => ['month' => 2, 'year' => 2026, 'label' => 'February 2026'],
     'mar' => ['month' => 3, 'year' => 2026, 'label' => 'March 2026'],
-    'apr' => ['month' => 4, 'year' => 2026, 'label' => 'April 2026'],
 ];
 
 $readings = [];
@@ -85,9 +86,7 @@ foreach ($months as $key => $month_info) {
         continue;
     }
 
-    // Jan–Mar: only save when marked ✓ Paid. April: never uses that toggle (always pending in UI);
-    // save April when verified reading + March→April chain are valid.
-    if ($key !== 'apr' && $statuses[$key] !== 'paid') {
+    if ($statuses[$key] !== 'paid') {
         continue;
     }
 
@@ -99,8 +98,6 @@ foreach ($months as $key => $month_info) {
         $prev_key = 'jan';
     } elseif ($key === 'mar') {
         $prev_key = 'feb';
-    } elseif ($key === 'apr') {
-        $prev_key = 'mar';
     }
 
     if ($curr_reading <= 0 || !$prev_key || $readings[$prev_key] <= 0) {
@@ -162,7 +159,7 @@ foreach ($months as $key => $month_info) {
 
 if ($success_count > 0) {
     $conn->commit();
-    $_SESSION['bulk_message'] = "Saved {$success_count} bill(s). Jan–Mar rows follow ✓ Paid; April saves when readings are valid. Pending Jan–Mar were not saved.";
+    $_SESSION['bulk_message'] = "Saved {$success_count} bill(s). Only ✓ Paid January–March rows are stored here. April is not created from bulk—use regular billing for April.";
     if ($error_count > 0) {
         $_SESSION['bulk_message'] .= ' (' . $error_count . ' skipped or failed: ' . implode('; ', array_slice($errors, 0, 5)) . ')';
     }
@@ -172,7 +169,7 @@ if ($success_count > 0) {
     if ($error_count > 0) {
         $_SESSION['bulk_message'] = 'No bills saved. ' . implode(', ', $errors);
     } else {
-        $_SESSION['bulk_message'] = 'No bills saved. Mark Jan–Mar as ✓ Paid for each bill you want. April cannot be toggled—its bill saves when the verified April reading and March reading are valid on the same submit.';
+        $_SESSION['bulk_message'] = 'No bills saved. Mark January–March as ✓ Paid for each month you want to record. April is reference-only on this form and is not inserted from bulk save.';
     }
     $_SESSION['bulk_status'] = 'danger';
 }

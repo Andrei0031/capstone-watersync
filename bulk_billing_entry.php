@@ -321,7 +321,7 @@ include 'header.php';
             </li>
             <li class="nav-item">
                 <button class="nav-link" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers-pane" type="button" role="tab">
-                    <i class="fas fa-list me-2"></i>Completed bulk (Dec–Apr)
+                    <i class="fas fa-list me-2"></i>Completed bulk (Jan–Mar)
                 </button>
             </li>
         </ul>
@@ -338,11 +338,11 @@ include 'header.php';
                         <!-- Customer Dropdown -->
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label for="customer_select"><strong>Customer Name & Meter Code:</strong></label>
-                            <p class="text-muted small mb-1">Customers who already have all four bulk bills (Jan–Apr 2026) are not listed here.</p>
+                            <p class="text-muted small mb-1">Customers who already have all three bulk bills (Jan–Mar 2026) are not listed here.</p>
                             <select id="customer_select" name="client_id" required style="margin-top: 8px;">
                                 <option value="">-- Choose a customer --</option>
                                 <?php
-                                // Exclude customers who already have all four bulk bills (Jan–Apr 2026).
+                                // Exclude customers who already have Jan–Mar 2026 bulk bills (April is not from bulk).
                                 $cust_sql = "SELECT c.id, c.firstname, c.lastname, c.meter_code, c.category_id
                                     FROM client_list c
                                     WHERE c.delete_flag = 0 AND c.status = 1
@@ -350,9 +350,9 @@ include 'header.php';
                                           SELECT bl.client_id
                                           FROM billing_list bl
                                           WHERE YEAR(bl.reading_date) = 2026
-                                            AND MONTH(bl.reading_date) IN (1, 2, 3, 4)
+                                            AND MONTH(bl.reading_date) IN (1, 2, 3)
                                           GROUP BY bl.client_id
-                                          HAVING COUNT(DISTINCT MONTH(bl.reading_date)) >= 4
+                                          HAVING COUNT(DISTINCT MONTH(bl.reading_date)) >= 3
                                       )
                                     ORDER BY c.firstname";
                                 $customers = $conn->query($cust_sql);
@@ -390,7 +390,7 @@ include 'header.php';
                                 <h6><i class="fas fa-lock me-2"></i>April 2026 Verified Reading</h6>
                                 <p><strong>Reading:</strong> <span id="verifiedReadingValue">--</span> m³</p>
                                 <p><strong>Date:</strong> <span id="verifiedDate">--</span></p>
-                                <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-info-circle me-1"></i>This value comes from the <strong>Pending</strong> readings workflow (verified OCR)—it is <strong>not</strong> a billing record until you save the April bill from this screen.</p>
+                                <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-info-circle me-1"></i>This value comes from the <strong>Pending</strong> readings workflow (verified OCR). Bulk save on this page <strong>does not</strong> create an April bill—use <strong>Add / regular billing</strong> to bill April when you are ready.</p>
                             </div>
                         </div>
 
@@ -429,9 +429,9 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. <strong>April 2026</strong> shows your latest <strong>verified</strong> meter reading (reference only in Pending)—the <strong>April bill</strong> is created here when you save with March filled.</p>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. <strong>Submit saves only January–March</strong> bills for months you mark ✓ Paid. <strong>April 2026</strong> is your latest <strong>verified</strong> reading from Pending—shown here for <strong>reference only</strong> (consumption/bill preview). Create the April bill in your normal billing flow, not from this bulk save.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>January–March</strong> only for bills you want saved. <strong>April</strong> cannot be marked paid—it shows your verified reading from Pending (reference only there). When you submit with at least one Jan–Mar month paid, the <strong>April bill is still saved</strong> if March and the verified April reading form a valid progression (no extra toggle).
+                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>January–March</strong> for bills to save from this page. April has no paid toggle and is <strong>never</strong> inserted from this form.
                         </p>
                         
                         <div class="table-responsive">
@@ -456,7 +456,7 @@ include 'header.php';
                                         </th>
                                         <th width="20%">
                                             April 2026<br>
-                                            <small style="font-weight: normal; color: #dc3545;">🔒 Verified reading (bill saved on submit, not ✓ Paid)</small>
+                                            <small style="font-weight: normal; color: #dc3545;">🔒 Verified reading (reference only—not saved here)</small>
                                         </th>
                                     </tr>
                                 </thead>
@@ -561,7 +561,7 @@ include 'header.php';
                                                 <strong>Bill:</strong> ₱<span id="apr_bill">0.00</span>
                                             </div>
                                             <div style="padding: 8px 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; font-size: 0.72rem; color: #1565c0; line-height: 1.35;">
-                                                <strong>No ✓ Paid for April.</strong> Bill is saved when March → April readings are valid on submit (with at least one Jan–Mar paid).
+                                                <strong>Reference only.</strong> April is not written to billing from bulk—bill April separately when ready.
                                             </div>
                                             <input type="hidden" name="apr_status" id="apr_status" value="pending">
                                         </td>
@@ -573,7 +573,7 @@ include 'header.php';
 
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i>Save paid Jan–Mar and April when valid
+                        <i class="fas fa-save me-2"></i>Save paid Jan–Mar only
                     </button>
                 </form>
             </div>
@@ -581,8 +581,8 @@ include 'header.php';
             <!-- Customers with Readings Tab -->
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
-                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Dec 2025 – Apr 2026 bulk)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Listed here only if they already have <strong>all four</strong> bulk billing records for <strong>January through April 2026</strong> (December is the starting month in the form, no bill row). These accounts are <strong>excluded</strong> from the dropdown on Add Billing Entry so they are not billed again by mistake.</p>
+                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Jan–Mar bulk)</h5>
+                    <p style="color: #666; margin-bottom: 20px;">Listed when they have <strong>all three</strong> bulk billing records for <strong>January through March 2026</strong> (December is the starting reading in the form, no bill row). April is not part of bulk save—bill it elsewhere. These accounts are <strong>excluded</strong> from the dropdown so they are not run through bulk again by mistake.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -590,7 +590,7 @@ include 'header.php';
                                 <tr>
                                     <th>Customer Name</th>
                                     <th>Meter Code</th>
-                                    <th>April reading (m³)</th>
+                                    <th>Verified April ref. (m³)</th>
                                     <th>Status</th>
                                     <th>Last bill date</th>
                                     <th></th>
@@ -638,12 +638,16 @@ include 'header.php';
                 if (data && Array.isArray(data) && data.length > 0) {
                     let html = '';
                     data.forEach(customer => {
+                        const ref = customer.verified_reading;
+                        const refCell = (ref != null && !isNaN(ref) && ref > 0)
+                            ? `<span class="badge bg-secondary">${Number(ref).toFixed(2)}</span> m³`
+                            : '<span class="text-muted">—</span>';
                         html += `
                             <tr>
                                 <td><strong>${customer.firstname} ${customer.lastname}</strong></td>
                                 <td>${customer.meter_code}</td>
-                                <td><span class="badge bg-success">${Number(customer.verified_reading).toFixed(2)}</span> m³</td>
-                                <td><span class="badge bg-success">Complete</span></td>
+                                <td>${refCell}</td>
+                                <td><span class="badge bg-success">Jan–Mar complete</span></td>
                                 <td>${customer.processed_date ? (() => { const d = new Date(customer.processed_date); return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString(); })() : 'N/A'}</td>
                                 <td></td>
                             </tr>
@@ -651,7 +655,7 @@ include 'header.php';
                     });
                     document.getElementById('customersTableBody').innerHTML = html;
                 } else {
-                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Jan–Apr 2026 bulk billing set yet.</td></tr>';
+                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Jan–Mar 2026 bulk billing set yet.</td></tr>';
                 }
             })
             .catch(err => {
@@ -964,7 +968,7 @@ include 'header.php';
         });
         if (!anyPaid) {
             e.preventDefault();
-            alert('Mark at least one of January–March as ✓ Paid. April has no Paid toggle; its bill saves when readings are valid.');
+            alert('Mark at least one of January–March as ✓ Paid. April is reference-only here and is not saved from bulk.');
             return false;
         }
 
