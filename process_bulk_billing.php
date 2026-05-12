@@ -140,8 +140,8 @@ foreach ($months as $key => $month_info) {
 
     $reading_date = date('Y-m-d H:i:s', mktime(0, 0, 0, $month_info['month'] + 1, 0, $month_info['year']));
     $due_date = date('Y-m-d', mktime(0, 0, 0, $month_info['month'] + 2, 15, $month_info['year']));
-    // 0 = unpaid (same as Add Billing); customer pays via Payments later.
-    $bill_status = 0;
+    // ✓ Paid on bulk form = bill is saved and treated as fully settled (matches billing list + customer modal).
+    $bill_status = 1;
 
     $insert_sql = 'INSERT INTO billing_list
                   (client_id, reading_date, previous, reading, total, status, due_date)
@@ -150,8 +150,35 @@ foreach ($months as $key => $month_info) {
     $insert_stmt->bind_param('isdddis', $client_id, $reading_date, $prev_reading, $curr_reading, $amount, $bill_status, $due_date);
 
     if ($insert_stmt->execute()) {
-        $success_count++;
-        $saved_labels[] = $month_info['label'];
+        $new_bill_id = (int) $conn->insert_id;
+        $payment_ts = date('Y-m-d H:i:s');
+        $pay_sql = 'INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date)
+                    VALUES (?, ?, ?, ?, ?, ?, 1, ?)';
+        $pay_stmt = $conn->prepare($pay_sql);
+        if (!$pay_stmt) {
+            $del = $conn->prepare('DELETE FROM billing_list WHERE id = ?');
+            $del->bind_param('i', $new_bill_id);
+            $del->execute();
+            $del->close();
+            $error_count++;
+            $errors[] = $month_info['label'] . ': Could not prepare payment record (' . $conn->error . ')';
+        } else {
+            $pm = 'bulk_billing';
+            $ref = 'BULK';
+            $pay_stmt->bind_param('iisdsss', $client_id, $new_bill_id, $payment_ts, $amount, $pm, $ref, $payment_ts);
+            if (!$pay_stmt->execute()) {
+                $del = $conn->prepare('DELETE FROM billing_list WHERE id = ?');
+                $del->bind_param('i', $new_bill_id);
+                $del->execute();
+                $del->close();
+                $error_count++;
+                $errors[] = $month_info['label'] . ': Payment record failed (' . $pay_stmt->error . ')';
+            } else {
+                $success_count++;
+                $saved_labels[] = $month_info['label'];
+            }
+            $pay_stmt->close();
+        }
     } else {
         $error_count++;
         $errors[] = $month_info['label'] . ': ' . $insert_stmt->error;
@@ -167,8 +194,8 @@ if ($success_count > 0) {
             $pending_left[] = $month_info['label'];
         }
     }
-    $_SESSION['bulk_message'] = 'Saved ' . $success_count . ' bill(s): ' . implode(', ', $saved_labels)
-        . '. New bills are unpaid until you record payment in Payments.';
+    $_SESSION['bulk_message'] = 'Saved ' . $success_count . ' bill(s) as fully paid: ' . implode(', ', $saved_labels)
+        . '. Each bill has a matching verified payment (bulk billing).';
     if (!empty($pending_left)) {
         $_SESSION['bulk_message'] .= ' No bill created this submit for (still ⏳ Pending): ' . implode(', ', $pending_left) . '.';
     }

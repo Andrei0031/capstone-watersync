@@ -2216,7 +2216,10 @@ html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-
                     <!-- Billing History Table (scrollable) -->
                     <div class="card border-0 shadow-sm">
                         <div class="card-header py-1 d-flex justify-content-between align-items-center flex-wrap gap-1">
-                            <h6 class="mb-0 fw-bold text-primary" style="font-size:0.85rem;"><i class="fas fa-history me-1"></i>Billing History</h6>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-primary" style="font-size:0.85rem;"><i class="fas fa-history me-1"></i>Billing History</h6>
+                                <p class="text-muted small mb-0 mt-1" style="font-size:0.72rem; max-width:42rem;">November is not a separate bill—it is only the <strong>previous reading</strong> on the December row. On the main list, <strong>Total Due</strong> can include an older <strong>previous balance</strong>; here you see every bill line for this customer.</p>
+                            </div>
                             <div class="d-flex gap-1 align-items-center">
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="customerModalSelectAll" title="Select all bills">
                                     <i class="fas fa-check-square me-1"></i>Select All

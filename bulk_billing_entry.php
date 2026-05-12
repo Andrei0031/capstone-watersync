@@ -431,7 +431,7 @@ include 'header.php';
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
                         <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;"><strong>November</strong> is only the <em>previous reading</em> for December—it does <strong>not</strong> create its own bill. Bills are only created for <strong>December–March</strong>, and <strong>only when that column shows ✓ Paid</strong> (typing readings alone does nothing until you mark Paid). <strong>April</strong> here is verified reading for reference; bill April elsewhere.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 10px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Click <strong>✓ Paid</strong> on each of <strong>December–March</strong> you want to save this time. Months left on <strong>⏳ Pending</strong> are skipped—so if January or March stay Pending, they will not appear in Billing History.
+                            <strong>Per-month Paid:</strong> Click <strong>✓ Paid</strong> on each of <strong>December–March</strong> you want to save this time. That saves the bill and records it as <strong>fully paid</strong> in Billing / customer history (with a payment row). Months left on <strong>⏳ Pending</strong> are skipped.
                         </p>
                         <p class="mb-3">
                             <button type="button" class="btn btn-sm btn-success" onclick="markBulkMonthsPaid()"><i class="fas fa-check-double me-1"></i>Mark December–March as ✓ Paid</button>
