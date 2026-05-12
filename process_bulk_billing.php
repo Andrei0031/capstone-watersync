@@ -12,6 +12,8 @@ watersync_force_timezone($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $client_id = intval($_POST['client_id'] ?? 0);
+    $payment_status = $_POST['payment_status'] ?? 'pending'; // Get payment status (pending or paid)
+    $payment_status = ($payment_status === 'paid') ? 'paid' : 'pending'; // Validate it's one of two values
 
     if ($client_id <= 0) {
         $_SESSION['bulk_message'] = 'Invalid customer';
@@ -136,9 +138,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Insert billing record with consecutive meter readings
         $insert_sql = "INSERT INTO billing_list 
                       (client_id, reading_date, previous, reading, total, status, due_date) 
-                      VALUES (?, ?, ?, ?, ?, 'pending', ?)";
+                      VALUES (?, ?, ?, ?, ?, ?, ?)";
         $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("isddds", $client_id, $reading_date, $prev_reading, $curr_reading, $amount, $due_date);
+        $insert_stmt->bind_param("isdddss", $client_id, $reading_date, $prev_reading, $curr_reading, $amount, $payment_status, $due_date);
 
         if ($insert_stmt->execute()) {
             $success_count++;

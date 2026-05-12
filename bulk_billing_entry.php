@@ -536,6 +536,36 @@ include 'header.php';
                         </div>
                     </div>
 
+                    <!-- Payment Status Selection -->
+                    <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #007bff;">
+                        <h5 style="margin-bottom: 15px;"><i class="fas fa-money-bill-wave me-2"></i>Billing Status</h5>
+                        <p style="color: #666; margin-bottom: 15px;">Mark these 5 billing records as:</p>
+                        
+                        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                            <!-- Pending Option -->
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
+                                    <input type="radio" name="payment_status" value="pending" checked style="margin-right: 10px; cursor: pointer; width: 18px; height: 18px;">
+                                    <span style="font-weight: 600; color: #ff9800; font-size: 1rem;">
+                                        <i class="fas fa-clock me-2"></i>Pending (Not Paid)
+                                    </span>
+                                </label>
+                                <p style="margin-left: 28px; color: #666; font-size: 0.9rem;">Billings will be marked as unpaid and sent to customer</p>
+                            </div>
+                            
+                            <!-- Paid Option -->
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
+                                    <input type="radio" name="payment_status" value="paid" style="margin-right: 10px; cursor: pointer; width: 18px; height: 18px;">
+                                    <span style="font-weight: 600; color: #4CAF50; font-size: 1rem;">
+                                        <i class="fas fa-check-circle me-2"></i>Paid
+                                    </span>
+                                </label>
+                                <p style="margin-left: 28px; color: #666; font-size: 0.9rem;">Billings will be marked as already paid</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-save me-2"></i>Save All Billing Records
