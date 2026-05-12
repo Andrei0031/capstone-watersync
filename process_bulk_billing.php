@@ -85,7 +85,9 @@ foreach ($months as $key => $month_info) {
         continue;
     }
 
-    if ($statuses[$key] !== 'paid') {
+    // Jan–Mar: only save when marked ✓ Paid. April: never uses that toggle (always pending in UI);
+    // save April when verified reading + March→April chain are valid.
+    if ($key !== 'apr' && $statuses[$key] !== 'paid') {
         continue;
     }
 
@@ -160,7 +162,7 @@ foreach ($months as $key => $month_info) {
 
 if ($success_count > 0) {
     $conn->commit();
-    $_SESSION['bulk_message'] = "Saved {$success_count} paid bill(s). Months left on Pending were not saved.";
+    $_SESSION['bulk_message'] = "Saved {$success_count} bill(s). Jan–Mar rows follow ✓ Paid; April saves when readings are valid. Pending Jan–Mar were not saved.";
     if ($error_count > 0) {
         $_SESSION['bulk_message'] .= ' (' . $error_count . ' skipped or failed: ' . implode('; ', array_slice($errors, 0, 5)) . ')';
     }
@@ -170,7 +172,7 @@ if ($success_count > 0) {
     if ($error_count > 0) {
         $_SESSION['bulk_message'] = 'No bills saved. ' . implode(', ', $errors);
     } else {
-        $_SESSION['bulk_message'] = 'No bills saved. Mark each month you want to record as ✓ Paid (only those months are saved), then submit again.';
+        $_SESSION['bulk_message'] = 'No bills saved. Mark Jan–Mar as ✓ Paid for each bill you want. April cannot be toggled—its bill saves when the verified April reading and March reading are valid on the same submit.';
     }
     $_SESSION['bulk_status'] = 'danger';
 }

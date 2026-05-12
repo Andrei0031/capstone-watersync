@@ -431,7 +431,7 @@ include 'header.php';
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
                         <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. <strong>April 2026</strong> shows your latest <strong>verified</strong> meter reading (reference only in Pending)—the <strong>April bill</strong> is created here when you save with March filled.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on Jan–Mar for bills you want now. <strong>April</strong> uses your verified meter reading (from Pending—reference only, not a bill there). When a verified reading loads, April is set to <strong>✓ Paid</strong> automatically so its bill is saved with your paid months; set April to <strong>Pending</strong> if you want to skip the April bill on this submit.
+                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>January–March</strong> only for bills you want saved. <strong>April</strong> cannot be marked paid—it shows your verified reading from Pending (reference only there). When you submit with at least one Jan–Mar month paid, the <strong>April bill is still saved</strong> if March and the verified April reading form a valid progression (no extra toggle).
                         </p>
                         
                         <div class="table-responsive">
@@ -456,7 +456,7 @@ include 'header.php';
                                         </th>
                                         <th width="20%">
                                             April 2026<br>
-                                            <small style="font-weight: normal; color: #dc3545;">🔒 Verified reading (bill saved here)</small>
+                                            <small style="font-weight: normal; color: #dc3545;">🔒 Verified reading (bill saved on submit, not ✓ Paid)</small>
                                         </th>
                                     </tr>
                                 </thead>
@@ -560,11 +560,10 @@ include 'header.php';
                                             <div style="background: #4CAF50; color: white; padding: 8px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
                                                 <strong>Bill:</strong> ₱<span id="apr_bill">0.00</span>
                                             </div>
-                                            <div style="display: flex; gap: 4px;">
-                                                <button type="button" class="status-btn" data-month="apr" data-status="pending" onclick="setMonthStatus('apr', 'pending')" style="flex: 1; padding: 4px; background: rgba(255, 152, 0, 0.3); border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
-                                                <button type="button" class="status-btn" data-month="apr" data-status="paid" onclick="setMonthStatus('apr', 'paid')" style="flex: 1; padding: 4px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4CAF50; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #2E7D32;">✓ Paid</button>
-                                                <input type="hidden" name="apr_status" id="apr_status" value="pending">
+                                            <div style="padding: 8px 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; font-size: 0.72rem; color: #1565c0; line-height: 1.35;">
+                                                <strong>No ✓ Paid for April.</strong> Bill is saved when March → April readings are valid on submit (with at least one Jan–Mar paid).
                                             </div>
+                                            <input type="hidden" name="apr_status" id="apr_status" value="pending">
                                         </td>
                                     </tr>
                                 </tbody>
@@ -574,7 +573,7 @@ include 'header.php';
 
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i>Save paid months only
+                        <i class="fas fa-save me-2"></i>Save paid Jan–Mar and April when valid
                     </button>
                 </form>
             </div>
@@ -583,7 +582,7 @@ include 'header.php';
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
                     <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Dec 2025 – Apr 2026 bulk)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Listed here only if they already have <strong>all four</strong> paid bulk bills for <strong>January through April 2026</strong> (December is the starting month in the form, no bill row). These accounts are <strong>excluded</strong> from the dropdown on Add Billing Entry so they are not billed again by mistake.</p>
+                    <p style="color: #666; margin-bottom: 20px;">Listed here only if they already have <strong>all four</strong> bulk billing records for <strong>January through April 2026</strong> (December is the starting month in the form, no bill row). These accounts are <strong>excluded</strong> from the dropdown on Add Billing Entry so they are not billed again by mistake.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -725,11 +724,6 @@ include 'header.php';
                     // Calculate all bills with new reading
                     calculateAllBills();
 
-                    // April bill is created on this page, not from Pending; default Paid so submit includes April when Mar→Apr is valid
-                    if (typeof setMonthStatus === 'function') {
-                        setMonthStatus('apr', 'paid');
-                    }
-                    
                     // Show billing examples progression based on April reading
                     showBillingExamples();
                     
@@ -838,6 +832,9 @@ include 'header.php';
     }
 
     function setMonthStatus(month, status) {
+        if (month === 'apr') {
+            return;
+        }
         // Update hidden field
         const hiddenInput = document.getElementById(month + '_status');
         if (hiddenInput) {
@@ -960,14 +957,14 @@ include 'header.php';
             return false;
         }
 
-        const months = ['jan', 'feb', 'mar', 'apr'];
-        const anyPaid = months.some(m => {
+        const paidToggleMonths = ['jan', 'feb', 'mar'];
+        const anyPaid = paidToggleMonths.some(m => {
             const el = document.getElementById(m + '_status');
             return el && el.value === 'paid';
         });
         if (!anyPaid) {
             e.preventDefault();
-            alert('Mark at least one month as ✓ Paid to save bills for that month only. Pending months are not saved.');
+            alert('Mark at least one of January–March as ✓ Paid. April has no Paid toggle; its bill saves when readings are valid.');
             return false;
         }
 
