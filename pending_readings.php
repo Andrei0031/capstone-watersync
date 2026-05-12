@@ -321,14 +321,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
 
             $statusToSet = ocrResultQualifiesForAutoVerify($ocrResult) ? 'verified' : 'needs_review';
 
-            $processedAt = date('Y-m-d H:i:s');
             $update = $conn->prepare("UPDATE pending_meter_readings SET 
                 status = ?,
                 ocr_reading = ?,
                 extracted_text = ?,
-                processed_at = ?
+                processed_at = NOW()
                 WHERE id = ?");
-            $update->bind_param("sdssi", $statusToSet, $ocrReading, $extractedText, $processedAt, $reading_id);
+            $update->bind_param("sdsi", $statusToSet, $ocrReading, $extractedText, $reading_id);
 
             if (!$update->execute()) {
                 throw new Exception('Failed to update database: ' . $conn->error);
@@ -342,13 +341,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_selected'])) 
             ];
         } catch (Exception $e) {
             $error_msg = $e->getMessage();
-            $failedProcessedAt = date('Y-m-d H:i:s');
             $update = $conn->prepare("UPDATE pending_meter_readings SET 
                 status = 'failed',
                 admin_notes = ?,
-                processed_at = ?
+                processed_at = NOW()
                 WHERE id = ?");
-            $update->bind_param("ssi", $error_msg, $failedProcessedAt, $reading_id);
+            $update->bind_param("si", $error_msg, $reading_id);
             $update->execute();
 
             return [
@@ -2047,7 +2045,6 @@ function pendingFormatReading($row) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <!-- DEBUG processed_at=<?php echo $row['processed_at'] ?? 'NULL'; ?> processed_date=<?php echo $row['processed_date'] ?? 'NULL'; ?> -->
                                                 <?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?>
                                             </td>
                                             <td>

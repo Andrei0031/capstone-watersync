@@ -17,6 +17,9 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/roboflow_service.php';
 require_once __DIR__ . '/ocr_functions.php';
 
+// Ensure MySQL connection also uses Manila timezone
+watersync_force_timezone($conn);
+
 header('Content-Type: application/json');
 
 if (!isset($_POST['reading_id'])) {
@@ -114,14 +117,13 @@ function processPendingReading($conn, $reading_id) {
 
         $statusToSet = ocrResultQualifiesForAutoVerify($ocrResult) ? 'verified' : 'needs_review';
 
-        $processedAt = date('Y-m-d H:i:s');
         $update = $conn->prepare("UPDATE pending_meter_readings SET 
             status = ?,
             ocr_reading = ?,
             extracted_text = ?,
-            processed_at = ?
+            processed_at = NOW()
             WHERE id = ?");
-        $update->bind_param("sdssi", $statusToSet, $ocrReading, $extractedText, $processedAt, $reading_id);
+        $update->bind_param("sdsi", $statusToSet, $ocrReading, $extractedText, $reading_id);
 
         if (!$update->execute()) {
             throw new Exception('Failed to update database: ' . $conn->error);
@@ -135,13 +137,12 @@ function processPendingReading($conn, $reading_id) {
         ];
     } catch (Exception $e) {
         $error_msg = $e->getMessage();
-        $failedProcessedAt = date('Y-m-d H:i:s');
         $update = $conn->prepare("UPDATE pending_meter_readings SET 
             status = 'failed',
             admin_notes = ?,
-            processed_at = ?
+            processed_at = NOW()
             WHERE id = ?");
-        $update->bind_param("ssi", $error_msg, $failedProcessedAt, $reading_id);
+        $update->bind_param("si", $error_msg, $reading_id);
         $update->execute();
 
         return [
