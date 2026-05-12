@@ -338,21 +338,21 @@ include 'header.php';
                         <!-- Customer Dropdown -->
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label for="customer_select"><strong>Customer Name & Meter Code:</strong></label>
-                            <p class="text-muted small mb-1">Customers who already have December 2025 plus January–March 2026 bulk bills are not listed here.</p>
+                            <p class="text-muted small mb-1">Only customers with <strong>no</strong> bill yet in December 2025 through March 2026 appear here. If bulk is started or incomplete, use <strong>Bulk progress (Dec–Mar)</strong> to find them and <strong>Billing list</strong> to add or fix months.</p>
                             <select id="customer_select" name="client_id" required style="margin-top: 8px;">
                                 <option value="">-- Choose a customer --</option>
                                 <?php
-                                // Exclude customers with full Dec 2025 + Jan–Mar 2026 bulk set (April not from bulk).
+                                // Any bill in the bulk window = started or finished; do not list (finish via Billing list).
                                 $cust_sql = "SELECT c.id, c.firstname, c.lastname, c.meter_code, c.category_id
                                     FROM client_list c
                                     WHERE c.delete_flag = 0 AND c.status = 1
-                                      AND c.id NOT IN (
-                                          SELECT bl.client_id
-                                          FROM billing_list bl
-                                          WHERE (YEAR(bl.reading_date) = 2025 AND MONTH(bl.reading_date) = 12)
-                                             OR (YEAR(bl.reading_date) = 2026 AND MONTH(bl.reading_date) IN (1, 2, 3))
-                                          GROUP BY bl.client_id
-                                          HAVING COUNT(DISTINCT (YEAR(bl.reading_date) * 100 + MONTH(bl.reading_date))) >= 4
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM billing_list bl
+                                          WHERE bl.client_id = c.id
+                                            AND (
+                                                (YEAR(bl.reading_date) = 2025 AND MONTH(bl.reading_date) = 12)
+                                                OR (YEAR(bl.reading_date) = 2026 AND MONTH(bl.reading_date) IN (1, 2, 3))
+                                            )
                                       )
                                     ORDER BY c.firstname";
                                 $customers = $conn->query($cust_sql);
@@ -594,7 +594,7 @@ include 'header.php';
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
                     <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Bulk progress (Dec–Mar)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Everyone here has at least one bill in the <strong>December 2025 – March 2026</strong> window. <strong>Dec–Mar months</strong> shows how many of the four months are on file (4/4 = finished bulk; you are still in the bulk dropdown until 4/4). Use <strong>Billing list → customer → Edit</strong> to fix readings or add a missing month. April is not part of bulk.</p>
+                    <p style="color: #666; margin-bottom: 20px;">Everyone here has at least one bill in the <strong>December 2025 – March 2026</strong> window. <strong>Dec–Mar months</strong> shows how many of the four months are on file. After the first bill in this window, the customer is <strong>removed from the Add Billing Entry dropdown</strong>; use <strong>Billing list → customer → Edit</strong> to add a missing month or fix readings until you reach 4/4. April is not part of bulk.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
