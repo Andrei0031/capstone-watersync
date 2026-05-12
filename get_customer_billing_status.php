@@ -8,73 +8,42 @@ watersync_force_timezone($conn);
 
 // Check if we should return all customers with readings
 if (isset($_GET['all']) && $_GET['all'] == '1') {
-    // Customers with a meter reading on file (pending OCR/verified) OR at least one bill in billing_list
+    // Customers who already finished bulk billing for Jan–Apr 2026 (same window as bulk_billing_entry).
+    // December is the starting point in the UI and does not get a bill row from bulk save.
     $sql = "SELECT
                 cl.id AS client_id,
                 cl.firstname,
                 cl.lastname,
                 cl.meter_code,
-                COALESCE(
-                    (
-                        SELECT COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value)
-                        FROM pending_meter_readings pmr
-                        WHERE pmr.client_id = cl.id
-                          AND pmr.status IN ('verified', 'needs_review', 'processed', 'pending')
-                          AND COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) > 0
-                        ORDER BY pmr.processed_at DESC, pmr.id DESC
-                        LIMIT 1
-                    ),
-                    (
-                        SELECT bl.reading
-                        FROM billing_list bl
-                        WHERE bl.client_id = cl.id
-                        ORDER BY bl.reading_date DESC, bl.id DESC
-                        LIMIT 1
-                    ),
-                    0
-                ) AS reading_value,
                 (
-                    SELECT bc.cycle_name
-                    FROM pending_meter_readings pmr2
-                    LEFT JOIN billing_cycles bc ON pmr2.billing_cycle_id = bc.id
-                    WHERE pmr2.client_id = cl.id
-                      AND pmr2.status IN ('verified', 'needs_review', 'processed', 'pending')
-                    ORDER BY pmr2.processed_at DESC, pmr2.id DESC
+                    SELECT bl.reading
+                    FROM billing_list bl
+                    WHERE bl.client_id = cl.id
+                      AND YEAR(bl.reading_date) = 2026
+                      AND MONTH(bl.reading_date) = 4
+                    ORDER BY bl.reading_date DESC, bl.id DESC
                     LIMIT 1
-                ) AS cycle_name,
-                COALESCE(
-                    (
-                        SELECT pmr3.processed_at
-                        FROM pending_meter_readings pmr3
-                        WHERE pmr3.client_id = cl.id
-                          AND pmr3.status IN ('verified', 'needs_review', 'processed', 'pending')
-                        ORDER BY pmr3.processed_at DESC, pmr3.id DESC
-                        LIMIT 1
-                    ),
-                    (
-                        SELECT bl2.reading_date
-                        FROM billing_list bl2
-                        WHERE bl2.client_id = cl.id
-                        ORDER BY bl2.reading_date DESC, bl2.id DESC
-                        LIMIT 1
-                    ),
-                    NOW()
+                ) AS reading_value,
+                'Dec 2025 – Apr 2026 (complete)' AS cycle_name,
+                (
+                    SELECT MAX(bl2.reading_date)
+                    FROM billing_list bl2
+                    WHERE bl2.client_id = cl.id
+                      AND YEAR(bl2.reading_date) = 2026
+                      AND MONTH(bl2.reading_date) IN (1, 2, 3, 4)
                 ) AS sort_date
             FROM client_list cl
+            INNER JOIN (
+                SELECT bl3.client_id
+                FROM billing_list bl3
+                WHERE YEAR(bl3.reading_date) = 2026
+                  AND MONTH(bl3.reading_date) IN (1, 2, 3, 4)
+                GROUP BY bl3.client_id
+                HAVING COUNT(DISTINCT MONTH(bl3.reading_date)) >= 4
+            ) bulk_done ON bulk_done.client_id = cl.id
             WHERE cl.delete_flag = 0
               AND cl.status = 1
-              AND (
-                  EXISTS (
-                      SELECT 1 FROM pending_meter_readings pmr
-                      WHERE pmr.client_id = cl.id
-                        AND pmr.status IN ('verified', 'needs_review', 'processed', 'pending')
-                        AND COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) > 0
-                  )
-                  OR EXISTS (
-                      SELECT 1 FROM billing_list bl3 WHERE bl3.client_id = cl.id
-                  )
-              )
-            HAVING reading_value > 0
+            HAVING reading_value IS NOT NULL AND reading_value > 0
             ORDER BY sort_date DESC
             LIMIT 200";
 

@@ -321,7 +321,7 @@ include 'header.php';
             </li>
             <li class="nav-item">
                 <button class="nav-link" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers-pane" type="button" role="tab">
-                    <i class="fas fa-list me-2"></i>Customers with Readings
+                    <i class="fas fa-list me-2"></i>Completed bulk (Dec–Apr)
                 </button>
             </li>
         </ul>
@@ -338,16 +338,34 @@ include 'header.php';
                         <!-- Customer Dropdown -->
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label for="customer_select"><strong>Customer Name & Meter Code:</strong></label>
+                            <p class="text-muted small mb-1">Customers who already have all four bulk bills (Jan–Apr 2026) are not listed here.</p>
                             <select id="customer_select" name="client_id" required style="margin-top: 8px;">
                                 <option value="">-- Choose a customer --</option>
                                 <?php
-                                $customers = $conn->query("SELECT id, firstname, lastname, meter_code, category_id FROM client_list WHERE delete_flag = 0 AND status = 1 ORDER BY firstname");
-                                while ($cust = $customers->fetch_assoc()):
+                                // Exclude customers who already have all four bulk bills (Jan–Apr 2026).
+                                $cust_sql = "SELECT c.id, c.firstname, c.lastname, c.meter_code, c.category_id
+                                    FROM client_list c
+                                    WHERE c.delete_flag = 0 AND c.status = 1
+                                      AND c.id NOT IN (
+                                          SELECT bl.client_id
+                                          FROM billing_list bl
+                                          WHERE YEAR(bl.reading_date) = 2026
+                                            AND MONTH(bl.reading_date) IN (1, 2, 3, 4)
+                                          GROUP BY bl.client_id
+                                          HAVING COUNT(DISTINCT MONTH(bl.reading_date)) >= 4
+                                      )
+                                    ORDER BY c.firstname";
+                                $customers = $conn->query($cust_sql);
+                                if ($customers) {
+                                    while ($cust = $customers->fetch_assoc()):
                                 ?>
                                     <option value="<?php echo $cust['id']; ?>" data-category="<?php echo $cust['category_id']; ?>">
                                         <?php echo htmlspecialchars($cust['firstname'] . ' ' . $cust['lastname'] . ' (Meter: ' . $cust['meter_code'] . ')'); ?>
                                     </option>
-                                <?php endwhile; ?>
+                                <?php
+                                    endwhile;
+                                }
+                                ?>
                             </select>
                         </div>
 
@@ -564,8 +582,8 @@ include 'header.php';
             <!-- Customers with Readings Tab -->
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
-                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers with readings or bills</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Includes customers with a pending/verified/processed meter reading <strong>or</strong> at least one bill already in billing. Use <strong>Use</strong> to open them in Add Billing Entry.</p>
+                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Dec 2025 – Apr 2026 bulk)</h5>
+                    <p style="color: #666; margin-bottom: 20px;">Listed here only if they already have <strong>all four</strong> paid bulk bills for <strong>January through April 2026</strong> (December is the starting month in the form, no bill row). These accounts are <strong>excluded</strong> from the dropdown on Add Billing Entry so they are not billed again by mistake.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -573,10 +591,10 @@ include 'header.php';
                                 <tr>
                                     <th>Customer Name</th>
                                     <th>Meter Code</th>
-                                    <th>Latest reading</th>
-                                    <th>Billing Cycle</th>
-                                    <th>Reading Date</th>
-                                    <th>Action</th>
+                                    <th>April reading (m³)</th>
+                                    <th>Status</th>
+                                    <th>Last bill date</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody id="customersTableBody">
@@ -626,31 +644,21 @@ include 'header.php';
                                 <td><strong>${customer.firstname} ${customer.lastname}</strong></td>
                                 <td>${customer.meter_code}</td>
                                 <td><span class="badge bg-success">${Number(customer.verified_reading).toFixed(2)}</span> m³</td>
-                                <td>${customer.cycle_name || 'N/A'}</td>
+                                <td><span class="badge bg-success">Complete</span></td>
                                 <td>${customer.processed_date ? (() => { const d = new Date(customer.processed_date); return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString(); })() : 'N/A'}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="selectCustomerFromTab(${customer.client_id})">
-                                        <i class="fas fa-arrow-right"></i> Use
-                                    </button>
-                                </td>
+                                <td></td>
                             </tr>
                         `;
                     });
                     document.getElementById('customersTableBody').innerHTML = html;
                 } else {
-                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers found (need a reading on file or at least one bill)</td></tr>';
+                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Jan–Apr 2026 bulk billing set yet.</td></tr>';
                 }
             })
             .catch(err => {
                 console.error('Error loading customers:', err);
                 document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading data</td></tr>';
             });
-    }
-
-    function selectCustomerFromTab(clientId) {
-        document.getElementById('customer_select').value = clientId;
-        document.getElementById('customer_select').dispatchEvent(new Event('change'));
-        document.getElementById('entry-tab').click();
     }
 
     function loadBillingStatus(clientId) {
