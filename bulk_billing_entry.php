@@ -384,35 +384,28 @@ include 'header.php';
                         <!-- Rate Information -->
                         <div id="rateInfoBox" style="display: none;">
                             <div class="rate-info">
-                                <h5>Current Water Rates</h5>
-                                <p><strong>Base Rate:</strong> ₱<span id="baseRate">0.00</span> per 6 m³</p>
-                                <p><strong>Excess Rate:</strong> ₱<span id="excessRate">0.00</span> per m³</p>
-                                <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
-                                    <i class="fas fa-calculator me-1"></i>
-                                    <strong>If consumption ≤ 6 m³:</strong> Bill = Base Rate<br>
-                                    <strong>If consumption > 6 m³:</strong> Bill = Base Rate + (Excess m³ × Excess Rate)
-                                </p>
-                                
-                                <!-- Example Calculations based on April Reading -->
-                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-                                    <h6 style="color: #007bff; margin-bottom: 10px;"><i class="fas fa-lightbulb me-2"></i>Billing Examples</h6>
-                                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">Based on your April verified reading of <strong id="exampleAprilReading">--</strong> m³:</p>
+                                <!-- Billing Examples Progression -->
+                                <div>
+                                    <h6 style="color: #007bff; margin-bottom: 10px;"><i class="fas fa-lightbulb me-2"></i>Reading Progression Examples</h6>
+                                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">Based on your April verified reading of <strong id="exampleAprilReading">--</strong> m³. Here's how readings might progress from December to January:</p>
                                     
                                     <!-- Small Consumption Example -->
-                                    <div style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #4CAF50;">
-                                        <strong style="color: #2E7D32; font-size: 0.9rem;"><i class="fas fa-arrow-up me-1"></i>Small Consumption (Low Usage)</strong>
-                                        <div style="font-size: 0.85rem; margin-top: 5px;">
-                                            Previous: <strong id="exSmallPrev">--</strong> m³ → Current: <strong id="exSmallCurr">--</strong> m³<br>
-                                            Consumption: <strong id="exSmallConsump">--</strong> m³ = Bill: <strong style="color: #2E7D32;">₱<span id="exSmallBill">0.00</span></strong>
+                                    <div style="background: rgba(76, 175, 80, 0.1); padding: 12px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #4CAF50;">
+                                        <strong style="color: #2E7D32; font-size: 0.9rem;"><i class="fas fa-chart-line me-1"></i>Example 1: Low Consumption Pattern</strong>
+                                        <div style="font-size: 0.85rem; margin-top: 6px; line-height: 1.6;">
+                                            <strong>December:</strong> Previous <strong id="exSmallDecPrev">--</strong> m³ → Current <strong id="exSmallDecCurr">--</strong> m³ (Usage: <strong id="exSmallDecUse">--</strong> m³) = ₱<strong style="color: #2E7D32;" id="exSmallDecBill">0.00</strong><br>
+                                            <strong>January:</strong> Previous <strong id="exSmallJanPrev">--</strong> m³ → Current <strong id="exSmallJanCurr">--</strong> m³ (Usage: <strong id="exSmallJanUse">--</strong> m³) = ₱<strong style="color: #2E7D32;" id="exSmallJanBill">0.00</strong><br>
+                                            <span style="color: #666; font-size: 0.8rem;">Progressing toward April ↑</span>
                                         </div>
                                     </div>
                                     
                                     <!-- Large Consumption Example -->
-                                    <div style="background: rgba(33, 150, 243, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #2196F3;">
-                                        <strong style="color: #1565C0; font-size: 0.9rem;"><i class="fas fa-arrow-up me-1"></i>Large Consumption (High Usage)</strong>
-                                        <div style="font-size: 0.85rem; margin-top: 5px;">
-                                            Previous: <strong id="exLargePrev">--</strong> m³ → Current: <strong id="exLargeCurr">--</strong> m³<br>
-                                            Consumption: <strong id="exLargeConsump">--</strong> m³ = Bill: <strong style="color: #1565C0;">₱<span id="exLargeBill">0.00</span></strong>
+                                    <div style="background: rgba(33, 150, 243, 0.1); padding: 12px; border-radius: 4px; border-left: 3px solid #2196F3;">
+                                        <strong style="color: #1565C0; font-size: 0.9rem;"><i class="fas fa-chart-line me-1"></i>Example 2: High Consumption Pattern</strong>
+                                        <div style="font-size: 0.85rem; margin-top: 6px; line-height: 1.6;">
+                                            <strong>December:</strong> Previous <strong id="exLargeDecPrev">--</strong> m³ → Current <strong id="exLargeDecCurr">--</strong> m³ (Usage: <strong id="exLargeDecUse">--</strong> m³) = ₱<strong style="color: #1565C0;" id="exLargeDecBill">0.00</strong><br>
+                                            <strong>January:</strong> Previous <strong id="exLargeJanPrev">--</strong> m³ → Current <strong id="exLargeJanCurr">--</strong> m³ (Usage: <strong id="exLargeJanUse">--</strong> m³) = ₱<strong style="color: #1565C0;" id="exLargeJanBill">0.00</strong><br>
+                                            <span style="color: #666; font-size: 0.8rem;">Progressing toward April ↑</span>
                                         </div>
                                     </div>
                                 </div>
@@ -687,7 +680,7 @@ include 'header.php';
                     // Calculate April bill
                     calculateMonthly('apr');
                     
-                    // Show billing examples based on April reading
+                    // Show billing examples progression based on April reading
                     showBillingExamples();
                     
                     console.log('Verified reading set:', verifiedReadingValue);
@@ -697,18 +690,13 @@ include 'header.php';
                     clearAprilColumn();
                 }
 
-                // Show rate info
-                const categoryId = document.getElementById('customer_select').options[document.getElementById('customer_select').selectedIndex].dataset.category;
-                if (categoryId && categoryRates[categoryId]) {
-                    const rates = categoryRates[categoryId];
-                    document.getElementById('baseRate').textContent = rates.rate.toFixed(2);
-                    document.getElementById('excessRate').textContent = rates.excess_rate.toFixed(2);
-                    document.getElementById('rateInfoBox').style.display = 'block';
-                }
+                // Show reading progression examples
+                document.getElementById('rateInfoBox').style.display = 'block';
             })
             .catch(err => {
                 console.error('Error loading verified reading:', err);
                 document.getElementById('verifiedReadingBox').style.display = 'none';
+                document.getElementById('rateInfoBox').style.display = 'none';
                 clearAprilColumn();
             });
     }
@@ -731,27 +719,69 @@ include 'header.php';
         const baseRate = rates.rate;
         const excessRate = rates.excess_rate;
 
-        // Example 1: Small consumption (use April reading + 50 m³ as example)
-        const smallConsumption = 50;
-        const smallPrevious = verifiedReadingValue;
-        const smallCurrent = verifiedReadingValue + smallConsumption;
-        const smallBill = calculateBill(smallConsumption, baseRate, excessRate);
+        // SMALL CONSUMPTION EXAMPLE: ~40 m³/month progression
+        const smallMonthlyUsage = 40;
+        
+        // Working backwards from April verified reading
+        const apr = verifiedReadingValue;
+        const mar = apr - smallMonthlyUsage;
+        const feb = mar - smallMonthlyUsage;
+        const jan = feb - smallMonthlyUsage;
+        const dec = jan - smallMonthlyUsage;
 
-        document.getElementById('exSmallPrev').textContent = smallPrevious.toFixed(2);
-        document.getElementById('exSmallCurr').textContent = smallCurrent.toFixed(2);
-        document.getElementById('exSmallConsump').textContent = smallConsumption.toFixed(2);
-        document.getElementById('exSmallBill').textContent = smallBill.toFixed(2);
+        // December small example
+        const decSmallPrev = Math.max(0, dec - smallMonthlyUsage);
+        const decSmallCurr = dec;
+        const decSmallUsage = decSmallCurr - decSmallPrev;
+        const decSmallBill = calculateBill(decSmallUsage, baseRate, excessRate);
 
-        // Example 2: Large consumption (use April reading + 500 m³ as example)
-        const largeConsumption = 500;
-        const largePrevious = verifiedReadingValue;
-        const largeCurrent = verifiedReadingValue + largeConsumption;
-        const largeBill = calculateBill(largeConsumption, baseRate, excessRate);
+        document.getElementById('exSmallDecPrev').textContent = decSmallPrev.toFixed(2);
+        document.getElementById('exSmallDecCurr').textContent = decSmallCurr.toFixed(2);
+        document.getElementById('exSmallDecUse').textContent = decSmallUsage.toFixed(2);
+        document.getElementById('exSmallDecBill').textContent = decSmallBill.toFixed(2);
 
-        document.getElementById('exLargePrev').textContent = largePrevious.toFixed(2);
-        document.getElementById('exLargeCurr').textContent = largeCurrent.toFixed(2);
-        document.getElementById('exLargeConsump').textContent = largeConsumption.toFixed(2);
-        document.getElementById('exLargeBill').textContent = largeBill.toFixed(2);
+        // January small example
+        const janSmallPrev = dec;
+        const janSmallCurr = jan;
+        const janSmallUsage = janSmallCurr - janSmallPrev;
+        const janSmallBill = calculateBill(janSmallUsage, baseRate, excessRate);
+
+        document.getElementById('exSmallJanPrev').textContent = janSmallPrev.toFixed(2);
+        document.getElementById('exSmallJanCurr').textContent = janSmallCurr.toFixed(2);
+        document.getElementById('exSmallJanUse').textContent = janSmallUsage.toFixed(2);
+        document.getElementById('exSmallJanBill').textContent = janSmallBill.toFixed(2);
+
+        // LARGE CONSUMPTION EXAMPLE: ~150 m³/month progression
+        const largeMonthlyUsage = 150;
+        
+        // Working backwards from April verified reading
+        const apr_lg = verifiedReadingValue;
+        const mar_lg = apr_lg - largeMonthlyUsage;
+        const feb_lg = mar_lg - largeMonthlyUsage;
+        const jan_lg = feb_lg - largeMonthlyUsage;
+        const dec_lg = jan_lg - largeMonthlyUsage;
+
+        // December large example
+        const decLargePrev = Math.max(0, dec_lg - largeMonthlyUsage);
+        const decLargeCurr = Math.max(0, dec_lg);
+        const decLargeUsage = decLargeCurr - decLargePrev;
+        const decLargeBill = calculateBill(decLargeUsage, baseRate, excessRate);
+
+        document.getElementById('exLargeDecPrev').textContent = decLargePrev.toFixed(2);
+        document.getElementById('exLargeDecCurr').textContent = decLargeCurr.toFixed(2);
+        document.getElementById('exLargeDecUse').textContent = decLargeUsage.toFixed(2);
+        document.getElementById('exLargeDecBill').textContent = decLargeBill.toFixed(2);
+
+        // January large example
+        const janLargePrev = Math.max(0, dec_lg);
+        const janLargeCurr = jan_lg;
+        const janLargeUsage = janLargeCurr - janLargePrev;
+        const janLargeBill = calculateBill(janLargeUsage, baseRate, excessRate);
+
+        document.getElementById('exLargeJanPrev').textContent = janLargePrev.toFixed(2);
+        document.getElementById('exLargeJanCurr').textContent = janLargeCurr.toFixed(2);
+        document.getElementById('exLargeJanUse').textContent = janLargeUsage.toFixed(2);
+        document.getElementById('exLargeJanBill').textContent = janLargeBill.toFixed(2);
     }
 
     function calculateBill(consumption, baseRate, excessRate) {
