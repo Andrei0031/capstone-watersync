@@ -729,18 +729,15 @@ include 'header.php';
         const jan = feb - smallMonthlyUsage;
         const dec = jan - smallMonthlyUsage;
 
-        // December small example
-        const decSmallPrev = Math.max(0, dec - smallMonthlyUsage);
+        // December small example - NO PREVIOUS READING
         const decSmallCurr = dec;
-        const decSmallUsage = decSmallCurr - decSmallPrev;
-        const decSmallBill = calculateBill(decSmallUsage, baseRate, excessRate);
-
-        document.getElementById('exSmallDecPrev').textContent = decSmallPrev.toFixed(2);
+        
+        document.getElementById('exSmallDecPrev').textContent = "N/A";
         document.getElementById('exSmallDecCurr').textContent = decSmallCurr.toFixed(2);
-        document.getElementById('exSmallDecUse').textContent = decSmallUsage.toFixed(2);
-        document.getElementById('exSmallDecBill').textContent = decSmallBill.toFixed(2);
+        document.getElementById('exSmallDecUse').textContent = "N/A";
+        document.getElementById('exSmallDecBill').textContent = "N/A";
 
-        // January small example
+        // January small example - uses December current as previous
         const janSmallPrev = dec;
         const janSmallCurr = jan;
         const janSmallUsage = janSmallCurr - janSmallPrev;
@@ -761,18 +758,15 @@ include 'header.php';
         const jan_lg = feb_lg - largeMonthlyUsage;
         const dec_lg = jan_lg - largeMonthlyUsage;
 
-        // December large example
-        const decLargePrev = Math.max(0, dec_lg - largeMonthlyUsage);
+        // December large example - NO PREVIOUS READING
         const decLargeCurr = Math.max(0, dec_lg);
-        const decLargeUsage = decLargeCurr - decLargePrev;
-        const decLargeBill = calculateBill(decLargeUsage, baseRate, excessRate);
-
-        document.getElementById('exLargeDecPrev').textContent = decLargePrev.toFixed(2);
+        
+        document.getElementById('exLargeDecPrev').textContent = "N/A";
         document.getElementById('exLargeDecCurr').textContent = decLargeCurr.toFixed(2);
-        document.getElementById('exLargeDecUse').textContent = decLargeUsage.toFixed(2);
-        document.getElementById('exLargeDecBill').textContent = decLargeBill.toFixed(2);
+        document.getElementById('exLargeDecUse').textContent = "N/A";
+        document.getElementById('exLargeDecBill').textContent = "N/A";
 
-        // January large example
+        // January large example - uses December current as previous
         const janLargePrev = Math.max(0, dec_lg);
         const janLargeCurr = jan_lg;
         const janLargeUsage = janLargeCurr - janLargePrev;
