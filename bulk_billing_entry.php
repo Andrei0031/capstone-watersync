@@ -466,11 +466,11 @@ include 'header.php';
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.8rem;">November 2025 (m³)</strong>
-                                                <input type="number" step="0.01" name="nov_reading" id="nov_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <input type="number" step="1" min="0" name="nov_reading" id="nov_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">December reading (m³)</strong>
-                                                <input type="number" step="0.01" name="dec_reading" id="dec_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <input type="number" step="1" min="0" name="dec_reading" id="dec_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
@@ -492,7 +492,7 @@ include 'header.php';
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
-                                                <input type="number" step="0.01" name="jan_reading" id="jan_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <input type="number" step="1" min="0" name="jan_reading" id="jan_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
@@ -514,7 +514,7 @@ include 'header.php';
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
-                                                <input type="number" step="0.01" name="feb_reading" id="feb_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <input type="number" step="1" min="0" name="feb_reading" id="feb_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
@@ -536,7 +536,7 @@ include 'header.php';
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
-                                                <input type="number" step="0.01" name="mar_reading" id="mar_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <input type="number" step="1" min="0" name="mar_reading" id="mar_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
@@ -558,7 +558,7 @@ include 'header.php';
                                         <td style="vertical-align: top; padding: 10px; background: rgba(76, 175, 80, 0.15); border-left: 4px solid #4CAF50;">
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem; color: #2E7D32;">🔒 Meter Reading (m³)</strong>
-                                                <input type="number" step="0.01" name="apr_reading" id="apr_reading" readonly placeholder="0" value="0" style="width: 100%; padding: 6px; margin-top: 3px; background: #e0e0e0; color: #666; cursor: not-allowed;">
+                                                <input type="number" step="1" min="0" name="apr_reading" id="apr_reading" readonly placeholder="0" value="0" style="width: 100%; padding: 6px; margin-top: 3px; background: #e0e0e0; color: #666; cursor: not-allowed;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
                                                 <strong style="font-size: 0.85rem; color: #2E7D32;">Consumption (m³)</strong>
@@ -619,6 +619,10 @@ include 'header.php';
     let verifiedReading = null;
     let verifiedReadingValue = 0;
 
+    function readMeterInput(id) {
+        return Math.round(parseFloat(document.getElementById(id).value) || 0);
+    }
+
     // Load category rates on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadCategoryRates();
@@ -650,7 +654,7 @@ include 'header.php';
                     data.forEach(customer => {
                         const ref = customer.verified_reading;
                         const refCell = (ref != null && !isNaN(ref) && ref > 0)
-                            ? `<span class="badge bg-secondary">${Number(ref).toFixed(2)}</span> m³`
+                            ? `<span class="badge bg-secondary">${Math.round(Number(ref))}</span> m³`
                             : '<span class="text-muted">—</span>';
                         html += `
                             <tr>
@@ -724,11 +728,11 @@ include 'header.php';
                 
                 if (data.success && data.verified_reading !== null && data.verified_reading !== undefined) {
                     verifiedReading = data.verified_reading;
-                    verifiedReadingValue = parseFloat(data.verified_reading);
+                    verifiedReadingValue = Math.round(Number(data.verified_reading));
                     
-                    // Fill April column with verified reading
-                    document.getElementById('apr_reading').value = verifiedReadingValue.toFixed(2);
-                    document.getElementById('verifiedReadingValue').textContent = verifiedReadingValue.toFixed(2);
+                    // Fill April column with verified reading (whole m³)
+                    document.getElementById('apr_reading').value = String(verifiedReadingValue);
+                    document.getElementById('verifiedReadingValue').textContent = String(verifiedReadingValue);
                     const pd = data.processed_date ? new Date(data.processed_date) : null;
                     document.getElementById('verifiedDate').textContent = (pd && !isNaN(pd.getTime()))
                         ? pd.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -765,7 +769,7 @@ include 'header.php';
         }
 
         // Display April reading as reference
-        document.getElementById('exampleAprilReading').textContent = verifiedReadingValue.toFixed(2);
+        document.getElementById('exampleAprilReading').textContent = String(Math.round(verifiedReadingValue));
 
         const categoryId = document.getElementById('customer_select').options[document.getElementById('customer_select').selectedIndex].dataset.category;
         
@@ -908,12 +912,12 @@ include 'header.php';
         const excessRate = hasRates ? categoryRates[categoryId].excess_rate : 0;
 
         const readings = {
-            nov: parseFloat(document.getElementById('nov_reading').value) || 0,
-            dec: parseFloat(document.getElementById('dec_reading').value) || 0,
-            jan: parseFloat(document.getElementById('jan_reading').value) || 0,
-            feb: parseFloat(document.getElementById('feb_reading').value) || 0,
-            mar: parseFloat(document.getElementById('mar_reading').value) || 0,
-            apr: parseFloat(document.getElementById('apr_reading').value) || 0
+            nov: readMeterInput('nov_reading'),
+            dec: readMeterInput('dec_reading'),
+            jan: readMeterInput('jan_reading'),
+            feb: readMeterInput('feb_reading'),
+            mar: readMeterInput('mar_reading'),
+            apr: readMeterInput('apr_reading')
         };
 
         // December (November → December)
@@ -1024,12 +1028,12 @@ include 'header.php';
 
         // Check if at least one month has reading data
         const readings = {
-            nov: parseFloat(document.getElementById('nov_reading').value) || 0,
-            dec: parseFloat(document.getElementById('dec_reading').value) || 0,
-            jan: parseFloat(document.getElementById('jan_reading').value) || 0,
-            feb: parseFloat(document.getElementById('feb_reading').value) || 0,
-            mar: parseFloat(document.getElementById('mar_reading').value) || 0,
-            apr: parseFloat(document.getElementById('apr_reading').value) || 0
+            nov: readMeterInput('nov_reading'),
+            dec: readMeterInput('dec_reading'),
+            jan: readMeterInput('jan_reading'),
+            feb: readMeterInput('feb_reading'),
+            mar: readMeterInput('mar_reading'),
+            apr: readMeterInput('apr_reading')
         };
 
         let hasData = Object.values(readings).some(val => val > 0);

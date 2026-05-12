@@ -69,10 +69,10 @@ $months = [
 ];
 
 $readings = [];
-$readings['nov'] = floatval($_POST['nov_reading'] ?? 0);
+$readings['nov'] = round(floatval($_POST['nov_reading'] ?? 0));
 $statuses = [];
 foreach ($months as $key => $_info) {
-    $readings[$key] = floatval($_POST[$key . '_reading'] ?? 0);
+    $readings[$key] = round(floatval($_POST[$key . '_reading'] ?? 0));
     $statuses[$key] = strtolower(trim((string) ($_POST[$key . '_status'] ?? 'pending'))) === 'paid' ? 'paid' : 'pending';
 }
 
