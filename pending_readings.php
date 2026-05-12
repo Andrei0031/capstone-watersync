@@ -1878,7 +1878,7 @@ function pendingFormatReading($row) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['processed_date'] ?? $row['processed_at'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
