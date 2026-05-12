@@ -351,22 +351,17 @@ include 'header.php';
                             </select>
                         </div>
 
-                <!-- Billing Status Box -->
-                <div id="billingStatusBox" style="display: none; margin-top: 15px;">
-                    <div class="billing-status-box">
-                        <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
-                        <p id="billingStatusText">--</p>
-            <!-- Billing Status Box -->
-                <div id="billingStatusBox" style="display: none; margin-top: 15px;">
-                    <div class="billing-status-box">
-                        <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
-                        <p id="billingStatusText">--</p>
-                        <div class="checkbox-group" id="billingCheckboxGroup" style="display: none;">
-                            <input type="checkbox" id="hasExistingBilling" name="has_existing_billing">
-                            <label for="hasExistingBilling">I'm adding to existing billing records</label>
+                        <!-- Billing Status Box -->
+                        <div id="billingStatusBox" style="display: none; margin-top: 15px;">
+                            <div class="billing-status-box">
+                                <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
+                                <p id="billingStatusText">--</p>
+                                <div class="checkbox-group" id="billingCheckboxGroup" style="display: none;">
+                                    <input type="checkbox" id="hasExistingBilling" name="has_existing_billing">
+                                    <label for="hasExistingBilling">I'm adding to existing billing records</label>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
                     </div>
 
                     <!-- Verified Reading & Rate Info Row -->
@@ -416,7 +411,10 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">Enter readings for the months below. April 2026 is locked with the verified reading.</p>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. April 2026 is locked with the verified reading.</p>
+                        <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> only on months you want to save as bills right now. Months left on <strong>⏳ Pending</strong> are not saved. You can submit again later for other months.
+                        </p>
                         
                         <div class="table-responsive">
                             <table class="readings-table" style="margin: 0;">
@@ -475,8 +473,13 @@ include 'header.php';
                                                     <span id="jan_consumption">0.00</span>
                                                 </div>
                                             </div>
-                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
                                                 <strong>Bill:</strong> ₱<span id="jan_bill">0.00</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button type="button" class="status-btn" data-month="jan" data-status="pending" onclick="setMonthStatus('jan', 'pending')" style="flex: 1; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
+                                                <button type="button" class="status-btn" data-month="jan" data-status="paid" onclick="setMonthStatus('jan', 'paid')" style="flex: 1; padding: 4px; background: #e8f5e9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #999;">✓ Paid</button>
+                                                <input type="hidden" name="jan_status" id="jan_status" value="pending">
                                             </div>
                                         </td>
                                         
@@ -492,8 +495,13 @@ include 'header.php';
                                                     <span id="feb_consumption">0.00</span>
                                                 </div>
                                             </div>
-                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
                                                 <strong>Bill:</strong> ₱<span id="feb_bill">0.00</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button type="button" class="status-btn" data-month="feb" data-status="pending" onclick="setMonthStatus('feb', 'pending')" style="flex: 1; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
+                                                <button type="button" class="status-btn" data-month="feb" data-status="paid" onclick="setMonthStatus('feb', 'paid')" style="flex: 1; padding: 4px; background: #e8f5e9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #999;">✓ Paid</button>
+                                                <input type="hidden" name="feb_status" id="feb_status" value="pending">
                                             </div>
                                         </td>
                                         
@@ -509,8 +517,13 @@ include 'header.php';
                                                     <span id="mar_consumption">0.00</span>
                                                 </div>
                                             </div>
-                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
                                                 <strong>Bill:</strong> ₱<span id="mar_bill">0.00</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button type="button" class="status-btn" data-month="mar" data-status="pending" onclick="setMonthStatus('mar', 'pending')" style="flex: 1; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
+                                                <button type="button" class="status-btn" data-month="mar" data-status="paid" onclick="setMonthStatus('mar', 'paid')" style="flex: 1; padding: 4px; background: #e8f5e9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #999;">✓ Paid</button>
+                                                <input type="hidden" name="mar_status" id="mar_status" value="pending">
                                             </div>
                                         </td>
                                         
@@ -526,8 +539,13 @@ include 'header.php';
                                                     <span id="apr_consumption">0.00</span>
                                                 </div>
                                             </div>
-                                            <div style="background: #4CAF50; color: white; padding: 8px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
+                                            <div style="background: #4CAF50; color: white; padding: 8px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">
                                                 <strong>Bill:</strong> ₱<span id="apr_bill">0.00</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button type="button" class="status-btn" data-month="apr" data-status="pending" onclick="setMonthStatus('apr', 'pending')" style="flex: 1; padding: 4px; background: rgba(255, 152, 0, 0.3); border: 1px solid #ffc107; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #ff9800;">⏳ Pending</button>
+                                                <button type="button" class="status-btn" data-month="apr" data-status="paid" onclick="setMonthStatus('apr', 'paid')" style="flex: 1; padding: 4px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4CAF50; border-radius: 3px; font-size: 0.75rem; cursor: pointer; font-weight: 600; color: #2E7D32;">✓ Paid</button>
+                                                <input type="hidden" name="apr_status" id="apr_status" value="pending">
                                             </div>
                                         </td>
                                     </tr>
@@ -536,39 +554,9 @@ include 'header.php';
                         </div>
                     </div>
 
-                    <!-- Payment Status Selection -->
-                    <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #007bff;">
-                        <h5 style="margin-bottom: 15px;"><i class="fas fa-money-bill-wave me-2"></i>Billing Status</h5>
-                        <p style="color: #666; margin-bottom: 15px;">Mark these 5 billing records as:</p>
-                        
-                        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
-                            <!-- Pending Option -->
-                            <div style="flex: 1; min-width: 200px;">
-                                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
-                                    <input type="radio" name="payment_status" value="pending" checked style="margin-right: 10px; cursor: pointer; width: 18px; height: 18px;">
-                                    <span style="font-weight: 600; color: #ff9800; font-size: 1rem;">
-                                        <i class="fas fa-clock me-2"></i>Pending (Not Paid)
-                                    </span>
-                                </label>
-                                <p style="margin-left: 28px; color: #666; font-size: 0.9rem;">Billings will be marked as unpaid and sent to customer</p>
-                            </div>
-                            
-                            <!-- Paid Option -->
-                            <div style="flex: 1; min-width: 200px;">
-                                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
-                                    <input type="radio" name="payment_status" value="paid" style="margin-right: 10px; cursor: pointer; width: 18px; height: 18px;">
-                                    <span style="font-weight: 600; color: #4CAF50; font-size: 1rem;">
-                                        <i class="fas fa-check-circle me-2"></i>Paid
-                                    </span>
-                                </label>
-                                <p style="margin-left: 28px; color: #666; font-size: 0.9rem;">Billings will be marked as already paid</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i>Save All Billing Records
+                        <i class="fas fa-save me-2"></i>Save paid months only
                     </button>
                 </form>
             </div>
@@ -576,8 +564,8 @@ include 'header.php';
             <!-- Customers with Readings Tab -->
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
-                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers with Verified Readings</h5>
-                    <p style="color: #666; margin-bottom: 20px;">These customers already have verified readings in the system:</p>
+                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers with readings or bills</h5>
+                    <p style="color: #666; margin-bottom: 20px;">Includes customers with a pending/verified/processed meter reading <strong>or</strong> at least one bill already in billing. Use <strong>Use</strong> to open them in Add Billing Entry.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -585,7 +573,7 @@ include 'header.php';
                                 <tr>
                                     <th>Customer Name</th>
                                     <th>Meter Code</th>
-                                    <th>Verified Reading</th>
+                                    <th>Latest reading</th>
                                     <th>Billing Cycle</th>
                                     <th>Reading Date</th>
                                     <th>Action</th>
@@ -609,6 +597,12 @@ include 'header.php';
     document.addEventListener('DOMContentLoaded', function() {
         loadCategoryRates();
         loadCustomersWithReadings();
+        const customersTab = document.getElementById('customers-tab');
+        if (customersTab) {
+            customersTab.addEventListener('shown.bs.tab', function() {
+                loadCustomersWithReadings();
+            });
+        }
     });
 
     function loadCategoryRates() {
@@ -631,9 +625,9 @@ include 'header.php';
                             <tr>
                                 <td><strong>${customer.firstname} ${customer.lastname}</strong></td>
                                 <td>${customer.meter_code}</td>
-                                <td><span class="badge bg-success">${customer.verified_reading}</span> m³</td>
+                                <td><span class="badge bg-success">${Number(customer.verified_reading).toFixed(2)}</span> m³</td>
                                 <td>${customer.cycle_name || 'N/A'}</td>
-                                <td>${new Date(customer.processed_date).toLocaleDateString()}</td>
+                                <td>${customer.processed_date ? (() => { const d = new Date(customer.processed_date); return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString(); })() : 'N/A'}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" onclick="selectCustomerFromTab(${customer.client_id})">
                                         <i class="fas fa-arrow-right"></i> Use
@@ -644,7 +638,7 @@ include 'header.php';
                     });
                     document.getElementById('customersTableBody').innerHTML = html;
                 } else {
-                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with verified readings found</td></tr>';
+                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers found (need a reading on file or at least one bill)</td></tr>';
                 }
             })
             .catch(err => {
@@ -827,6 +821,45 @@ include 'header.php';
         }
     }
 
+    function setMonthStatus(month, status) {
+        // Update hidden field
+        const hiddenInput = document.getElementById(month + '_status');
+        if (hiddenInput) {
+            hiddenInput.value = status;
+        }
+
+        // Update button styles
+        const buttons = document.querySelectorAll(`.status-btn[data-month="${month}"]`);
+        buttons.forEach(btn => {
+            const btnStatus = btn.dataset.status;
+            if (btnStatus === status) {
+                // Active button (selected status)
+                if (status === 'pending') {
+                    btn.style.background = '#ffc107';
+                    btn.style.color = 'white';
+                    btn.style.fontWeight = 'bold';
+                } else {
+                    btn.style.background = '#4CAF50';
+                    btn.style.color = 'white';
+                    btn.style.fontWeight = 'bold';
+                }
+            } else {
+                // Inactive button
+                if (btnStatus === 'pending') {
+                    btn.style.background = '#fff3cd';
+                    btn.style.border = '1px solid #ffc107';
+                    btn.style.color = '#ff9800';
+                    btn.style.fontWeight = '600';
+                } else {
+                    btn.style.background = '#e8f5e9';
+                    btn.style.border = '1px solid #ddd';
+                    btn.style.color = '#999';
+                    btn.style.fontWeight = '600';
+                }
+            }
+        });
+    }
+
     function clearAprilColumn() {
         document.getElementById('apr_reading').value = '0';
         document.getElementById('apr_consumption').textContent = '0.00';
@@ -897,15 +930,6 @@ include 'header.php';
         }
     }
 
-    function calculateBill(consumption, baseRate, excessRate) {
-        if (consumption <= 6) {
-            return (consumption / 6) * baseRate;
-        } else {
-            const excessUsage = consumption - 6;
-            return baseRate + (excessUsage * excessRate);
-        }
-    }
-
     // Load verified reading and billing status when customer changes
     document.getElementById('customer_select').addEventListener('change', function() {
         loadVerifiedReading(this.value);
@@ -917,6 +941,17 @@ include 'header.php';
         if (!document.getElementById('customer_select').value) {
             e.preventDefault();
             alert('Please select a customer');
+            return false;
+        }
+
+        const months = ['jan', 'feb', 'mar', 'apr'];
+        const anyPaid = months.some(m => {
+            const el = document.getElementById(m + '_status');
+            return el && el.value === 'paid';
+        });
+        if (!anyPaid) {
+            e.preventDefault();
+            alert('Mark at least one month as ✓ Paid to save bills for that month only. Pending months are not saved.');
             return false;
         }
 

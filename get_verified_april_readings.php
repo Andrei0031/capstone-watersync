@@ -23,7 +23,8 @@ $sql = "SELECT pmr.*, cl.firstname, cl.lastname, cl.meter_code, cl.status as cli
         LEFT JOIN client_list cl ON pmr.client_id = cl.id 
         LEFT JOIN billing_cycles bc ON pmr.billing_cycle_id = bc.id
         WHERE pmr.client_id = ? 
-        AND pmr.status = 'verified'
+        AND pmr.status IN ('verified', 'needs_review', 'processed', 'pending')
+        AND COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0) > 0
         ORDER BY pmr.processed_date DESC, pmr.processed_at DESC
         LIMIT 1";
 
@@ -42,7 +43,7 @@ $stmt->close();
 if ($row && $row['reading_value'] > 0) {
     $processDate = $row['processed_date'] ?? $row['processed_at'];
     $cycleName = $row['cycle_name'] ?? 'Verified Reading';
-    
+
     echo json_encode([
         'success' => true,
         'verified_reading' => floatval($row['reading_value']),
@@ -50,9 +51,35 @@ if ($row && $row['reading_value'] > 0) {
         'processed_date' => $processDate,
         'reading_id' => $row['id'],
         'firstname' => $row['firstname'],
-        'lastname' => $row['lastname']
+        'lastname' => $row['lastname'],
     ]);
-} else {
-    echo json_encode(['success' => false, 'verified_reading' => null, 'debug' => 'No verified reading found']);
+    exit();
 }
+
+// Fallback: customer has bills encoded but no verified pending row (e.g. only billing_list)
+$billStmt = $conn->prepare(
+    'SELECT bl.reading, bl.reading_date FROM billing_list bl WHERE bl.client_id = ? ORDER BY bl.reading_date DESC, bl.id DESC LIMIT 1'
+);
+if ($billStmt) {
+    $billStmt->bind_param('i', $client_id);
+    $billStmt->execute();
+    $billRes = $billStmt->get_result();
+    $billRow = $billRes ? $billRes->fetch_assoc() : null;
+    $billStmt->close();
+    if ($billRow && floatval($billRow['reading']) > 0) {
+        echo json_encode([
+            'success' => true,
+            'verified_reading' => floatval($billRow['reading']),
+            'cycle_name' => 'Latest bill reading',
+            'processed_date' => $billRow['reading_date'],
+            'reading_id' => null,
+            'firstname' => null,
+            'lastname' => null,
+            'source' => 'billing_list',
+        ]);
+        exit();
+    }
+}
+
+echo json_encode(['success' => false, 'verified_reading' => null, 'debug' => 'No verified or bill reading found']);
 ?>
