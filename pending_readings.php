@@ -1498,9 +1498,6 @@ function pendingFormatReading($row) {
         <!-- Header Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Meter Reading Management</h2>
-            <a href="view_mobile_upload_logs.php" class="btn btn-outline-info btn-sm" target="_blank" title="See if mobile uploads are reaching the server">
-                <i class="fas fa-file-alt me-1"></i>View Mobile Upload Logs
-            </a>
         </div>
 
         <!-- Current Billing Cycle Info -->
