@@ -696,15 +696,8 @@ function pendingFormatDT($dt) {
     if (empty($dt)) return 'N/A';
     
     try {
-        // Create DateTime from the string using the app's default Manila timezone
-        // If the stored value has no timezone info, assume it's UTC in the DB
-        // and convert it to the application's default timezone for display.
-        $appTz = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
-
-        // Create DateTime assuming UTC (covers DATETIME columns stored as UTC)
-        $datetime = new DateTime($dt, new DateTimeZone('UTC'));
-        $datetime->setTimezone($appTz);
-
+        // Timestamps are already stored in local time (Manila), just format them as-is
+        $datetime = new DateTime($dt);
         return $datetime->format('M d, Y g:i A');
     } catch (Exception $e) {
         error_log("DateTime parsing error: " . $e->getMessage() . " for input: " . $dt);
