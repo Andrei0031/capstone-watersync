@@ -390,7 +390,7 @@ include 'header.php';
                                 <h6><i class="fas fa-lock me-2"></i>April 2026 Verified Reading</h6>
                                 <p><strong>Reading:</strong> <span id="verifiedReadingValue">--</span> m³</p>
                                 <p><strong>Date:</strong> <span id="verifiedDate">--</span></p>
-                                <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-info-circle me-1"></i>This reading is locked and will fill the April column</p>
+                                <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-info-circle me-1"></i>This value comes from the <strong>Pending</strong> readings workflow (verified OCR)—it is <strong>not</strong> a billing record until you save the April bill from this screen.</p>
                             </div>
                         </div>
 
@@ -429,9 +429,9 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. April 2026 is locked with the verified reading.</p>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings for the months below. <strong>April 2026</strong> shows your latest <strong>verified</strong> meter reading (reference only in Pending)—the <strong>April bill</strong> is created here when you save with March filled.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> only on months you want to save as bills right now. Months left on <strong>⏳ Pending</strong> are not saved. You can submit again later for other months.
+                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on Jan–Mar for bills you want now. <strong>April</strong> uses your verified meter reading (from Pending—reference only, not a bill there). When a verified reading loads, April is set to <strong>✓ Paid</strong> automatically so its bill is saved with your paid months; set April to <strong>Pending</strong> if you want to skip the April bill on this submit.
                         </p>
                         
                         <div class="table-responsive">
@@ -456,7 +456,7 @@ include 'header.php';
                                         </th>
                                         <th width="20%">
                                             April 2026<br>
-                                            <small style="font-weight: normal; color: #dc3545;">🔒 LOCKED (Verified)</small>
+                                            <small style="font-weight: normal; color: #dc3545;">🔒 Verified reading (bill saved here)</small>
                                         </th>
                                     </tr>
                                 </thead>
@@ -716,11 +716,19 @@ include 'header.php';
                     // Fill April column with verified reading
                     document.getElementById('apr_reading').value = verifiedReadingValue.toFixed(2);
                     document.getElementById('verifiedReadingValue').textContent = verifiedReadingValue.toFixed(2);
-                    document.getElementById('verifiedDate').textContent = new Date(data.processed_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    const pd = data.processed_date ? new Date(data.processed_date) : null;
+                    document.getElementById('verifiedDate').textContent = (pd && !isNaN(pd.getTime()))
+                        ? pd.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                        : '—';
                     document.getElementById('verifiedReadingBox').style.display = 'block';
                     
                     // Calculate all bills with new reading
                     calculateAllBills();
+
+                    // April bill is created on this page, not from Pending; default Paid so submit includes April when Mar→Apr is valid
+                    if (typeof setMonthStatus === 'function') {
+                        setMonthStatus('apr', 'paid');
+                    }
                     
                     // Show billing examples progression based on April reading
                     showBillingExamples();
