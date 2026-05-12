@@ -422,56 +422,60 @@ include 'header.php';
                             <table class="readings-table" style="margin: 0;">
                                 <thead>
                                     <tr>
-                                        <th width="18%">
+                                        <th width="16%">
                                             December 2025<br>
-                                            <small style="font-weight: normal;">(Editable)</small>
+                                            <small style="font-weight: normal;">(Starting Point)</small>
                                         </th>
-                                        <th width="18%">
+                                        <th width="16%">
                                             January 2026<br>
                                             <small style="font-weight: normal;">(Editable)</small>
                                         </th>
-                                        <th width="18%">
+                                        <th width="16%">
                                             February 2026<br>
                                             <small style="font-weight: normal;">(Editable)</small>
                                         </th>
-                                        <th width="18%">
+                                        <th width="16%">
                                             March 2026<br>
                                             <small style="font-weight: normal;">(Editable)</small>
                                         </th>
-                                        <th width="28%">
+                                        <th width="20%">
                                             April 2026<br>
                                             <small style="font-weight: normal; color: #dc3545;">🔒 LOCKED (Verified)</small>
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr id="readingRow" style="height: 120px;">
-                                        <!-- December 2025 -->
+                                    <tr id="readingRow" style="height: 140px;">
+                                        <!-- December 2025: Starting Point (No Consumption) -->
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Previous (m³)</strong>
-                                                <input type="number" step="0.01" name="dec_prev" id="dec_prev" placeholder="0" value="0" oninput="calculateMonthly('dec')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
+                                                <input type="number" step="0.01" name="dec_reading" id="dec_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Current (m³)</strong>
-                                                <input type="number" step="0.01" name="dec_curr" id="dec_curr" placeholder="0" value="0" oninput="calculateMonthly('dec')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem; color: #999;">Consumption (m³)</strong>
+                                                <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem; color: #999;">
+                                                    <strong>N/A</strong> (starting point)
+                                                </div>
                                             </div>
-                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem;">
-                                                <strong>Bill:</strong> ₱<span id="dec_bill">0.00</span>
+                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem; color: #999;">
+                                                <strong>Bill:</strong> N/A
                                             </div>
                                         </td>
                                         
                                         <!-- January 2026 -->
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Previous (m³)</strong>
-                                                <input type="number" step="0.01" name="jan_prev" id="jan_prev" placeholder="0" value="0" oninput="calculateMonthly('jan')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
+                                                <input type="number" step="0.01" name="jan_reading" id="jan_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Current (m³)</strong>
-                                                <input type="number" step="0.01" name="jan_curr" id="jan_curr" placeholder="0" value="0" oninput="calculateMonthly('jan')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
+                                                <div style="background: #e8f5e9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; color: #2E7D32;">
+                                                    <span id="jan_consumption">0.00</span>
+                                                </div>
                                             </div>
-                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
                                                 <strong>Bill:</strong> ₱<span id="jan_bill">0.00</span>
                                             </div>
                                         </td>
@@ -479,14 +483,16 @@ include 'header.php';
                                         <!-- February 2026 -->
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Previous (m³)</strong>
-                                                <input type="number" step="0.01" name="feb_prev" id="feb_prev" placeholder="0" value="0" oninput="calculateMonthly('feb')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
+                                                <input type="number" step="0.01" name="feb_reading" id="feb_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Current (m³)</strong>
-                                                <input type="number" step="0.01" name="feb_curr" id="feb_curr" placeholder="0" value="0" oninput="calculateMonthly('feb')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
+                                                <div style="background: #e8f5e9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; color: #2E7D32;">
+                                                    <span id="feb_consumption">0.00</span>
+                                                </div>
                                             </div>
-                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
                                                 <strong>Bill:</strong> ₱<span id="feb_bill">0.00</span>
                                             </div>
                                         </td>
@@ -494,27 +500,31 @@ include 'header.php';
                                         <!-- March 2026 -->
                                         <td style="vertical-align: top; padding: 10px;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Previous (m³)</strong>
-                                                <input type="number" step="0.01" name="mar_prev" id="mar_prev" placeholder="0" value="0" oninput="calculateMonthly('mar')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Meter Reading (m³)</strong>
+                                                <input type="number" step="0.01" name="mar_reading" id="mar_reading" placeholder="0" value="0" oninput="calculateAllBills()" style="width: 100%; padding: 6px; margin-top: 3px;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem;">Current (m³)</strong>
-                                                <input type="number" step="0.01" name="mar_curr" id="mar_curr" placeholder="0" value="0" oninput="calculateMonthly('mar')" style="width: 100%; padding: 6px; margin-top: 3px;">
+                                                <strong style="font-size: 0.85rem;">Consumption (m³)</strong>
+                                                <div style="background: #e8f5e9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; color: #2E7D32;">
+                                                    <span id="mar_consumption">0.00</span>
+                                                </div>
                                             </div>
-                                            <div style="background: #f0f0f0; padding: 6px; border-radius: 3px; font-size: 0.85rem;">
+                                            <div style="background: #c8e6c9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
                                                 <strong>Bill:</strong> ₱<span id="mar_bill">0.00</span>
                                             </div>
                                         </td>
                                         
                                         <!-- April 2026 (LOCKED) -->
-                                        <td style="vertical-align: top; padding: 10px; background: rgba(255, 193, 7, 0.1); border-left: 4px solid #ffc107;">
+                                        <td style="vertical-align: top; padding: 10px; background: rgba(76, 175, 80, 0.15); border-left: 4px solid #4CAF50;">
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem; color: #d32f2f;">🔒 Previous (m³)</strong>
-                                                <input type="number" step="0.01" name="apr_prev" id="apr_prev" readonly placeholder="0" value="0" style="width: 100%; padding: 6px; margin-top: 3px; background: #e0e0e0; color: #666; cursor: not-allowed;">
+                                                <strong style="font-size: 0.85rem; color: #2E7D32;">🔒 Meter Reading (m³)</strong>
+                                                <input type="number" step="0.01" name="apr_reading" id="apr_reading" readonly placeholder="0" value="0" style="width: 100%; padding: 6px; margin-top: 3px; background: #e0e0e0; color: #666; cursor: not-allowed;">
                                             </div>
                                             <div style="margin-bottom: 8px;">
-                                                <strong style="font-size: 0.85rem; color: #d32f2f;">🔒 Current (m³)</strong>
-                                                <input type="number" step="0.01" name="apr_curr" id="apr_curr" readonly placeholder="0" value="0" style="width: 100%; padding: 6px; margin-top: 3px; background: #e0e0e0; color: #666; cursor: not-allowed;">
+                                                <strong style="font-size: 0.85rem; color: #2E7D32;">Consumption (m³)</strong>
+                                                <div style="background: #e8f5e9; padding: 6px; border-radius: 3px; font-size: 0.85rem; font-weight: bold; color: #2E7D32;">
+                                                    <span id="apr_consumption">0.00</span>
+                                                </div>
                                             </div>
                                             <div style="background: #4CAF50; color: white; padding: 8px; border-radius: 3px; font-size: 0.85rem; font-weight: bold;">
                                                 <strong>Bill:</strong> ₱<span id="apr_bill">0.00</span>
@@ -672,13 +682,13 @@ include 'header.php';
                     verifiedReadingValue = parseFloat(data.verified_reading);
                     
                     // Fill April column with verified reading
-                    document.getElementById('apr_curr').value = verifiedReadingValue.toFixed(2);
+                    document.getElementById('apr_reading').value = verifiedReadingValue.toFixed(2);
                     document.getElementById('verifiedReadingValue').textContent = verifiedReadingValue.toFixed(2);
                     document.getElementById('verifiedDate').textContent = new Date(data.processed_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                     document.getElementById('verifiedReadingBox').style.display = 'block';
                     
-                    // Calculate April bill
-                    calculateMonthly('apr');
+                    // Calculate all bills with new reading
+                    calculateAllBills();
                     
                     // Show billing examples progression based on April reading
                     showBillingExamples();
@@ -788,39 +798,81 @@ include 'header.php';
     }
 
     function clearAprilColumn() {
-        document.getElementById('apr_prev').value = '0';
-        document.getElementById('apr_curr').value = '0';
+        document.getElementById('apr_reading').value = '0';
+        document.getElementById('apr_consumption').textContent = '0.00';
         document.getElementById('apr_bill').textContent = '0.00';
     }
 
-    function calculateMonthly(month) {
-        const prevInput = document.getElementById(month + '_prev');
-        const currInput = document.getElementById(month + '_curr');
-        const billSpan = document.getElementById(month + '_bill');
-        
-        if (!prevInput || !currInput || !billSpan) return;
-
-        const prevReading = parseFloat(prevInput.value) || 0;
-        const currReading = parseFloat(currInput.value) || 0;
-        const consumption = currReading - prevReading;
-
+    function calculateAllBills() {
         const categoryId = document.getElementById('customer_select').options[document.getElementById('customer_select').selectedIndex].dataset.category;
 
-        if (categoryId && categoryRates[categoryId]) {
-            const rates = categoryRates[categoryId];
-            const baseRate = rates.rate;
-            const excessRate = rates.excess_rate;
+        if (!categoryId || !categoryRates[categoryId]) return;
 
-            let amount = 0;
+        const rates = categoryRates[categoryId];
+        const baseRate = rates.rate;
+        const excessRate = rates.excess_rate;
 
-            if (consumption <= 6) {
-                amount = (consumption / 6) * baseRate;
-            } else {
-                const excessUsage = consumption - 6;
-                amount = baseRate + (excessUsage * excessRate);
-            }
+        // Get all meter readings
+        const readings = {
+            dec: parseFloat(document.getElementById('dec_reading').value) || 0,
+            jan: parseFloat(document.getElementById('jan_reading').value) || 0,
+            feb: parseFloat(document.getElementById('feb_reading').value) || 0,
+            mar: parseFloat(document.getElementById('mar_reading').value) || 0,
+            apr: parseFloat(document.getElementById('apr_reading').value) || 0
+        };
 
-            billSpan.textContent = amount.toFixed(2);
+        // Calculate and display consumption and bills for each month
+        // January (Dec reading → Jan reading)
+        if (readings.dec > 0 && readings.jan > 0) {
+            const janConsumption = readings.jan - readings.dec;
+            const janBill = calculateBill(janConsumption, baseRate, excessRate);
+            document.getElementById('jan_consumption').textContent = janConsumption.toFixed(2);
+            document.getElementById('jan_bill').textContent = janBill.toFixed(2);
+        } else {
+            document.getElementById('jan_consumption').textContent = '0.00';
+            document.getElementById('jan_bill').textContent = '0.00';
+        }
+
+        // February (Jan reading → Feb reading)
+        if (readings.jan > 0 && readings.feb > 0) {
+            const febConsumption = readings.feb - readings.jan;
+            const febBill = calculateBill(febConsumption, baseRate, excessRate);
+            document.getElementById('feb_consumption').textContent = febConsumption.toFixed(2);
+            document.getElementById('feb_bill').textContent = febBill.toFixed(2);
+        } else {
+            document.getElementById('feb_consumption').textContent = '0.00';
+            document.getElementById('feb_bill').textContent = '0.00';
+        }
+
+        // March (Feb reading → Mar reading)
+        if (readings.feb > 0 && readings.mar > 0) {
+            const marConsumption = readings.mar - readings.feb;
+            const marBill = calculateBill(marConsumption, baseRate, excessRate);
+            document.getElementById('mar_consumption').textContent = marConsumption.toFixed(2);
+            document.getElementById('mar_bill').textContent = marBill.toFixed(2);
+        } else {
+            document.getElementById('mar_consumption').textContent = '0.00';
+            document.getElementById('mar_bill').textContent = '0.00';
+        }
+
+        // April (Mar reading → Apr reading)
+        if (readings.mar > 0 && readings.apr > 0) {
+            const aprConsumption = readings.apr - readings.mar;
+            const aprBill = calculateBill(aprConsumption, baseRate, excessRate);
+            document.getElementById('apr_consumption').textContent = aprConsumption.toFixed(2);
+            document.getElementById('apr_bill').textContent = aprBill.toFixed(2);
+        } else {
+            document.getElementById('apr_consumption').textContent = '0.00';
+            document.getElementById('apr_bill').textContent = '0.00';
+        }
+    }
+
+    function calculateBill(consumption, baseRate, excessRate) {
+        if (consumption <= 6) {
+            return (consumption / 6) * baseRate;
+        } else {
+            const excessUsage = consumption - 6;
+            return baseRate + (excessUsage * excessRate);
         }
     }
 
@@ -838,22 +890,31 @@ include 'header.php';
             return false;
         }
 
-        // Check if at least one month has data
-        const months = ['dec', 'jan', 'feb', 'mar', 'apr'];
-        let hasData = false;
-        
-        months.forEach(month => {
-            const prev = parseFloat(document.getElementById(month + '_prev').value) || 0;
-            const curr = parseFloat(document.getElementById(month + '_curr').value) || 0;
-            if (prev !== 0 || curr !== 0) {
-                hasData = true;
-            }
-        });
+        // Check if at least one month has reading data
+        const readings = {
+            dec: parseFloat(document.getElementById('dec_reading').value) || 0,
+            jan: parseFloat(document.getElementById('jan_reading').value) || 0,
+            feb: parseFloat(document.getElementById('feb_reading').value) || 0,
+            mar: parseFloat(document.getElementById('mar_reading').value) || 0,
+            apr: parseFloat(document.getElementById('apr_reading').value) || 0
+        };
+
+        let hasData = Object.values(readings).some(val => val > 0);
 
         if (!hasData) {
             e.preventDefault();
-            alert('Please enter readings for at least one month');
+            alert('Please enter meter readings for at least one month');
             return false;
+        }
+
+        // Validate that readings are in ascending order
+        const readingArray = [readings.dec, readings.jan, readings.feb, readings.mar, readings.apr];
+        for (let i = 1; i < readingArray.length; i++) {
+            if (readingArray[i] > 0 && readingArray[i - 1] > 0 && readingArray[i] < readingArray[i - 1]) {
+                e.preventDefault();
+                alert('Meter readings must be in ascending order (cannot decrease)');
+                return false;
+            }
         }
     });
 </script>

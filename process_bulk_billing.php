@@ -63,21 +63,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error_count = 0;
     $errors = [];
 
+    // Get all meter readings first
+    $readings = [];
+    foreach ($months as $key => $month_info) {
+        $reading_key = $key . '_reading';
+        $readings[$key] = floatval($_POST[$reading_key] ?? 0);
+    }
+
     $conn->begin_transaction();
 
+    // Process each month using consecutive readings
     foreach ($months as $key => $month_info) {
-        $prev_key = $key . '_prev';
-        $curr_key = $key . '_curr';
+        $curr_reading = $readings[$key];
 
-        $prev_reading = floatval($_POST[$prev_key] ?? 0);
-        $curr_reading = floatval($_POST[$curr_key] ?? 0);
+        // Get previous month reading
+        $prev_key = null;
+        if ($key === 'jan') $prev_key = 'dec';
+        elseif ($key === 'feb') $prev_key = 'jan';
+        elseif ($key === 'mar') $prev_key = 'feb';
+        elseif ($key === 'apr') $prev_key = 'mar';
 
-        // Skip if no readings entered
-        if ($prev_reading == 0 && $curr_reading == 0) {
+        // Skip December (no previous to calculate consumption)
+        if ($key === 'dec') {
             continue;
         }
 
-        // Calculate consumption and bill
+        // Skip if current reading is 0 or no previous reading
+        if ($curr_reading <= 0 || !$prev_key || $readings[$prev_key] <= 0) {
+            continue;
+        }
+
+        $prev_reading = $readings[$prev_key];
+
+        // Calculate consumption
         $consumption = $curr_reading - $prev_reading;
         
         if ($consumption < 0) {
@@ -111,11 +129,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $check_stmt->close();
 
-        // Create reading date (last day of the month or today if same month)
+        // Create reading date (last day of the month)
         $reading_date = date('Y-m-d H:i:s', mktime(0, 0, 0, $month_info['month'] + 1, 0, $month_info['year']));
         $due_date = date('Y-m-d', mktime(0, 0, 0, $month_info['month'] + 2, 15, $month_info['year']));
 
-        // Insert billing record
+        // Insert billing record with consecutive meter readings
         $insert_sql = "INSERT INTO billing_list 
                       (client_id, reading_date, previous, reading, total, status, due_date) 
                       VALUES (?, ?, ?, ?, ?, 'pending', ?)";
