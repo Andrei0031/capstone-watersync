@@ -1878,7 +1878,7 @@ function pendingFormatReading($row) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['processed_at'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-danger">
@@ -2048,7 +2048,7 @@ function pendingFormatReading($row) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo pendingFormatDT($row['processed_at'] ?? null); ?>
+                                                <?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?>
                                             </td>
                                             <td>
                                                 <span class="status-badge bg-info">
@@ -2190,7 +2190,7 @@ function pendingFormatReading($row) {
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo pendingFormatDT($row['processed_at'] ?? null); ?></td>
+                                            <td><?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?></td>
                                             <td>
                                                 <span class="status-badge status-processed">
                                                     <i class="fas fa-file-invoice-dollar"></i>
