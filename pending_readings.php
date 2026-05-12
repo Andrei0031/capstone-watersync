@@ -2047,6 +2047,7 @@ function pendingFormatReading($row) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
+                                                <!-- DEBUG processed_at=<?php echo $row['processed_at'] ?? 'NULL'; ?> processed_date=<?php echo $row['processed_date'] ?? 'NULL'; ?> -->
                                                 <?php echo pendingFormatDT($row['processed_at'] ?? $row['processed_date'] ?? null); ?>
                                             </td>
                                             <td>
