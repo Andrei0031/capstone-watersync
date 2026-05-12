@@ -484,13 +484,29 @@ include 'header.php';
         fetch(`get_verified_april_readings.php?client_id=${clientId}`)
             .then(res => res.json())
             .then(data => {
-                if (data.success && data.verified_reading) {
+                console.log('Verified reading response:', data);
+                
+                if (data.success && data.verified_reading !== null && data.verified_reading !== undefined) {
                     verifiedReading = data.verified_reading;
-                    document.getElementById('verifiedReadingValue').textContent = data.verified_reading.toFixed(2);
+                    const readingValue = parseFloat(data.verified_reading).toFixed(2);
+                    document.getElementById('verifiedReadingValue').textContent = readingValue;
                     document.getElementById('verifiedCycleName').textContent = data.cycle_name || 'April Billing';
-                    document.getElementById('verifiedDate').textContent = new Date(data.processed_date).toLocaleDateString();
+                    
+                    // Format date properly
+                    let dateStr = '--';
+                    if (data.processed_date) {
+                        try {
+                            const dateObj = new Date(data.processed_date);
+                            dateStr = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                        } catch (e) {
+                            dateStr = data.processed_date;
+                        }
+                    }
+                    document.getElementById('verifiedDate').textContent = dateStr;
                     document.getElementById('verifiedReadingBox').style.display = 'block';
+                    console.log('Verified reading displayed:', readingValue, data.cycle_name);
                 } else {
+                    console.log('No verified reading found for customer');
                     document.getElementById('verifiedReadingBox').style.display = 'none';
                     verifiedReading = null;
                 }
@@ -503,6 +519,10 @@ include 'header.php';
                     document.getElementById('excessRate').textContent = rates.excess_rate.toFixed(2);
                     document.getElementById('rateInfoBox').style.display = 'block';
                 }
+            })
+            .catch(err => {
+                console.error('Error loading verified reading:', err);
+                document.getElementById('verifiedReadingBox').style.display = 'none';
             });
     }
 
