@@ -429,13 +429,13 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;"><strong>November</strong> is only the <em>previous reading</em> for December—it does <strong>not</strong> create its own bill. Bills are only created for <strong>December–March</strong>, and <strong>only when that column shows ✓ Paid</strong> (typing readings alone does nothing until you mark Paid). <strong>April</strong> here is verified reading for reference; bill April elsewhere.</p>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;"><strong>November</strong> is only the <em>previous reading</em> for December—it does <strong>not</strong> create its own bill. For <strong>December–March</strong>, submit saves each column that has valid readings: <strong>✓ Paid</strong> creates a paid bill (with payment); <strong>⏳ Pending</strong> creates an <strong>unpaid</strong> bill that still appears in Billing / customer history. <strong>April</strong> here is reference only; bill April elsewhere.</p>
                         <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 10px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Click <strong>✓ Paid</strong> on each of <strong>December–March</strong> you want to save this time. That saves the bill and records it as <strong>fully paid</strong> in Billing / customer history (with a payment row). Months left on <strong>⏳ Pending</strong> are skipped.
+                            <strong>Per month:</strong> Choose <strong>✓ Paid</strong> or <strong>⏳ Pending</strong> for each of <strong>December–March</strong> before saving. Both create billing rows when readings are valid; only Paid adds a verified payment.
                         </p>
                         <p class="mb-3">
                             <button type="button" class="btn btn-sm btn-success" onclick="markBulkMonthsPaid()"><i class="fas fa-check-double me-1"></i>Mark December–March as ✓ Paid</button>
-                            <span class="text-muted small ms-2">Use after entering readings to save all four months in one submit.</span>
+                            <span class="text-muted small ms-2">Quick-set all four months to ✓ Paid; switch individual columns to ⏳ Pending for unpaid bills.</span>
                         </p>
                         <div class="table-responsive">
                             <table class="readings-table" style="margin: 0;">
@@ -585,7 +585,7 @@ include 'header.php';
 
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i>Save paid December–March only
+                        <i class="fas fa-save me-2"></i>Save December–March bills
                     </button>
                 </form>
             </div>
@@ -594,7 +594,7 @@ include 'header.php';
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
                     <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Bulk progress (Dec–Mar)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Everyone here has at least one bill in the <strong>December 2025 – March 2026</strong> window. <strong>Dec–Mar months</strong> shows how many of the four months are on file. After the first bill in this window, the customer is <strong>removed from the Add Billing Entry dropdown</strong>; use <strong>Billing list → customer → Edit</strong> to add a missing month or fix readings until you reach 4/4. April is not part of bulk.</p>
+                    <p style="color: #666; margin-bottom: 20px;">Everyone here has at least one bill in the <strong>December 2025 – March 2026</strong> window. <strong>Dec–Mar months</strong> shows how many of the four months are on file. After the first bill in this window, the customer is <strong>removed from the Add Billing Entry dropdown</strong>; use <strong>Billing list</strong> or regular billing entry to add a missing month until you reach 4/4. April is not part of bulk.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -1034,18 +1034,6 @@ include 'header.php';
             return false;
         }
 
-        const paidToggleMonths = ['dec', 'jan', 'feb', 'mar'];
-        const anyPaid = paidToggleMonths.some(m => {
-            const el = document.getElementById(m + '_status');
-            return el && el.value === 'paid';
-        });
-        if (!anyPaid) {
-            e.preventDefault();
-            alert('Mark at least one of December–March as ✓ Paid. April is reference-only here and is not saved from bulk.');
-            return false;
-        }
-
-        // Check if at least one month has reading data
         const readings = {
             nov: readMeterInput('nov_reading'),
             dec: readMeterInput('dec_reading'),
@@ -1054,6 +1042,24 @@ include 'header.php';
             mar: readMeterInput('mar_reading'),
             apr: readMeterInput('apr_reading')
         };
+
+        const chainOk = (prev, curr) => curr > 0 && prev > 0 && curr >= prev;
+        const monthsMeta = [
+            { key: 'dec', prevKey: 'nov', currKey: 'dec' },
+            { key: 'jan', prevKey: 'dec', currKey: 'jan' },
+            { key: 'feb', prevKey: 'jan', currKey: 'feb' },
+            { key: 'mar', prevKey: 'feb', currKey: 'mar' },
+        ];
+        const anySaveable = monthsMeta.some(({ key, prevKey, currKey }) => {
+            const stEl = document.getElementById(key + '_status');
+            if (!stEl || (stEl.value !== 'paid' && stEl.value !== 'pending')) return false;
+            return chainOk(readings[prevKey], readings[currKey]);
+        });
+        if (!anySaveable) {
+            e.preventDefault();
+            alert('Enter valid meter readings for each December–March column you want to save. Use ✓ Paid for paid bills or ⏳ Pending for unpaid bills. November and December readings are required for a December bill.');
+            return false;
+        }
 
         let hasData = Object.values(readings).some(val => val > 0);
 

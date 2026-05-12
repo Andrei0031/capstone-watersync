@@ -59,7 +59,7 @@ if (!$rate_row) {
 $base_rate = floatval($rate_row['rate'] ?? 0);
 $excess_rate = floatval($rate_row['excess_rate'] ?? 0);
 
-// Bulk save: December–March when marked Paid (November reading anchors December bill).
+// Bulk save: December–March — ✓ Paid = bill + verified payment; ⏳ Pending = unpaid bill only (November anchors December).
 // April verified reading is UI reference only (create April bill elsewhere).
 $months = [
     'dec' => ['month' => 12, 'year' => 2025, 'label' => 'December 2025'],
@@ -79,14 +79,13 @@ foreach ($months as $key => $_info) {
 $success_count = 0;
 $error_count = 0;
 $errors = [];
-$saved_labels = [];
+$saved_paid_labels = [];
+$saved_unpaid_labels = [];
 
 $conn->begin_transaction();
 
 foreach ($months as $key => $month_info) {
-    if ($statuses[$key] !== 'paid') {
-        continue;
-    }
+    $is_paid = ($statuses[$key] === 'paid');
 
     $curr_reading = $readings[$key];
     $prev_key = null;
@@ -101,8 +100,11 @@ foreach ($months as $key => $month_info) {
     }
 
     if ($curr_reading <= 0 || !$prev_key || $readings[$prev_key] <= 0) {
-        $error_count++;
-        $errors[] = $month_info['label'] . ': Set meter readings before marking this month as Paid';
+        if ($is_paid) {
+            $error_count++;
+            $errors[] = $month_info['label'] . ': Set meter readings before marking this month as Paid';
+        }
+        // Pending with missing/zero readings: skip (nothing to save this month).
         continue;
     }
 
@@ -140,8 +142,7 @@ foreach ($months as $key => $month_info) {
 
     $reading_date = date('Y-m-d H:i:s', mktime(0, 0, 0, $month_info['month'] + 1, 0, $month_info['year']));
     $due_date = date('Y-m-d', mktime(0, 0, 0, $month_info['month'] + 2, 15, $month_info['year']));
-    // ✓ Paid on bulk form = bill is saved and treated as fully settled (matches billing list + customer modal).
-    $bill_status = 1;
+    $bill_status = $is_paid ? 1 : 0;
 
     $insert_sql = 'INSERT INTO billing_list
                   (client_id, reading_date, previous, reading, total, status, due_date)
@@ -151,33 +152,38 @@ foreach ($months as $key => $month_info) {
 
     if ($insert_stmt->execute()) {
         $new_bill_id = (int) $conn->insert_id;
-        $payment_ts = date('Y-m-d H:i:s');
-        $pay_sql = 'INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date)
-                    VALUES (?, ?, ?, ?, ?, ?, 1, ?)';
-        $pay_stmt = $conn->prepare($pay_sql);
-        if (!$pay_stmt) {
-            $del = $conn->prepare('DELETE FROM billing_list WHERE id = ?');
-            $del->bind_param('i', $new_bill_id);
-            $del->execute();
-            $del->close();
-            $error_count++;
-            $errors[] = $month_info['label'] . ': Could not prepare payment record (' . $conn->error . ')';
-        } else {
-            $pm = 'bulk_billing';
-            $ref = 'BULK';
-            $pay_stmt->bind_param('iisdsss', $client_id, $new_bill_id, $payment_ts, $amount, $pm, $ref, $payment_ts);
-            if (!$pay_stmt->execute()) {
+        if ($is_paid) {
+            $payment_ts = date('Y-m-d H:i:s');
+            $pay_sql = 'INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, ?)';
+            $pay_stmt = $conn->prepare($pay_sql);
+            if (!$pay_stmt) {
                 $del = $conn->prepare('DELETE FROM billing_list WHERE id = ?');
                 $del->bind_param('i', $new_bill_id);
                 $del->execute();
                 $del->close();
                 $error_count++;
-                $errors[] = $month_info['label'] . ': Payment record failed (' . $pay_stmt->error . ')';
+                $errors[] = $month_info['label'] . ': Could not prepare payment record (' . $conn->error . ')';
             } else {
-                $success_count++;
-                $saved_labels[] = $month_info['label'];
+                $pm = 'bulk_billing';
+                $ref = 'BULK';
+                $pay_stmt->bind_param('iisdsss', $client_id, $new_bill_id, $payment_ts, $amount, $pm, $ref, $payment_ts);
+                if (!$pay_stmt->execute()) {
+                    $del = $conn->prepare('DELETE FROM billing_list WHERE id = ?');
+                    $del->bind_param('i', $new_bill_id);
+                    $del->execute();
+                    $del->close();
+                    $error_count++;
+                    $errors[] = $month_info['label'] . ': Payment record failed (' . $pay_stmt->error . ')';
+                } else {
+                    $success_count++;
+                    $saved_paid_labels[] = $month_info['label'];
+                }
+                $pay_stmt->close();
             }
-            $pay_stmt->close();
+        } else {
+            $success_count++;
+            $saved_unpaid_labels[] = $month_info['label'];
         }
     } else {
         $error_count++;
@@ -188,17 +194,14 @@ foreach ($months as $key => $month_info) {
 
 if ($success_count > 0) {
     $conn->commit();
-    $pending_left = [];
-    foreach ($months as $key => $month_info) {
-        if (($statuses[$key] ?? '') !== 'paid') {
-            $pending_left[] = $month_info['label'];
-        }
+    $parts = [];
+    if (!empty($saved_paid_labels)) {
+        $parts[] = 'Fully paid (' . count($saved_paid_labels) . '): ' . implode(', ', $saved_paid_labels);
     }
-    $_SESSION['bulk_message'] = 'Saved ' . $success_count . ' bill(s) as fully paid: ' . implode(', ', $saved_labels)
-        . '. Each bill has a matching verified payment (bulk billing).';
-    if (!empty($pending_left)) {
-        $_SESSION['bulk_message'] .= ' No bill created this submit for (still ⏳ Pending): ' . implode(', ', $pending_left) . '.';
+    if (!empty($saved_unpaid_labels)) {
+        $parts[] = 'Unpaid / pending payment (' . count($saved_unpaid_labels) . '): ' . implode(', ', $saved_unpaid_labels);
     }
+    $_SESSION['bulk_message'] = 'Saved ' . $success_count . ' bill(s). ' . implode('. ', $parts) . '.';
     if ($error_count > 0) {
         $_SESSION['bulk_message'] .= ' Issues: ' . implode('; ', array_slice($errors, 0, 8));
     }
@@ -208,7 +211,7 @@ if ($success_count > 0) {
     if ($error_count > 0) {
         $_SESSION['bulk_message'] = 'No bills saved. ' . implode(', ', $errors);
     } else {
-        $_SESSION['bulk_message'] = 'No bills saved. Mark December–March as ✓ Paid for each month you want to record (enter November + December readings for a December bill). April is reference-only on this form and is not inserted from bulk save.';
+        $_SESSION['bulk_message'] = 'No bills saved. Enter readings for each December–March column you want to save. Use ✓ Paid to record as paid (with payment), or ⏳ Pending to record as unpaid. April is reference-only on this form.';
     }
     $_SESSION['bulk_status'] = 'danger';
 }
