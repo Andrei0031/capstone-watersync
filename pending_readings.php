@@ -2058,25 +2058,18 @@ function pendingFormatReading($row) {
                                                     <button class="btn btn-sm btn-outline-info" title="Reference for bulk billing" onclick="copyToClipboard(<?php echo htmlspecialchars(pendingFormatReading($row)); ?>)">
                                                         <i class="fas fa-copy"></i> Copy Reading
                                                     </button>
-                                                </div>
-                                            </td>
-                                                <span class="status-badge bg-info">
-                                                    <i class="fas fa-check-circle"></i>
-                                                    Verified
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <?php if ($delete_password_configured): ?>
-                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
-                                                        <i class="fas fa-trash"></i>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="viewImage('<?php echo htmlspecialchars($row['image_path']); ?>')">
+                                                        <i class="fas fa-eye"></i>
                                                     </button>
-                                                <?php endif; ?>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="editReading(<?php echo $row['id']; ?>)">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <?php if ($delete_password_configured): ?>
+                                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteReadingWithPassword(<?php echo $row['id']; ?>)" title="Delete Reading">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
