@@ -21,8 +21,9 @@ include 'header.php';
 .readings-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: 0;
+    box-shadow: none;
+    background: var(--bs-body-bg);
 }
 
 .readings-table th,
@@ -30,28 +31,40 @@ include 'header.php';
     padding: 12px;
     border: 1px solid var(--bs-border-color);
     text-align: center;
+    font-size: 0.95rem;
 }
 
 .readings-table th {
-    background-color: var(--bs-secondary-bg);
-    font-weight: bold;
+    background-color: #007bff;
+    font-weight: 600;
     color: white;
+    white-space: nowrap;
 }
 
-.readings-table tr:hover {
-    background-color: rgba(0,0,0,0.02);
+.readings-table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bs-body-bg);
 }
 
 .readings-table input[type="number"],
 .readings-table input[type="month"],
 .readings-table select {
     width: 100%;
-    padding: 8px;
+    min-width: 80px;
+    padding: 8px 6px;
     box-sizing: border-box;
     border: 1px solid var(--bs-border-color);
-    border-radius: 4px;
+    border-radius: 3px;
     background-color: var(--bs-body-bg);
     color: var(--bs-body-color);
+    font-size: 0.9rem;
 }
 
 .readings-table input:read-only,
@@ -107,6 +120,10 @@ include 'header.php';
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .btn-add-row:hover {
@@ -116,11 +133,13 @@ include 'header.php';
 .btn-remove {
     background: #dc3545;
     color: white;
-    padding: 6px 12px;
+    padding: 6px 10px;
     border: none;
     border-radius: 3px;
     cursor: pointer;
     font-weight: 500;
+    font-size: 0.85rem;
+    white-space: nowrap;
 }
 
 .btn-remove:hover {
@@ -133,7 +152,7 @@ include 'header.php';
 }
 
 .btn-submit {
-    margin-top: 20px;
+    margin-top: 30px;
     background-color: #007bff;
     color: white;
     padding: 12px 30px;
@@ -141,7 +160,10 @@ include 'header.php';
     border-radius: 4px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 1.05rem;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .btn-submit:hover {
@@ -291,77 +313,96 @@ include 'header.php';
         <?php endif; ?>
 
         <form id="bulkBillingForm" method="POST" action="process_bulk_billing.php">
-            <!-- Customer Selection -->
-            <div class="form-group">
-                <label for="customer_select"><strong>Select Customer:</strong></label>
-                <select id="customer_select" name="client_id" required>
-                    <option value="">-- Choose a customer --</option>
-                    <?php
-                    $customers = $conn->query("SELECT id, firstname, lastname, meter_code, category_id FROM client_list WHERE delete_flag = 0 AND status = 1 ORDER BY firstname");
-                    while ($cust = $customers->fetch_assoc()):
-                    ?>
-                        <option value="<?php echo $cust['id']; ?>" data-category="<?php echo $cust['category_id']; ?>">
-                            <?php echo htmlspecialchars($cust['firstname'] . ' ' . $cust['lastname'] . ' (Meter: ' . $cust['meter_code'] . ')'); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
+            <!-- Customer Selection Card -->
+            <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 2px solid var(--bs-border-color);">
+                <h5 style="margin-bottom: 20px;"><i class="fas fa-user me-2"></i>Select Customer</h5>
+                
+                <!-- Customer Dropdown -->
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="customer_select"><strong>Customer Name & Meter Code:</strong></label>
+                    <select id="customer_select" name="client_id" required style="margin-top: 8px;">
+                        <option value="">-- Choose a customer --</option>
+                        <?php
+                        $customers = $conn->query("SELECT id, firstname, lastname, meter_code, category_id FROM client_list WHERE delete_flag = 0 AND status = 1 ORDER BY firstname");
+                        while ($cust = $customers->fetch_assoc()):
+                        ?>
+                            <option value="<?php echo $cust['id']; ?>" data-category="<?php echo $cust['category_id']; ?>">
+                                <?php echo htmlspecialchars($cust['firstname'] . ' ' . $cust['lastname'] . ' (Meter: ' . $cust['meter_code'] . ')'); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
 
-            <!-- Billing Status Box -->
-            <div id="billingStatusBox" style="display: none;">
-                <div class="billing-status-box">
-                    <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
-                    <p id="billingStatusText">--</p>
-                    <div class="checkbox-group" id="billingCheckboxGroup" style="display: none;">
-                        <input type="checkbox" id="hasExistingBilling" name="has_existing_billing">
-                        <label for="hasExistingBilling">I'm adding to existing billing records</label>
+                <!-- Billing Status Box -->
+                <div id="billingStatusBox" style="display: none; margin-top: 15px;">
+                    <div class="billing-status-box">
+                        <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
+                        <p id="billingStatusText">--</p>
+                        <div class="checkbox-group" id="billingCheckboxGroup" style="display: none;">
+                            <input type="checkbox" id="hasExistingBilling" name="has_existing_billing">
+                            <label for="hasExistingBilling">I'm adding to existing billing records</label>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div id="verifiedReadingBox" style="display: none;">
-                <div class="verified-reading-box">
-                    <h6><i class="fas fa-lock me-2"></i>Latest Verified Reading (April Billing)</h6>
-                    <p><strong>Verified Reading:</strong> <span id="verifiedReadingValue">--</span> m³</p>
-                    <p><strong>Cycle:</strong> <span id="verifiedCycleName">--</span></p>
-                    <p><strong>Processed Date:</strong> <span id="verifiedDate">--</span></p>
-                    <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-info-circle me-1"></i>Use this as your <strong>Previous Reading</strong> for the next billing month</p>
+
+            <!-- Verified Reading & Rate Info Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <!-- Verified April Reading Box -->
+                <div id="verifiedReadingBox" style="display: none;">
+                    <div class="verified-reading-box">
+                        <h6><i class="fas fa-lock me-2"></i>Latest Verified Reading (April)</h6>
+                        <p><strong>Reading:</strong> <span id="verifiedReadingValue">--</span> m³</p>
+                        <p><strong>Cycle:</strong> <span id="verifiedCycleName">--</span></p>
+                        <p><strong>Date:</strong> <span id="verifiedDate">--</span></p>
+                        <p style="color: #666; font-size: 0.9rem; margin-top: 10px;"><i class="fas fa-arrow-right me-1"></i>Use above as <strong>Previous Reading</strong> for next month</p>
+                    </div>
+                </div>
+
+                <!-- Rate Information -->
+                <div id="rateInfoBox" style="display: none;">
+                    <div class="rate-info">
+                        <h5>Current Water Rates</h5>
+                        <p><strong>Base Rate:</strong> ₱<span id="baseRate">0.00</span> per 6 m³</p>
+                        <p><strong>Excess Rate:</strong> ₱<span id="excessRate">0.00</span> per m³</p>
+                        <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
+                            <i class="fas fa-calculator me-1"></i>
+                            <strong>If consumption ≤ 6 m³:</strong> Bill = Base Rate<br>
+                            <strong>If consumption > 6 m³:</strong> Bill = Base Rate + (Excess m³ × Excess Rate)
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Rate Information -->
-            <div id="rateInfoBox" style="display: none;">
-                <div class="rate-info">
-                    <h5>Current Water Rates</h5>
-                    <p><strong>Base Rate (First 6 m³):</strong> ₱<span id="baseRate">0.00</span> per 6 m³</p>
-                    <p><strong>Excess Rate:</strong> ₱<span id="excessRate">0.00</span> per m³ (above 6 m³)</p>
-                    <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
-                        <i class="fas fa-calculator me-1"></i>
-                        <strong>Calculation:</strong> If consumption ≤ 6 m³: Bill = Base Rate. If consumption > 6 m³: Bill = Base Rate + (Excess m³ × Excess Rate)
-                    </p>
+            <!-- Billing Records Table Section -->
+            <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records</h5>
+                
+                <div class="table-responsive">
+                    <table class="readings-table">
+                        <thead>
+                            <tr>
+                                <th>Month & Year</th>
+                                <th>Previous Reading (m³)</th>
+                                <th>Current Reading (m³)</th>
+                                <th>Usage (m³)</th>
+                                <th>Bill Amount (₱)</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="billingRows">
+                            <!-- Rows will be added here -->
+                        </tbody>
+                    </table>
                 </div>
+
+                <button type="button" class="btn-add-row" onclick="addBillingRow()" style="margin-top: 15px;">
+                    <i class="fas fa-plus me-2"></i>Add Billing Month
+                </button>
             </div>
 
-            <!-- Billing Records Table -->
-            <table class="readings-table">
-                <thead>
-                    <tr>
-                        <th width="15%">Month & Year</th>
-                        <th width="15%">Previous Reading (m³)</th>
-                        <th width="15%">Current Reading (m³)</th>
-                        <th width="12%">Usage (m³)</th>
-                        <th width="13%">Bill Amount (₱)</th>
-                        <th width="12%">Status</th>
-                        <th width="8%">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="billingRows">
-                    <!-- Rows will be added here -->
-                </tbody>
-            </table>
-
-            <button type="button" class="btn-add-row" onclick="addBillingRow()">
-                <i class="fas fa-plus me-2"></i>Add Billing Month
-            </button>
+            <!-- Submit Button -->
             <button type="submit" class="btn-submit">
                 <i class="fas fa-save me-2"></i>Save All Billing Records
             </button>

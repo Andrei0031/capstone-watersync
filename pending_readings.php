@@ -2048,6 +2048,18 @@ function pendingFormatReading($row) {
                                                 <?php echo pendingFormatDT($row['processed_date'] ?? $row['processed_at'] ?? null); ?>
                                             </td>
                                             <td>
+                                                <span class="status-badge status-processed">
+                                                    <i class="fas fa-check"></i>
+                                                    Verified
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-sm btn-outline-info" title="Reference for bulk billing" onclick="copyToClipboard(<?php echo htmlspecialchars(pendingFormatReading($row)); ?>)">
+                                                        <i class="fas fa-copy"></i> Copy Reading
+                                                    </button>
+                                                </div>
+                                            </td>
                                                 <span class="status-badge bg-info">
                                                     <i class="fas fa-check-circle"></i>
                                                     Verified
