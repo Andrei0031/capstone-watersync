@@ -392,6 +392,30 @@ include 'header.php';
                                     <strong>If consumption ≤ 6 m³:</strong> Bill = Base Rate<br>
                                     <strong>If consumption > 6 m³:</strong> Bill = Base Rate + (Excess m³ × Excess Rate)
                                 </p>
+                                
+                                <!-- Example Calculations based on April Reading -->
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                                    <h6 style="color: #007bff; margin-bottom: 10px;"><i class="fas fa-lightbulb me-2"></i>Billing Examples</h6>
+                                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">Based on your April verified reading of <strong id="exampleAprilReading">--</strong> m³:</p>
+                                    
+                                    <!-- Small Consumption Example -->
+                                    <div style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #4CAF50;">
+                                        <strong style="color: #2E7D32; font-size: 0.9rem;"><i class="fas fa-arrow-up me-1"></i>Small Consumption (Low Usage)</strong>
+                                        <div style="font-size: 0.85rem; margin-top: 5px;">
+                                            Previous: <strong id="exSmallPrev">--</strong> m³ → Current: <strong id="exSmallCurr">--</strong> m³<br>
+                                            Consumption: <strong id="exSmallConsump">--</strong> m³ = Bill: <strong style="color: #2E7D32;">₱<span id="exSmallBill">0.00</span></strong>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Large Consumption Example -->
+                                    <div style="background: rgba(33, 150, 243, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #2196F3;">
+                                        <strong style="color: #1565C0; font-size: 0.9rem;"><i class="fas fa-arrow-up me-1"></i>Large Consumption (High Usage)</strong>
+                                        <div style="font-size: 0.85rem; margin-top: 5px;">
+                                            Previous: <strong id="exLargePrev">--</strong> m³ → Current: <strong id="exLargeCurr">--</strong> m³<br>
+                                            Consumption: <strong id="exLargeConsump">--</strong> m³ = Bill: <strong style="color: #1565C0;">₱<span id="exLargeBill">0.00</span></strong>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -662,6 +686,10 @@ include 'header.php';
                     
                     // Calculate April bill
                     calculateMonthly('apr');
+                    
+                    // Show billing examples based on April reading
+                    showBillingExamples();
+                    
                     console.log('Verified reading set:', verifiedReadingValue);
                 } else {
                     console.log('No verified reading found');
@@ -683,6 +711,56 @@ include 'header.php';
                 document.getElementById('verifiedReadingBox').style.display = 'none';
                 clearAprilColumn();
             });
+    }
+
+    function showBillingExamples() {
+        if (verifiedReadingValue <= 0) {
+            return;
+        }
+
+        // Display April reading as reference
+        document.getElementById('exampleAprilReading').textContent = verifiedReadingValue.toFixed(2);
+
+        const categoryId = document.getElementById('customer_select').options[document.getElementById('customer_select').selectedIndex].dataset.category;
+        
+        if (!categoryId || !categoryRates[categoryId]) {
+            return;
+        }
+
+        const rates = categoryRates[categoryId];
+        const baseRate = rates.rate;
+        const excessRate = rates.excess_rate;
+
+        // Example 1: Small consumption (use April reading + 50 m³ as example)
+        const smallConsumption = 50;
+        const smallPrevious = verifiedReadingValue;
+        const smallCurrent = verifiedReadingValue + smallConsumption;
+        const smallBill = calculateBill(smallConsumption, baseRate, excessRate);
+
+        document.getElementById('exSmallPrev').textContent = smallPrevious.toFixed(2);
+        document.getElementById('exSmallCurr').textContent = smallCurrent.toFixed(2);
+        document.getElementById('exSmallConsump').textContent = smallConsumption.toFixed(2);
+        document.getElementById('exSmallBill').textContent = smallBill.toFixed(2);
+
+        // Example 2: Large consumption (use April reading + 500 m³ as example)
+        const largeConsumption = 500;
+        const largePrevious = verifiedReadingValue;
+        const largeCurrent = verifiedReadingValue + largeConsumption;
+        const largeBill = calculateBill(largeConsumption, baseRate, excessRate);
+
+        document.getElementById('exLargePrev').textContent = largePrevious.toFixed(2);
+        document.getElementById('exLargeCurr').textContent = largeCurrent.toFixed(2);
+        document.getElementById('exLargeConsump').textContent = largeConsumption.toFixed(2);
+        document.getElementById('exLargeBill').textContent = largeBill.toFixed(2);
+    }
+
+    function calculateBill(consumption, baseRate, excessRate) {
+        if (consumption <= 6) {
+            return (consumption / 6) * baseRate;
+        } else {
+            const excessUsage = consumption - 6;
+            return baseRate + (excessUsage * excessRate);
+        }
     }
 
     function clearAprilColumn() {
