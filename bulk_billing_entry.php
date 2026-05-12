@@ -429,11 +429,14 @@ include 'header.php';
                     <!-- Billing Records Table - 5 Fixed Months (Dec 2025 - Apr 2026) -->
                     <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h5 style="margin-bottom: 20px;"><i class="fas fa-table me-2"></i>Billing Records (5 Months)</h5>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;">Enter readings in order: <strong>November</strong> (previous) through <strong>March</strong>. <strong>Submit saves December–March</strong> for months you mark ✓ Paid. <strong>April 2026</strong> is your verified reading from Pending—<strong>reference only</strong>. Bill April using your normal billing screen.</p>
-                        <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 15px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                            <strong>Per-month Paid:</strong> Use <strong>✓ Paid</strong> on <strong>December–March</strong> for bills to save from this page. Enter <strong>November</strong> and <strong>December</strong> readings to compute and save the December bill. April is never inserted from this form.
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 8px;"><strong>November</strong> is only the <em>previous reading</em> for December—it does <strong>not</strong> create its own bill. Bills are only created for <strong>December–March</strong>, and <strong>only when that column shows ✓ Paid</strong> (typing readings alone does nothing until you mark Paid). <strong>April</strong> here is verified reading for reference; bill April elsewhere.</p>
+                        <p style="color: #0c5460; font-size: 0.9rem; margin-bottom: 10px; background: #d1ecf1; padding: 10px; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                            <strong>Per-month Paid:</strong> Click <strong>✓ Paid</strong> on each of <strong>December–March</strong> you want to save this time. Months left on <strong>⏳ Pending</strong> are skipped—so if January or March stay Pending, they will not appear in Billing History.
                         </p>
-                        
+                        <p class="mb-3">
+                            <button type="button" class="btn btn-sm btn-success" onclick="markBulkMonthsPaid()"><i class="fas fa-check-double me-1"></i>Mark December–March as ✓ Paid</button>
+                            <span class="text-muted small ms-2">Use after entering readings to save all four months in one submit.</span>
+                        </p>
                         <div class="table-responsive">
                             <table class="readings-table" style="margin: 0;">
                                 <thead>
@@ -853,6 +856,12 @@ include 'header.php';
             const excessUsage = consumption - 6;
             return baseRate + (excessUsage * excessRate);
         }
+    }
+
+    function markBulkMonthsPaid() {
+        ['dec', 'jan', 'feb', 'mar'].forEach(function(m) {
+            setMonthStatus(m, 'paid');
+        });
     }
 
     function setMonthStatus(month, status) {

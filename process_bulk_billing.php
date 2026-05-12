@@ -79,6 +79,7 @@ foreach ($months as $key => $_info) {
 $success_count = 0;
 $error_count = 0;
 $errors = [];
+$saved_labels = [];
 
 $conn->begin_transaction();
 
@@ -131,7 +132,7 @@ foreach ($months as $key => $month_info) {
 
     if ($check_stmt->get_result()->num_rows > 0) {
         $error_count++;
-        $errors[] = $month_info['label'] . ': Billing record already exists';
+        $errors[] = $month_info['label'] . ': Billing record already exists for this month';
         $check_stmt->close();
         continue;
     }
@@ -139,16 +140,18 @@ foreach ($months as $key => $month_info) {
 
     $reading_date = date('Y-m-d H:i:s', mktime(0, 0, 0, $month_info['month'] + 1, 0, $month_info['year']));
     $due_date = date('Y-m-d', mktime(0, 0, 0, $month_info['month'] + 2, 15, $month_info['year']));
-    $payment_status = 1;
+    // 0 = unpaid (same as Add Billing); customer pays via Payments later.
+    $bill_status = 0;
 
     $insert_sql = 'INSERT INTO billing_list
                   (client_id, reading_date, previous, reading, total, status, due_date)
                   VALUES (?, ?, ?, ?, ?, ?, ?)';
     $insert_stmt = $conn->prepare($insert_sql);
-    $insert_stmt->bind_param('isdddis', $client_id, $reading_date, $prev_reading, $curr_reading, $amount, $payment_status, $due_date);
+    $insert_stmt->bind_param('isdddis', $client_id, $reading_date, $prev_reading, $curr_reading, $amount, $bill_status, $due_date);
 
     if ($insert_stmt->execute()) {
         $success_count++;
+        $saved_labels[] = $month_info['label'];
     } else {
         $error_count++;
         $errors[] = $month_info['label'] . ': ' . $insert_stmt->error;
@@ -158,9 +161,19 @@ foreach ($months as $key => $month_info) {
 
 if ($success_count > 0) {
     $conn->commit();
-    $_SESSION['bulk_message'] = "Saved {$success_count} bill(s). Only ✓ Paid December–March rows are stored here. April is not created from bulk—use regular billing for April.";
+    $pending_left = [];
+    foreach ($months as $key => $month_info) {
+        if (($statuses[$key] ?? '') !== 'paid') {
+            $pending_left[] = $month_info['label'];
+        }
+    }
+    $_SESSION['bulk_message'] = 'Saved ' . $success_count . ' bill(s): ' . implode(', ', $saved_labels)
+        . '. New bills are unpaid until you record payment in Payments.';
+    if (!empty($pending_left)) {
+        $_SESSION['bulk_message'] .= ' No bill created this submit for (still ⏳ Pending): ' . implode(', ', $pending_left) . '.';
+    }
     if ($error_count > 0) {
-        $_SESSION['bulk_message'] .= ' (' . $error_count . ' skipped or failed: ' . implode('; ', array_slice($errors, 0, 5)) . ')';
+        $_SESSION['bulk_message'] .= ' Issues: ' . implode('; ', array_slice($errors, 0, 8));
     }
     $_SESSION['bulk_status'] = 'success';
 } else {
