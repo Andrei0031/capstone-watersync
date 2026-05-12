@@ -321,7 +321,7 @@ include 'header.php';
             </li>
             <li class="nav-item">
                 <button class="nav-link" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers-pane" type="button" role="tab">
-                    <i class="fas fa-list me-2"></i>Completed bulk (Dec–Mar)
+                    <i class="fas fa-list me-2"></i>Bulk progress (Dec–Mar)
                 </button>
             </li>
         </ul>
@@ -593,8 +593,8 @@ include 'header.php';
             <!-- Customers with Readings Tab -->
             <div class="tab-pane fade" id="customers-pane" role="tabpanel">
                 <div style="background: var(--bs-secondary-bg); padding: 20px; border-radius: 8px;">
-                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Customers finished (Dec–Mar bulk)</h5>
-                    <p style="color: #666; margin-bottom: 20px;">Listed when they have billing records for <strong>December 2025</strong> and <strong>January through March 2026</strong> (four months). April is not part of bulk save. These accounts are <strong>excluded</strong> from the dropdown so they are not run through bulk again by mistake.</p>
+                    <h5 style="margin-bottom: 15px;"><i class="fas fa-users me-2"></i>Bulk progress (Dec–Mar)</h5>
+                    <p style="color: #666; margin-bottom: 20px;">Everyone here has at least one bill in the <strong>December 2025 – March 2026</strong> window. <strong>Dec–Mar months</strong> shows how many of the four months are on file (4/4 = finished bulk; you are still in the bulk dropdown until 4/4). Use <strong>Billing list → customer → Edit</strong> to fix readings or add a missing month. April is not part of bulk.</p>
                     
                     <div class="table-responsive">
                         <table class="readings-table">
@@ -603,13 +603,14 @@ include 'header.php';
                                     <th>Customer Name</th>
                                     <th>Meter Code</th>
                                     <th>Verified April ref. (m³)</th>
+                                    <th>Dec–Mar months</th>
                                     <th>Status</th>
                                     <th>Last bill date</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody id="customersTableBody">
-                                <tr><td colspan="6" class="text-center text-muted" style="padding: 40px;">Loading customers...</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted" style="padding: 40px;">Loading customers...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -659,25 +660,34 @@ include 'header.php';
                         const refCell = (ref != null && !isNaN(ref) && ref > 0)
                             ? `<span class="badge bg-secondary">${Math.round(Number(ref))}</span> m³`
                             : '<span class="text-muted">—</span>';
+                        const cnt = parseInt(customer.bulk_months_count, 10) || 0;
+                        const complete = !!customer.bulk_complete;
+                        const progressCell = complete
+                            ? '<span class="badge bg-success">4 / 4</span>'
+                            : `<span class="badge bg-warning text-dark">${cnt} / 4</span>`;
+                        const statusCell = complete
+                            ? '<span class="badge bg-success">Complete</span>'
+                            : '<span class="badge bg-secondary">In progress</span>';
                         html += `
                             <tr>
                                 <td><strong>${customer.firstname} ${customer.lastname}</strong></td>
                                 <td>${customer.meter_code}</td>
                                 <td>${refCell}</td>
-                                <td><span class="badge bg-success">Dec–Mar complete</span></td>
+                                <td>${progressCell}</td>
+                                <td>${statusCell}</td>
                                 <td>${customer.processed_date ? (() => { const d = new Date(customer.processed_date); return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString(); })() : 'N/A'}</td>
-                                <td></td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="billing_list.php" target="_blank" rel="noopener">Open billing list</a></td>
                             </tr>
                         `;
                     });
                     document.getElementById('customersTableBody').innerHTML = html;
                 } else {
-                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers with a full Dec 2025 – Mar 2026 bulk billing set yet.</td></tr>';
+                    document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted">No customers with bulk-window bills (Dec 2025 – Mar 2026) yet.</td></tr>';
                 }
             })
             .catch(err => {
                 console.error('Error loading customers:', err);
-                document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading data</td></tr>';
+                document.getElementById('customersTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading data</td></tr>';
             });
     }
 

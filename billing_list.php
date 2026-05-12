@@ -2108,6 +2108,72 @@ html[data-theme="dark"] #customerDetailsModal .modal-content { background: var(-
 html[data-theme="dark"] #customerDetailsModal .card-header { background: rgba(33, 150, 243, 0.2) !important; }
 html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-body-bg) !important; }
 </style>
+<!-- Edit bill (shared: main list + customer details modal) -->
+<div class="modal fade" id="editBillModal" tabindex="-1" aria-labelledby="editBillModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="editBillModalLabel">Edit Billing Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editBillForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="editBillId" name="bill_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="modal-card">
+                                <h6 class="card-subtitle">Billing Information</h6>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Reading Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="editReadingDate" name="reading_date" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Due Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="editDueDate" name="due_date" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Status</label>
+                                    <select class="form-select form-select-sm" id="editStatus" name="status">
+                                        <option value="0">Unpaid / Pending</option>
+                                        <option value="1">Paid</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="modal-card">
+                                <h6 class="card-subtitle">Readings (m³)</h6>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Previous reading</label>
+                                    <input type="number" class="form-control form-control-sm" id="editPreviousReading" name="previous" step="1" min="0" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Current reading</label>
+                                    <input type="number" class="form-control form-control-sm" id="editCurrentReading" name="reading" step="1" min="0" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="bill-detail-label small">Rate (per m³)</label>
+                                    <input type="number" class="form-control form-control-sm" id="editRate" name="rate" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-card mt-2">
+                        <h6 class="card-subtitle">Calculated Totals</h6>
+                        <div class="payment-summary-row"><span class="payment-summary-label">Consumption</span><span class="payment-summary-value" id="editConsumption">0</span></div>
+                        <div class="payment-summary-row"><span class="payment-summary-label">Base (first 6 m³)</span><span class="payment-summary-value" id="editBaseCharge">₱0.00</span></div>
+                        <div class="payment-summary-row"><span class="payment-summary-label">Excess</span><span class="payment-summary-value" id="editExcessCharge">₱0.00</span></div>
+                        <div class="payment-summary-row payment-total"><span class="payment-summary-label">Total</span><span class="total-amount" id="editTotalAmount">₱0.00</span><input type="hidden" id="editTotalInput" name="total"></div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary" name="update_bill"><i class="fas fa-save me-1"></i>Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <!-- Customer Details Modal (compact) -->
 <div class="modal fade" id="customerDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -2176,11 +2242,12 @@ html[data-theme="dark"] #customerDetailsModal .card-body { background: var(--bs-
                                             <th class="text-end">Amount</th>
                                             <th class="text-end">Paid</th>
                                             <th class="text-end">Bal.</th>
+                                            <th class="text-center">Edit</th>
                                             <th class="text-center">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="billingHistoryTableBody">
-                                        <tr><td colspan="9" class="text-center text-muted py-2 small">Loading...</td></tr>
+                                        <tr><td colspan="10" class="text-center text-muted py-2 small">Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -2210,6 +2277,21 @@ document.addEventListener('DOMContentLoaded', function() {
         html.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
     });
+
+    (function bindCustomerBillingEditDelegation() {
+        const custHistTable = document.getElementById('customerBillingHistoryTable');
+        if (!custHistTable || custHistTable.dataset.editDelegationBound === '1') return;
+        custHistTable.dataset.editDelegationBound = '1';
+        custHistTable.addEventListener('click', function(ev) {
+            const btn = ev.target.closest('.customer-bill-edit-btn');
+            if (!btn) return;
+            ev.preventDefault();
+            const id = btn.getAttribute('data-bill-id');
+            if (id && typeof window.openEditBillFromId === 'function') {
+                window.openEditBillFromId(parseInt(id, 10));
+            }
+        });
+    })();
 
     // Modal cleanup function
     function cleanupModal(modalElement) {
@@ -2656,13 +2738,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add calculation listeners
-    ['editPreviousReading', 'editCurrentReading'].forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            element.addEventListener('input', calculateTotals);
-        }
-    });
+    window.openEditBillFromId = function(billId) {
+        if (!billId) return;
+        fetch('get_bill_details.php?id=' + encodeURIComponent(billId))
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load bill');
+                }
+                var bill = data.data;
+                document.getElementById('editBillId').value = bill.id;
+                document.getElementById('editReadingDate').value = bill.reading_date_formatted || '';
+                document.getElementById('editDueDate').value = bill.due_date_formatted || '';
+                document.getElementById('editStatus').value = (bill.status !== undefined && bill.status !== null) ? String(bill.status) : '0';
+                document.getElementById('editPreviousReading').value = bill.previous != null ? Math.round(parseFloat(bill.previous)) : '0';
+                document.getElementById('editCurrentReading').value = bill.reading != null ? Math.round(parseFloat(bill.reading)) : '0';
+                document.getElementById('editRate').value = bill.rate != null ? parseFloat(bill.rate) : '0';
+                var el = document.getElementById('editBillModal');
+                if (!el) return;
+                var editModal = bootstrap.Modal.getOrCreateInstance(el);
+                editModal.show();
+                if (typeof calculateTotals === 'function') {
+                    calculateTotals();
+                }
+            })
+            .catch(function(err) {
+                console.error(err);
+                if (typeof showError === 'function') {
+                    showError(err.message || 'Could not load bill');
+                } else {
+                    alert(err.message || 'Could not load bill');
+                }
+            });
+    };
 
     // Customer Details Modal Functionality
     window.viewCustomerDetails = function(clientId) {
@@ -2722,13 +2830,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td class="text-end"><strong>₱${parseFloat(bill.total).toFixed(2)}</strong></td>
                                     <td class="text-end">₱${parseFloat(bill.amount_paid).toFixed(2)}</td>
                                     <td class="text-end"><strong>₱${parseFloat(bill.remaining_balance).toFixed(2)}</strong></td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-primary customer-bill-edit-btn" data-bill-id="${bill.id}" title="Edit this bill">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </td>
                                     <td class="text-center"><span class="status-badge ${statusClass}">${bill.status_text}</span></td>
                                 </tr>
                             `;
                         }).join('');
                         attachCustomerModalBillingHandlers();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No billing history found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No billing history found</td></tr>';
                     }
                     
                     // Hide loading, show content

@@ -8,12 +8,13 @@ watersync_force_timezone($conn);
 
 // Check if we should return all customers with readings
 if (isset($_GET['all']) && $_GET['all'] == '1') {
-    // Bulk entry saves Dec 2025 + Jan–Mar 2026 when complete; April is separate.
+    // Anyone with at least one Dec 2025 / Jan–Mar 2026 bill in window; bulk_months_count shows progress (4 = full).
     $sql = "SELECT
                 cl.id AS client_id,
                 cl.firstname,
                 cl.lastname,
                 cl.meter_code,
+                x.bulk_months_count,
                 (
                     SELECT COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value)
                     FROM pending_meter_readings pmr
@@ -23,7 +24,6 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
                     ORDER BY pmr.processed_date DESC, pmr.processed_at DESC
                     LIMIT 1
                 ) AS reading_value,
-                'Dec 2025 – Mar 2026 bulk complete' AS cycle_name,
                 (
                     SELECT MAX(bl2.reading_date)
                     FROM billing_list bl2
@@ -35,17 +35,18 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
                 ) AS sort_date
             FROM client_list cl
             INNER JOIN (
-                SELECT bl3.client_id
+                SELECT bl3.client_id,
+                    COUNT(DISTINCT (YEAR(bl3.reading_date) * 100 + MONTH(bl3.reading_date))) AS bulk_months_count
                 FROM billing_list bl3
                 WHERE (YEAR(bl3.reading_date) = 2025 AND MONTH(bl3.reading_date) = 12)
                    OR (YEAR(bl3.reading_date) = 2026 AND MONTH(bl3.reading_date) IN (1, 2, 3))
                 GROUP BY bl3.client_id
-                HAVING COUNT(DISTINCT (YEAR(bl3.reading_date) * 100 + MONTH(bl3.reading_date))) >= 4
-            ) bulk_done ON bulk_done.client_id = cl.id
+                HAVING COUNT(DISTINCT (YEAR(bl3.reading_date) * 100 + MONTH(bl3.reading_date))) >= 1
+            ) x ON x.client_id = cl.id
             WHERE cl.delete_flag = 0
               AND cl.status = 1
-            ORDER BY sort_date DESC
-            LIMIT 200";
+            ORDER BY x.bulk_months_count DESC, sort_date DESC
+            LIMIT 300";
 
     $result = $conn->query($sql);
     $customers = [];
@@ -53,13 +54,16 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
     if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
             $ref = $row['reading_value'];
+            $cnt = (int) ($row['bulk_months_count'] ?? 0);
             $customers[] = [
                 'client_id' => (int) $row['client_id'],
                 'firstname' => $row['firstname'],
                 'lastname' => $row['lastname'],
                 'meter_code' => $row['meter_code'],
                 'verified_reading' => ($ref !== null && $ref !== '' && floatval($ref) > 0) ? floatval($ref) : null,
-                'cycle_name' => $row['cycle_name'] ?: 'Billing / reading on file',
+                'bulk_months_count' => $cnt,
+                'bulk_complete' => $cnt >= 4,
+                'cycle_name' => $cnt >= 4 ? 'Dec 2025 – Mar 2026 complete' : 'Bulk in progress',
                 'processed_date' => $row['sort_date'],
             ];
         }
