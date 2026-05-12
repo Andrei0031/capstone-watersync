@@ -228,6 +228,54 @@ include 'header.php';
     margin: 5px 0;
     font-size: 0.95rem;
 }
+
+.billing-status-box {
+    background-color: #e3f2fd;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border-left: 4px solid #2196F3;
+}
+
+.billing-status-box h6 {
+    color: #1976D2;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.billing-status-box p {
+    margin: 5px 0;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.billing-status-new {
+    background-color: #e8f5e9;
+    border-left-color: #4CAF50;
+}
+
+.billing-status-new h6 {
+    color: #388E3C;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.checkbox-group label {
+    margin: 0;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
 </style>
 
 <div class="main-content">
@@ -259,7 +307,17 @@ include 'header.php';
                 </select>
             </div>
 
-            <!-- Verified April Reading Box (Locked) -->
+            <!-- Billing Status Box -->
+            <div id="billingStatusBox" style="display: none;">
+                <div class="billing-status-box">
+                    <h6 id="billingStatusTitle"><i class="fas fa-info-circle me-2"></i>Billing Status</h6>
+                    <p id="billingStatusText">--</p>
+                    <div class="checkbox-group" id="billingCheckboxGroup" style="display: none;">
+                        <input type="checkbox" id="hasExistingBilling" name="has_existing_billing">
+                        <label for="hasExistingBilling">I'm adding to existing billing records</label>
+                    </div>
+                </div>
+            </div>
             <div id="verifiedReadingBox" style="display: none;">
                 <div class="verified-reading-box">
                     <h6><i class="fas fa-lock me-2"></i>Latest Verified Reading (April Billing)</h6>
@@ -333,6 +391,45 @@ include 'header.php';
                 categoryRates = data;
                 console.log('Rates loaded:', categoryRates);
             });
+    }
+
+    function loadBillingStatus(clientId) {
+        if (!clientId) {
+            document.getElementById('billingStatusBox').style.display = 'none';
+            return;
+        }
+
+        fetch(`get_customer_billing_status.php?client_id=${clientId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const statusBox = document.getElementById('billingStatusBox');
+                    const statusTitle = document.getElementById('billingStatusTitle');
+                    const statusText = document.getElementById('billingStatusText');
+                    const checkboxGroup = document.getElementById('billingCheckboxGroup');
+                    const checkbox = document.getElementById('hasExistingBilling');
+
+                    if (data.has_billing) {
+                        // Customer has existing billing
+                        statusBox.classList.add('billing-status-new');
+                        statusTitle.innerHTML = '<i class="fas fa-history me-2"></i>Customer has Existing Billings';
+                        statusText.innerHTML = `<strong>${data.billing_count} billing record(s) found</strong><br>Last billing: ${data.last_billing_date || 'N/A'}`;
+                        checkboxGroup.style.display = 'flex';
+                        checkbox.checked = false;
+                    } else {
+                        // New customer
+                        statusBox.classList.remove('billing-status-new');
+                        statusBox.classList.add('billing-status-new');
+                        statusTitle.innerHTML = '<i class="fas fa-star me-2"></i>New Customer';
+                        statusText.innerHTML = '<strong>No billing records found</strong><br>This customer is new to the billing system.';
+                        checkboxGroup.style.display = 'none';
+                        checkbox.checked = false;
+                    }
+
+                    statusBox.style.display = 'block';
+                }
+            })
+            .catch(err => console.error('Error loading billing status:', err));
     }
 
     function loadVerifiedReading(clientId) {
@@ -451,6 +548,7 @@ include 'header.php';
     // Load verified reading and recalculate when customer changes
     document.getElementById('customer_select').addEventListener('change', function() {
         loadVerifiedReading(this.value);
+        loadBillingStatus(this.value);
         document.querySelectorAll('#billingRows input[name="current_reading[]"]').forEach((input, idx) => {
             calculateRow(idx + 1);
         });
