@@ -194,17 +194,19 @@ if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $processed_and_verified_count = (int) ($row['processed_and_verified'] ?? 0);
 }
 
-// OCR Processed = only readings that actually went through OCR and were fully processed (have ocr_reading or extracted_text).
-// Only counts 'processed' and 'verified' statuses, excluding 'needs_review' (pending verification).
-// Excludes pending and manually added readings that never had OCR run.
-$ocr_where = "status IN ('verified','processed') 
-    AND (ocr_reading IS NOT NULL OR (extracted_text IS NOT NULL AND TRIM(COALESCE(extracted_text,'')) != ''))";
+// OCR Processed should match the Processed (Bills Created) tab so the dashboard count
+// reflects only readings that actually have a created bill entry.
+$ocr_processed_sql = "SELECT COUNT(DISTINCT pmr.id) AS cnt
+    FROM pending_meter_readings pmr
+    INNER JOIN billing_list bl ON bl.client_id = pmr.client_id
+        AND ABS(bl.reading - COALESCE(pmr.verified_reading, pmr.ocr_reading, pmr.reading_value, 0)) < 1
+        AND bl.reading_date >= DATE_SUB(pmr.processed_at, INTERVAL 7 DAY)
+    WHERE pmr.status IN ('processed', 'verified')";
 if ($active_cycle && isset($active_cycle['id'])) {
     $cycle_id = (int)$active_cycle['id'];
-    $ocr_where .= " AND billing_cycle_id = {$cycle_id}";
+    $ocr_processed_sql .= " AND pmr.billing_cycle_id = {$cycle_id}";
 }
-$ocr_attempts_sql = "SELECT COUNT(*) as cnt FROM pending_meter_readings WHERE {$ocr_where}";
-$ocr_attempts_result = $conn->query($ocr_attempts_sql);
+$ocr_attempts_result = $conn->query($ocr_processed_sql);
 if ($ocr_attempts_result && $ocr_row = $ocr_attempts_result->fetch_assoc()) {
     $ocr_processed_count = (int) ($ocr_row['cnt'] ?? 0);
 }
