@@ -954,7 +954,7 @@ $clients_needing_notices = getAllClientsNeedingNotices($billing_cycle_filter ?: 
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Total Amount Due</h6>
-                            <h4 class="card-title mb-0">₱<?php echo number_format($stats['total_amount_due'], 2); ?></h4>
+                            <h4 class="card-title mb-0">₱<?php echo number_format((float)($stats['total_amount_due'] ?? 0), 2); ?></h4>
                         </div>
                         <i class="fas fa-peso-sign fa-2x text-success"></i>
                     </div>
