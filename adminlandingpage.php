@@ -1268,10 +1268,10 @@ function updateRevenueChart(period) {
 
     const horizon = parseInt(document.getElementById('forecastHorizon')?.value || '6');
     const forecastMonths = convertHorizonToMonths(horizon, period);
-    const forecastMethod = 'seasonal';
+    const forecastMethod = 'holt';
 
-    // Fetch paid revenue forecast using time-series forecasting only
-    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Time Series');
+    // Fetch paid revenue forecast using Holt's linear trend
+    console.log('Fetching revenue forecast - Period:', period, 'Horizon:', horizon, 'Method: Holt Linear Trend');
     $.ajax({
         url: 'dashboard_data.php',
         method: 'GET',
@@ -1339,10 +1339,10 @@ function updateRevenueChart(period) {
 
         const datasets = [
             { label: 'Actual Revenue (Paid)', data: actualSeries, borderColor: '#4e73df', backgroundColor: 'rgba(78, 115, 223, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#4e73df', pointBorderColor: '#4e73df', pointRadius: 4, spanGaps: false },
-            { label: 'Forecasted Revenue (Time Series)', data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
+            { label: "Forecasted Revenue (Holt's Linear Trend)", data: forecastSeries, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.3, fill: false, pointBackgroundColor: '#dc3545', pointBorderColor: '#dc3545', pointRadius: 4, borderDash: [5,5], spanGaps: false }
         ];
         
-        console.log('TIME SERIES forecast - Actual data points:', actual.length, 'Forecast data points:', forecast.length);
+        console.log("Holt's Linear Trend forecast - Actual data points:", actual.length, 'Forecast data points:', forecast.length);
         console.log('All labels:', allLabels);
         console.log('Actual series (first 5):', actualSeries.slice(0, 5));
         console.log('Forecast series (first 5):', forecastSeries.slice(0, 5));
@@ -1482,7 +1482,7 @@ function updateRevenueChart(period) {
         }
     })
     .fail(function(xhr, status, error){
-        console.error('Time Series forecast failed:', error);
+        console.error("Holt's Linear Trend forecast failed:", error);
         console.error('Response:', xhr.responseText);
         console.log('Attempting to load actual data only as fallback');
         loadActualDataOnly(period);

@@ -578,14 +578,23 @@ class DashboardData {
             // Always provide actuals
             $actualData = $this->getRevenueData($period);
 
+            $normalizedForecastMethod = strtolower(trim((string) $forecastMethod));
+            $methodAliases = [
+                'holt' => 'exponential',
+                'holt_linear' => 'exponential',
+            ];
+            if (isset($methodAliases[$normalizedForecastMethod])) {
+                $normalizedForecastMethod = $methodAliases[$normalizedForecastMethod];
+            }
+
             // Prefer embedded PHP ML when requested
-            if ($forecastMethod === 'ml') {
+            if ($normalizedForecastMethod === 'ml') {
                 $phpMlForecast = $this->embeddedPhpMlForecast($forecastMonths);
                 if (!empty($phpMlForecast)) {
                     return [ 'actual' => $actualData, 'forecast' => $phpMlForecast ];
                 }
                 // fallback to seasonal
-                $forecastMethod = 'seasonal';
+                $normalizedForecastMethod = 'seasonal';
             }
 
             // PHP-native forecasts (fallbacks and for non-ML methods)
@@ -595,17 +604,17 @@ class DashboardData {
             // Log available methods for debugging
             if (isset($comprehensive['forecasts'])) {
                 error_log("Forecast Debug: Available methods: " . implode(', ', array_keys($comprehensive['forecasts'])));
-                error_log("Forecast Debug: Requested method: " . $forecastMethod);
+                error_log("Forecast Debug: Requested method: " . $normalizedForecastMethod);
             } else {
                 error_log("Forecast Debug: No 'forecasts' key in comprehensive result");
             }
             
-            if (isset($comprehensive['forecasts'][$forecastMethod])) {
-                $selectedForecast = $comprehensive['forecasts'][$forecastMethod];
-                error_log("Forecast Debug: Selected forecast method '{$forecastMethod}' returned " . count($selectedForecast) . " points");
+            if (isset($comprehensive['forecasts'][$normalizedForecastMethod])) {
+                $selectedForecast = $comprehensive['forecasts'][$normalizedForecastMethod];
+                error_log("Forecast Debug: Selected forecast method '{$normalizedForecastMethod}' returned " . count($selectedForecast) . " points");
             } else {
                 // Default to seasonal if requested method missing
-                error_log("Forecast Debug: Method '{$forecastMethod}' not found, falling back to seasonal");
+                error_log("Forecast Debug: Method '{$normalizedForecastMethod}' not found, falling back to seasonal");
                 $selectedForecast = $comprehensive['forecasts']['seasonal'] ?? [];
                 if (empty($selectedForecast)) {
                     // Try linear as last resort

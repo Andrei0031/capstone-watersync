@@ -389,6 +389,7 @@ class RevenueForecast {
                 'linear' => $linearForecast,
                 'moving_average' => $movingAvgForecast,
                 'exponential' => $expForecast,
+                'holt' => $expForecast,
                 'seasonal' => $seasonalForecast,
                 'ensemble' => $ensembleForecast
             ],
@@ -396,6 +397,7 @@ class RevenueForecast {
                 'linear' => 'Linear Trend',
                 'moving_average' => 'Moving Average',
                 'exponential' => 'Exponential Smoothing',
+                'holt' => "Holt's Linear Trend",
                 'seasonal' => 'Seasonal Analysis',
                 'ensemble' => 'Combined Forecast'
             ]
@@ -463,6 +465,7 @@ class RevenueForecast {
                 'linear' => $linearForecast,
                 'moving_average' => $movingAvgForecast,
                 'exponential' => $expForecast,
+                'holt' => $expForecast,
                 'seasonal' => $seasonalForecast,
                 'ensemble' => $ensembleForecast
             ],
@@ -470,6 +473,7 @@ class RevenueForecast {
                 'linear' => 'Linear Trend',
                 'moving_average' => 'Moving Average',
                 'exponential' => 'Exponential Smoothing',
+                'holt' => "Holt's Linear Trend",
                 'seasonal' => 'Seasonal Analysis',
                 'ensemble' => 'Combined Forecast'
             ]
