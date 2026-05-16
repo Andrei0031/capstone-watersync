@@ -194,9 +194,10 @@ if ($stats_result && $row = $stats_result->fetch_assoc()) {
     $processed_and_verified_count = (int) ($row['processed_and_verified'] ?? 0);
 }
 
-// OCR Processed = only readings that actually went through OCR (have ocr_reading or extracted_text).
+// OCR Processed = only readings that actually went through OCR and were fully processed (have ocr_reading or extracted_text).
+// Only counts 'processed' and 'verified' statuses, excluding 'needs_review' (pending verification).
 // Excludes pending and manually added readings that never had OCR run.
-$ocr_where = "status IN ('needs_review','verified','processed') 
+$ocr_where = "status IN ('verified','processed') 
     AND (ocr_reading IS NOT NULL OR (extracted_text IS NOT NULL AND TRIM(COALESCE(extracted_text,'')) != ''))";
 if ($active_cycle && isset($active_cycle['id'])) {
     $cycle_id = (int)$active_cycle['id'];
