@@ -11,6 +11,14 @@ date_default_timezone_set('Asia/Manila');
 include 'db.php';
 include 'late_payment_processor.php';
 
+// Add OR receipt column if it does not exist yet
+if ($conn instanceof mysqli) {
+    $or_column_check = $conn->query("SHOW COLUMNS FROM payment_list LIKE 'or_number'");
+    if ($or_column_check && $or_column_check->num_rows === 0) {
+        $conn->query("ALTER TABLE payment_list ADD COLUMN or_number VARCHAR(100) NULL AFTER reference_number");
+    }
+}
+
 // Ensure system_settings table exists for delete password configuration
 if ($conn instanceof mysqli) {
     $create_settings_table = "CREATE TABLE IF NOT EXISTS system_settings (
@@ -1163,6 +1171,19 @@ if (!empty($payment_params)) {
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Date</label>
+                            <input type="date" class="form-control" name="payment_date" value="<?php echo date('Y-m-d'); ?>">
+                            <small class="text-muted">Editable for backdated or same-day posting</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">OR Receipt No.</label>
+                            <input type="text" class="form-control" name="or_number" id="orNumber" placeholder="Enter official receipt number" required>
+                            <small class="text-muted">Match this with the paper OR issued to the customer</small>
+                        </div>
+                    </div>
+
                     <!-- Payment Summary Section -->
                     <div class="card mb-3">
                         <div class="card-body bg-light">
@@ -1215,10 +1236,6 @@ if (!empty($payment_params)) {
 
                     <div class="row">
                         <div class="col-md-6">
-                            <label class="form-label">Payment Date</label>
-                            <input type="date" class="form-control" name="payment_date" value="<?php echo date('Y-m-d'); ?>" readonly>
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label">Payment Method</label>
                             <select class="form-select" name="payment_method" required>
                                 <option value="cash">Cash</option>
@@ -1256,6 +1273,10 @@ if (!empty($payment_params)) {
                     <div class="col-6">
                         <small class="text-muted d-block">Reference Number</small>
                         <strong id="referenceNumberView"></strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">OR Receipt No.</small>
+                        <strong id="orNumberView"></strong>
                     </div>
                     <div class="col-6">
                         <small class="text-muted d-block">Amount Paid</small>
@@ -1872,6 +1893,7 @@ document.addEventListener('DOMContentLoaded', function() {
         amountToPayInput.value = '0.00';
         remainingBalanceInput.value = '0.00';
         document.getElementById('referenceNumber').value = '';
+        document.getElementById('orNumber').value = '';
         selectedBills.clear();
         allBills = [];
         selectAllBillsBtn.style.display = 'none';
@@ -2050,6 +2072,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set payment details
                 document.getElementById('referenceNumberView').textContent = payment.reference_number;
+                document.getElementById('orNumberView').textContent = payment.or_number || 'N/A';
                 // Show total amount paid if available (for multi-bill payments), otherwise show single payment amount
                 const amountToDisplay = payment.total_amount_paid || payment.amount;
                 document.getElementById('amountView').textContent = '₱' + amountToDisplay;

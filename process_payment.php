@@ -46,11 +46,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once 'db.php';
 require_once 'late_payment_processor.php';
 
+if ($conn instanceof mysqli) {
+    $or_column_check = $conn->query("SHOW COLUMNS FROM payment_list LIKE 'or_number'");
+    if ($or_column_check && $or_column_check->num_rows === 0) {
+        $conn->query("ALTER TABLE payment_list ADD COLUMN or_number VARCHAR(100) NULL AFTER reference_number");
+    }
+}
+
 try {
     // Validate required fields
     if (empty($_POST['client_id']) || empty($_POST['payment_date']) || 
         empty($_POST['payment_method']) || empty($_POST['reference_number']) || 
-        empty($_POST['amount']) || empty($_POST['bill_ids'])) {
+        empty($_POST['or_number']) || empty($_POST['amount']) || empty($_POST['bill_ids'])) {
         send_json_response(false, 'All fields are required.');
     }
 
@@ -59,6 +66,7 @@ try {
     $payment_date_input = trim((string)$_POST['payment_date']);
     $payment_method = $_POST['payment_method'];
     $reference_number = $_POST['reference_number'];
+    $or_number = trim((string)$_POST['or_number']);
     $amount_to_pay = floatval($_POST['amount']);
 
     // Keep fee calculations date-based, but always save payment with actual PH timestamp.
@@ -137,16 +145,16 @@ try {
         // Insert payment record
         if ($is_full_payment) {
             // Full payment - auto-verify with verified_date
-            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status, verified_date) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, or_number, status, verified_date) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($payment_sql);
-            $stmt->bind_param('iisdssss', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $payment_status, $verified_date);
+            $stmt->bind_param('iisdsssis', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $or_number, $payment_status, $verified_date);
         } else {
             // Partial payment - pending verification
-            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, status) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $payment_sql = "INSERT INTO payment_list (client_id, billing_id, payment_date, amount, payment_method, reference_number, or_number, status) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($payment_sql);
-            $stmt->bind_param('iisdssi', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $payment_status);
+            $stmt->bind_param('iisdsssi', $client_id, $bill_id, $payment_recorded_at, $payment_amount, $payment_method, $reference_number, $or_number, $payment_status);
         }
         
         if (!$stmt->execute()) {

@@ -639,6 +639,124 @@ class DashboardData {
     }
 
     /**
+     * Load a trained revenue forecast file produced outside the app.
+     * Supports CSV or JSON with common forecast column names.
+     */
+    public function getTrainedRevenueForecast($sourcePath = null) {
+        try {
+            $candidates = [];
+            if (!empty($sourcePath)) {
+                $candidates[] = $sourcePath;
+            }
+
+            $candidates = array_merge($candidates, [
+                __DIR__ . DIRECTORY_SEPARATOR . 'trained_revenue_forecast.csv',
+                __DIR__ . DIRECTORY_SEPARATOR . 'forecast.csv',
+                __DIR__ . DIRECTORY_SEPARATOR . 'colab' . DIRECTORY_SEPARATOR . 'forecast.csv',
+                __DIR__ . DIRECTORY_SEPARATOR . 'trained_revenue_forecast.json'
+            ]);
+
+            $existingFile = null;
+            foreach ($candidates as $candidate) {
+                if (!empty($candidate) && file_exists($candidate)) {
+                    $existingFile = $candidate;
+                    break;
+                }
+            }
+
+            if ($existingFile === null) {
+                return [
+                    'forecast' => [],
+                    'source' => null,
+                    'error' => 'No trained forecast file found. Save your Colab output as trained_revenue_forecast.csv or forecast.csv.'
+                ];
+            }
+
+            $extension = strtolower(pathinfo($existingFile, PATHINFO_EXTENSION));
+            $forecastPoints = [];
+
+            if ($extension === 'json') {
+                $raw = file_get_contents($existingFile);
+                $decoded = json_decode($raw, true);
+                if (!is_array($decoded)) {
+                    throw new Exception('Invalid JSON forecast file');
+                }
+                foreach ($decoded as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $period = $row['period'] ?? $row['ds'] ?? $row['date'] ?? $row['month'] ?? null;
+                    $value = $row['revenue'] ?? $row['yhat'] ?? $row['value'] ?? $row['forecast'] ?? $row['prediction'] ?? null;
+                    if ($period === null || $value === null) {
+                        continue;
+                    }
+                    $forecastPoints[] = [
+                        'period' => (string)$period,
+                        'revenue' => max(0, (float)$value)
+                    ];
+                }
+            } else {
+                $handle = fopen($existingFile, 'r');
+                if ($handle === false) {
+                    throw new Exception('Unable to open trained forecast file');
+                }
+
+                $headers = fgetcsv($handle);
+                if ($headers === false) {
+                    fclose($handle);
+                    throw new Exception('Trained forecast file is empty');
+                }
+
+                $normalizedHeaders = array_map(function($header) {
+                    return strtolower(trim((string)$header));
+                }, $headers);
+
+                while (($row = fgetcsv($handle)) !== false) {
+                    if ($row === [null] || empty($row)) {
+                        continue;
+                    }
+
+                    $mapped = [];
+                    foreach ($normalizedHeaders as $index => $header) {
+                        $mapped[$header] = isset($row[$index]) ? trim((string)$row[$index]) : '';
+                    }
+
+                    $period = $mapped['period'] ?? $mapped['ds'] ?? $mapped['date'] ?? $mapped['month'] ?? $mapped['datetime'] ?? null;
+                    $value = $mapped['revenue'] ?? $mapped['yhat'] ?? $mapped['value'] ?? $mapped['forecast'] ?? $mapped['prediction'] ?? null;
+                    if ($period === null || $period === '' || $value === null || $value === '') {
+                        continue;
+                    }
+
+                    $forecastPoints[] = [
+                        'period' => $period,
+                        'revenue' => max(0, (float)str_replace(',', '', $value))
+                    ];
+                }
+
+                fclose($handle);
+            }
+
+            usort($forecastPoints, function($left, $right) {
+                return strcmp((string)$left['period'], (string)$right['period']);
+            });
+
+            return [
+                'forecast' => $forecastPoints,
+                'source' => basename($existingFile),
+                'source_path' => $existingFile,
+                'count' => count($forecastPoints)
+            ];
+        } catch (\Throwable $e) {
+            error_log('Trained forecast load error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return [
+                'forecast' => [],
+                'source' => null,
+                'error' => 'Failed to load trained forecast: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * Embedded PHP ML forecast using Rubix ML Gradient Boosted regression.
      */
     private function embeddedPhpMlForecast($forecastMonths = 6) {
@@ -800,6 +918,10 @@ if(isset($_GET['action'])) {
                     'error' => 'Forecast generation failed: ' . $e->getMessage()
                 ];
             }
+            break;
+        case 'trained_revenue_forecast':
+            $sourcePath = $_GET['source_path'] ?? null;
+            $response = $dashboard->getTrainedRevenueForecast($sourcePath);
             break;
         case 'pending_revenue_forecast':
             $period = $_GET['period'] ?? 'monthly';

@@ -709,14 +709,69 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
                             <button class="btn btn-sm btn-outline-primary" data-period="quarterly">Months</button>
                             <button class="btn btn-sm btn-outline-primary" data-period="yearly">Yearly</button>
                             </div>
-                                    <select id="forecastHorizon" class="form-select form-select-sm" style="width: auto;">
-                                        <option value="6" selected>6 months</option>
-                                        <option value="12">12 months</option>
-                                    </select>
+                            <select id="forecastHorizon" class="form-select form-select-sm" style="width: auto;">
+                                <option value="6" selected>6 months</option>
+                                <option value="12">12 months</option>
+                            </select>
+                            <button id="refreshForecastBtn" class="btn btn-sm btn-primary">Generate Forecast</button>
                                 </div>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="revenueChart"></canvas>
+                    <ul class="nav nav-tabs mt-3" id="revenueForecastTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="live-forecast-tab" data-bs-toggle="tab" data-bs-target="#liveForecastPane" type="button" role="tab" aria-controls="liveForecastPane" aria-selected="true">
+                                Live Forecast
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="trained-forecast-tab" data-bs-toggle="tab" data-bs-target="#trainedForecastPane" type="button" role="tab" aria-controls="trainedForecastPane" aria-selected="false">
+                                ML Forecast
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content pt-3" id="revenueForecastTabsContent">
+                        <div class="tab-pane fade show active" id="liveForecastPane" role="tabpanel" aria-labelledby="live-forecast-tab" tabindex="0">
+                            <div class="chart-container">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                            <div class="mt-3 p-3 rounded" style="background: var(--hover-bg); border: 1px solid var(--border-color);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <strong style="color: var(--text-color);">Forecast Preview</strong>
+                                        <div class="small text-muted">Latest forecast output from the dashboard data endpoint.</div>
+                                    </div>
+                                </div>
+                                <div id="forecastSummary" class="small" style="color: var(--text-color);">Forecast details will appear here after generation.</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="trainedForecastPane" role="tabpanel" aria-labelledby="trained-forecast-tab" tabindex="0">
+                            <div class="p-3 rounded mb-3" style="background: var(--hover-bg); border: 1px solid var(--border-color);">
+                                <p class="mb-2" style="color: var(--text-color);">ML-trained revenue forecast from microservice. Shows both actual historical revenue and forecasted revenue projected by your deployed model.</p>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-8">
+                                        <select id="trainedForecastMonths" class="form-select">
+                                            <option value="6" selected>6 months forecast</option>
+                                            <option value="12">12 months forecast</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-grid">
+                                        <button id="loadTrainedForecastBtn" class="btn btn-primary" type="button">Load from Microservice</button>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-3">
+                                    <button id="clearTrainedForecastBtn" class="btn btn-outline-secondary btn-sm" type="button">Clear Chart</button>
+                                    <small id="trainedForecastStatus" class="text-muted" style="align-self: center;"></small>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="trainedRevenueChart"></canvas>
+                            </div>
+                            <div class="mt-3 p-3 rounded" style="background: var(--hover-bg); border: 1px solid var(--border-color);">
+                                <strong style="color: var(--text-color);">Trained Revenue Forecast</strong>
+                                <div id="trainedForecastSummary" class="small mt-2" style="color: var(--text-color);">Load the trained forecast file to render the second time-series graph.</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1214,6 +1269,7 @@ $clients_result = $conn->query("SELECT id, firstname, lastname FROM client_list 
 
 <script>
 let revenueChart;
+let trainedRevenueChart;
 // paymentStatusChart removed - replaced with bar graph
 
 // Initialize charts
@@ -1257,6 +1313,23 @@ $(document).ready(function() {
                     updateRevenueChart(period);
                 });
 
+                $('#refreshForecastBtn').on('click', function() {
+                    const period = $('.btn-group button.active').data('period') || 'monthly';
+                    updateRevenueChart(period);
+                });
+
+                $('#loadTrainedForecastBtn').on('click', function() {
+                    loadTrainedForecastFromMicroservice();
+                });
+
+                $('#clearTrainedForecastBtn').on('click', function() {
+                    clearTrainedForecastChart();
+                });
+
+                $('#trained-forecast-tab').on('shown.bs.tab', function() {
+                    loadTrainedForecastFromMicroservice();
+                });
+
     // Auto-refresh dashboard data every 5 minutes
     setInterval(refreshDashboardData, 300000);
 });
@@ -1289,6 +1362,8 @@ function updateRevenueChart(period) {
         
         const actual = paidData.actual || [];
         const forecast = normalizeForecastByPeriod(paidData.forecast || [], period);
+
+        renderForecastSummary(actual, forecast, period);
         
         console.log('🔍 After assignment - Actual:', actual.length, 'Forecast:', forecast.length);
         
@@ -1487,6 +1562,337 @@ function updateRevenueChart(period) {
         console.log('Attempting to load actual data only as fallback');
         loadActualDataOnly(period);
     });
+}
+
+function renderForecastSummary(actualData, forecastData, period) {
+    const summaryEl = document.getElementById('forecastSummary');
+    if (!summaryEl) {
+        return;
+    }
+
+    if (!Array.isArray(forecastData) || forecastData.length === 0) {
+        summaryEl.innerHTML = '<span class="text-muted">No forecast output yet. Generate a forecast to see the next periods.</span>';
+        return;
+    }
+
+    const upcoming = forecastData.slice(0, 3).map(item => {
+        const label = formatRevenuePeriodLabel(item.period, period, false);
+        const value = Number(item.revenue) || 0;
+        return `<div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span>${label}</span>
+                    <span>₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>`;
+    }).join('');
+
+    const actualCount = Array.isArray(actualData) ? actualData.length : 0;
+    summaryEl.innerHTML = `
+        <div class="mb-2">Actual points loaded: <strong>${actualCount}</strong></div>
+        <div class="mb-2">Next forecast periods</div>
+        ${upcoming}
+    `;
+}
+
+function renderTrainedForecastChart(actual, forecast) {
+    if (trainedRevenueChart) {
+        trainedRevenueChart.destroy();
+    }
+
+    const summaryEl = document.getElementById('trainedForecastSummary');
+    const canvasElement = document.getElementById('trainedRevenueChart');
+
+    if (!canvasElement) {
+        return;
+    }
+
+    const actualArr = Array.isArray(actual) ? actual : [];
+    const forecastArr = Array.isArray(forecast) ? forecast : [];
+
+    // Helper: normalize a label to YYYY-MM if possible
+    function normalizeLabel(raw) {
+        if (!raw && raw !== 0) return '';
+        const s = String(raw);
+        const d = new Date(s);
+        if (!isNaN(d)) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            return `${y}-${m}`;
+        }
+        if (/^\d{4}-\d{2}/.test(s)) return s.slice(0,7);
+        return s;
+    }
+
+    const actualMap = {};
+    actualArr.forEach(item => {
+        const lbl = normalizeLabel(item.period || item.ds || item.date || item.label);
+        actualMap[lbl] = Number(item.actual ?? item.revenue ?? item.y ?? 0);
+    });
+
+    const forecastMap = {};
+    forecastArr.forEach(item => {
+        const lbl = normalizeLabel(item.period || item.ds || item.date || item.label);
+        forecastMap[lbl] = Number(item.forecast ?? item.yhat ?? item.revenue ?? item.prediction ?? 0);
+    });
+
+    // Determine last actual label (most recent)
+    const actualLabels = Object.keys(actualMap).filter(l => l && l.length > 0);
+    actualLabels.sort((a,b) => new Date(a + '-01') - new Date(b + '-01'));
+    const lastActual = actualLabels.length ? actualLabels[actualLabels.length - 1] : null;
+
+    // Build labels: actual historical labels, then forecast labels strictly after last actual
+    const forecastLabels = Object.keys(forecastMap).filter(l => l && l.length > 0);
+    forecastLabels.sort((a,b) => new Date(a + '-01') - new Date(b + '-01'));
+
+    let labels = [];
+    // Use actual labels first
+    labels = actualLabels.slice();
+
+    // Append forecast labels that are after lastActual (future). If no actuals, use all forecast labels.
+    if (lastActual) {
+        const lastDate = new Date(lastActual + '-01');
+        forecastLabels.forEach(fl => {
+            const fd = new Date(fl + '-01');
+            if (!isNaN(fd) && fd > lastDate) labels.push(fl);
+        });
+    } else {
+        labels = labels.concat(forecastLabels);
+    }
+
+    // Build series aligned to labels: actuals for historical slots, null for future; forecast null for historical, values for future
+    const actualValues = labels.map(l => (Object.prototype.hasOwnProperty.call(actualMap, l) ? actualMap[l] : null));
+    const forecastValues = labels.map(l => (Object.prototype.hasOwnProperty.call(forecastMap, l) ? forecastMap[l] : null));
+
+    if (labels.length === 0) {
+        if (summaryEl) summaryEl.innerHTML = 'No forecast or actual data available.';
+        return;
+    }
+
+    const datasets = [];
+    if (actualValues.some(v => v !== null)) {
+        datasets.push({
+            label: 'Actual Revenue',
+            data: actualValues,
+            borderColor: '#2F80ED',
+            backgroundColor: 'rgba(47, 128, 237, 0.06)',
+            tension: 0.25,
+            fill: false,
+            borderWidth: 2,
+            pointBackgroundColor: '#2F80ED',
+            pointBorderColor: '#2F80ED',
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            spanGaps: false
+        });
+    }
+
+    if (forecastValues.some(v => v !== null)) {
+        datasets.push({
+            label: 'Forecasted Revenue',
+            data: forecastValues,
+            borderColor: '#F2994A',
+            backgroundColor: 'rgba(242, 153, 74, 0.04)',
+            tension: 0.25,
+            fill: false,
+            borderWidth: 2,
+            borderDash: [6,4],
+            pointBackgroundColor: '#F2994A',
+            pointBorderColor: '#F2994A',
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            spanGaps: false
+        });
+    }
+
+    const trainedCtx = canvasElement.getContext('2d');
+    trainedRevenueChart = new Chart(trainedCtx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            elements: { point: { radius: 0 } },
+            scales: {
+                x: {
+                    display: true,
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: true,
+                        callback: function(value, index) {
+                            try {
+                                const lbl = this.getLabelForValue ? this.getLabelForValue(value) : labels[index];
+                                const d = new Date(lbl + '-01');
+                                if (!isNaN(d)) return d.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+                                return lbl;
+                            } catch (e) { return labels[index] || '' }
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: false,
+                    ticks: { callback: function(value) { return '₱' + Number(value).toLocaleString(); } },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
+                }
+            },
+            plugins: {
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            const v = context.raw;
+                            return context.dataset.label + ': ₱' + (v === null || v === undefined ? '-' : Number(v).toLocaleString());
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    if (summaryEl) {
+        const firstLabel = labels[0] || 'n/a';
+        const lastLabel = labels[labels.length - 1] || 'n/a';
+        const actualCount = actualArr.length;
+        const forecastCount = forecastArr.length;
+        summaryEl.innerHTML = `ML-trained revenue forecast: ${actualCount} actual periods + ${forecastCount} forecast periods from ${firstLabel} to ${lastLabel}.`;
+    }
+}
+
+function loadTrainedForecastFromMicroservice() {
+    const months = document.getElementById('trainedForecastMonths')?.value || '6';
+    const statusEl = document.getElementById('trainedForecastStatus');
+    const summaryEl = document.getElementById('trainedForecastSummary');
+
+    if (statusEl) {
+        statusEl.textContent = 'Loading AI forecast...';
+    }
+
+    // Fetch AI forecast immediately (don't wait for dashboard data)
+    $.ajax({
+        url: 'https://watersync-ai-api.onrender.com/api/forecast',
+        method: 'GET',
+        // Request a history window to allow overlapping AI predictions with actuals if supported by the API
+        data: { months: months, history_months: 24 },
+        dataType: 'json',
+        timeout: 15000
+    })
+    .done(function(microserviceResponse) {
+        console.log('✅ Microservice forecast received:', microserviceResponse);
+
+        let forecastData = [];
+        let parsedRecords = [];
+
+        // Parse microservice response for forecast data
+        if (Array.isArray(microserviceResponse)) {
+            parsedRecords = microserviceResponse;
+        } else if (typeof microserviceResponse === 'object' && microserviceResponse.forecast) {
+            parsedRecords = Array.isArray(microserviceResponse.forecast) ? microserviceResponse.forecast : [];
+        } else if (typeof microserviceResponse === 'object' && microserviceResponse.data) {
+            parsedRecords = Array.isArray(microserviceResponse.data) ? microserviceResponse.data : [];
+        } else if (typeof microserviceResponse === 'string') {
+            try {
+                const parsed = JSON.parse(microserviceResponse);
+                parsedRecords = Array.isArray(parsed) ? parsed : (parsed.forecast || parsed.data || []);
+            } catch (e) {
+                parsedRecords = [];
+            }
+        }
+
+        if (!Array.isArray(parsedRecords) || parsedRecords.length === 0) {
+            if (summaryEl) {
+                summaryEl.innerHTML = 'No forecast data in microservice response.';
+            }
+            if (statusEl) {
+                statusEl.textContent = 'Error: Empty forecast response';
+            }
+            return;
+        }
+        // If API returns Prophet-style rows with `ds` and `yhat` and includes an anchor history row,
+        // follow that convention: first record is last actual anchor, rest are future months.
+        // If microservice returned full in-sample predictions (history + future), prefer those so
+        // forecast line will overlap historical actuals. Otherwise, fall back to the anchor+future convention.
+        const wantRows = Number(months) + 1;
+        if (Array.isArray(parsedRecords) && parsedRecords.length > wantRows) {
+            // parsedRecords contains more than the anchor+future rows — use entire set
+            forecastData = parsedRecords;
+        } else if (parsedRecords.length > 0 && parsedRecords[0].ds && (parsedRecords[0].yhat !== undefined)) {
+            // Protocol: first record is anchor; subsequent are future months
+            forecastData = parsedRecords.slice(1);
+        } else {
+            forecastData = parsedRecords;
+        }
+
+        // Render forecast immediately (future months only)
+        renderTrainedForecastChart([], forecastData);
+        if (statusEl) {
+            statusEl.textContent = 'Loaded (fetching actual data...)';
+        }
+
+        // Optionally fetch actual data in background (non-blocking)
+        $.ajax({
+            url: 'dashboard_data.php',
+            method: 'GET',
+            data: { action: 'revenue_forecast', period: 'monthly', forecast_method: 'holt', forecast_months: months },
+            dataType: 'json',
+            timeout: 10000
+        })
+        .done(function(dashboardData) {
+            const actualData = dashboardData.actual || [];
+            if (actualData.length > 0) {
+                // Re-render with actual data now available; keep forecastData as future rows
+                renderTrainedForecastChart(actualData, forecastData);
+                if (statusEl) {
+                    statusEl.textContent = 'Loaded successfully.';
+                }
+            } else {
+                // If actuals not present, but API provided an anchor row, include it as a pseudo-actual
+                if (parsedRecords.length > 0 && parsedRecords[0].ds && parsedRecords[0].yhat !== undefined) {
+                    // Build a synthetic actual array containing the anchor month with yhat as placeholder
+                    const anchor = parsedRecords[0];
+                    const syntheticActual = [{ ds: anchor.ds, actual: null }];
+                    renderTrainedForecastChart(syntheticActual, forecastData);
+                    if (statusEl) statusEl.textContent = 'Loaded (no actuals; using anchor).';
+                }
+            }
+        })
+        .fail(function() {
+            console.log('Note: Actual data not available, showing forecast only');
+            if (statusEl) {
+                statusEl.textContent = 'Loaded (actual data unavailable).';
+            }
+        });
+    })
+    .fail(function(xhr, status, error) {
+        console.error('Microservice forecast failed:', error, xhr);
+        if (summaryEl) {
+            summaryEl.innerHTML = `Failed to load from microservice: ${error}`;
+        }
+        if (statusEl) {
+            statusEl.textContent = `Error: ${error}`;
+        }
+    });
+}
+
+function clearTrainedForecastChart() {
+    const summaryEl = document.getElementById('trainedForecastSummary');
+
+    if (trainedRevenueChart) {
+        trainedRevenueChart.destroy();
+        trainedRevenueChart = null;
+    }
+
+    const canvasElement = document.getElementById('trainedRevenueChart');
+    if (canvasElement) {
+        const ctx = canvasElement.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        }
+    }
+
+    if (summaryEl) {
+        summaryEl.innerHTML = 'Load an ML-trained revenue forecast from the microservice to render the revenue trends.';
+    }
 }
 
 function updateForecastHorizonControl(period) {
